@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { withRetry, createError, AppError, ErrorType, ErrorSeverity, RetryConfig } from '@/utils/errorHandler';
 
 /**
  * 学习进度记录接口
@@ -61,6 +62,25 @@ export interface LearningStats {
 }
 
 /**
+ * 获取学习进度服务的重试配置
+ * @returns 重试配置对象
+ */
+function getRetryConfig(): RetryConfig {
+  return {
+    maxAttempts: 3,
+    delay: 1000,
+    exponentialBackoff: true,
+    jitter: true,
+    retryableErrors: [
+      ErrorType.NETWORK_ERROR,
+      ErrorType.TIMEOUT_ERROR,
+      ErrorType.DATABASE_ERROR,
+      ErrorType.SERVICE_UNAVAILABLE_ERROR
+    ]
+  };
+}
+
+/**
  * 保存或更新学习进度
  * @param userId 用户ID
  * @param courseId 课程ID
@@ -91,70 +111,77 @@ export async function saveLearningProgress(
   duration: number
 ): Promise<{ success: boolean; message: string; data?: LearningProgress }> {
   try {
-    // 计算完成百分比
-    const progressPercentage = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
-    const isCompleted = progressPercentage >= 90; // 观看90%以上视为完成
+    const result = await withRetry(async () => {
+      // 计算完成百分比
+      const progressPercentage = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
+      const isCompleted = progressPercentage >= 90; // 观看90%以上视为完成
 
-    // 检查是否已存在记录
-    const { data: existingProgress } = await supabase
-      .from('learning_progress')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('course_id', courseId)
-      .eq('lesson_id', lessonId)
-      .single();
-
-    const progressData = {
-      user_id: userId,
-      course_id: courseId,
-      lesson_id: lessonId,
-      current_time_seconds: currentTime,
-      duration: duration,
-      progress_percentage: progressPercentage,
-      is_completed: isCompleted,
-      last_updated_at: new Date().toISOString()
-    };
-
-    let result;
-    if (existingProgress) {
-      // 更新现有记录
-      result = await supabase
+      // 检查是否已存在记录
+      const { data: existingProgress } = await supabase
         .from('learning_progress')
-        .update(progressData)
-        .eq('id', existingProgress.id)
-        .select()
+        .select('*')
+        .eq('user_id', userId)
+        .eq('course_id', courseId)
+        .eq('lesson_id', lessonId)
         .single();
-    } else {
-      // 创建新记录
-      result = await supabase
-        .from('learning_progress')
-        .insert({
-          ...progressData,
-          created_at: new Date().toISOString()
-        })
-        .select()
-        .single();
-    }
 
-    if (result.error) {
-      console.error('保存学习进度失败:', result.error);
-      return {
-        success: false,
-        message: '保存学习进度失败'
+      const progressData = {
+        user_id: userId,
+        course_id: courseId,
+        lesson_id: lessonId,
+        current_time_seconds: currentTime,
+        duration: duration,
+        progress_percentage: progressPercentage,
+        is_completed: isCompleted,
+        last_updated_at: new Date().toISOString()
       };
-    }
+
+      let dbResult;
+      if (existingProgress) {
+        // 更新现有记录
+        dbResult = await supabase
+          .from('learning_progress')
+          .update(progressData)
+          .eq('id', existingProgress.id)
+          .select()
+          .single();
+      } else {
+        // 创建新记录
+        dbResult = await supabase
+          .from('learning_progress')
+          .insert({
+            ...progressData,
+            created_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+      }
+
+      if (dbResult.error) {
+        throw createError(
+          ErrorType.DATABASE_ERROR,
+          '保存学习进度失败',
+          'SAVE_PROGRESS_FAILED',
+          500,
+          ErrorSeverity.HIGH,
+          { userId, courseId, lessonId, error: dbResult.error }
+        );
+      }
+
+      return dbResult.data;
+    }, getRetryConfig());
 
     const progress: LearningProgress = {
-      id: result.data.id,
-      userId: result.data.user_id,
-      courseId: result.data.course_id,
-      lessonId: result.data.lesson_id,
-      currentTime: result.data.current_time_seconds,
-      duration: result.data.duration,
-      progressPercentage: result.data.progress_percentage,
-      isCompleted: result.data.is_completed,
-      lastUpdatedAt: result.data.last_updated_at,
-      createdAt: result.data.created_at
+      id: result.id,
+      userId: result.user_id,
+      courseId: result.course_id,
+      lessonId: result.lesson_id,
+      currentTime: result.current_time_seconds,
+      duration: result.duration,
+      progressPercentage: result.progress_percentage,
+      isCompleted: result.is_completed,
+      lastUpdatedAt: result.last_updated_at,
+      createdAt: result.created_at
     };
 
     return {
@@ -163,11 +190,17 @@ export async function saveLearningProgress(
       data: progress
     };
   } catch (error) {
-    console.error('保存学习进度时发生错误:', error);
-    return {
-      success: false,
-      message: '保存学习进度失败，请稍后重试'
-    };
+    if (error instanceof AppError) {
+      throw error;
+    }
+    throw createError(
+      ErrorType.DATABASE_ERROR,
+      '保存学习进度失败，请稍后重试',
+      'SAVE_PROGRESS_ERROR',
+      500,
+      ErrorSeverity.HIGH,
+      { userId, courseId, lessonId, originalError: error }
+    );
   }
 }
 
@@ -193,25 +226,49 @@ export async function getLearningProgress(
   lessonId?: string
 ): Promise<{ success: boolean; data?: LearningProgress | LearningProgress[]; message: string }> {
   try {
-    let query = supabase
-      .from('learning_progress')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('course_id', courseId);
+    const result = await withRetry(async () => {
+      let query = supabase
+        .from('learning_progress')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('course_id', courseId);
+
+      if (lessonId) {
+        query = query.eq('lesson_id', lessonId);
+        const { data, error } = await query.single();
+
+        if (error && error.code !== 'PGRST116') { // PGRST116 是没有找到记录的错误码
+          throw createError(
+            ErrorType.DATABASE_ERROR,
+            '获取学习进度失败',
+            'GET_PROGRESS_FAILED',
+            500,
+            ErrorSeverity.MEDIUM,
+            { userId, courseId, lessonId, error }
+          );
+        }
+
+        return data;
+      } else {
+        const { data, error } = await query.order('last_updated_at', { ascending: false });
+
+        if (error) {
+          throw createError(
+            ErrorType.DATABASE_ERROR,
+            '获取课程学习进度失败',
+            'GET_COURSE_PROGRESS_FAILED',
+            500,
+            ErrorSeverity.MEDIUM,
+            { userId, courseId, error }
+          );
+        }
+
+        return data;
+      }
+    }, getRetryConfig());
 
     if (lessonId) {
-      query = query.eq('lesson_id', lessonId);
-      const { data, error } = await query.single();
-
-      if (error && error.code !== 'PGRST116') { // PGRST116 是没有找到记录的错误码
-        console.error('获取学习进度失败:', error);
-        return {
-          success: false,
-          message: '获取学习进度失败'
-        };
-      }
-
-      if (!data) {
+      if (!result) {
         return {
           success: true,
           data: undefined,
@@ -220,16 +277,16 @@ export async function getLearningProgress(
       }
 
       const progress: LearningProgress = {
-        id: data.id,
-        userId: data.user_id,
-        courseId: data.course_id,
-        lessonId: data.lesson_id,
-        currentTime: data.current_time_seconds,
-        duration: data.duration,
-        progressPercentage: data.progress_percentage,
-        isCompleted: data.is_completed,
-        lastUpdatedAt: data.last_updated_at,
-        createdAt: data.created_at
+        id: result.id,
+        userId: result.user_id,
+        courseId: result.course_id,
+        lessonId: result.lesson_id,
+        currentTime: result.current_time_seconds,
+        duration: result.duration,
+        progressPercentage: result.progress_percentage,
+        isCompleted: result.is_completed,
+        lastUpdatedAt: result.last_updated_at,
+        createdAt: result.created_at
       };
 
       return {
@@ -238,17 +295,7 @@ export async function getLearningProgress(
         message: '获取学习进度成功'
       };
     } else {
-      const { data, error } = await query.order('last_updated_at', { ascending: false });
-
-      if (error) {
-        console.error('获取课程学习进度失败:', error);
-        return {
-          success: false,
-          message: '获取课程学习进度失败'
-        };
-      }
-
-      const progressList: LearningProgress[] = data.map(item => ({
+      const progressList: LearningProgress[] = result.map(item => ({
         id: item.id,
         userId: item.user_id,
         courseId: item.course_id,
@@ -268,11 +315,17 @@ export async function getLearningProgress(
       };
     }
   } catch (error) {
-    console.error('获取学习进度时发生错误:', error);
-    return {
-      success: false,
-      message: '获取学习进度失败，请稍后重试'
-    };
+    if (error instanceof AppError) {
+      throw error;
+    }
+    throw createError(
+      ErrorType.DATABASE_ERROR,
+      '获取学习进度失败，请稍后重试',
+      'GET_PROGRESS_ERROR',
+      500,
+      ErrorSeverity.MEDIUM,
+      { userId, courseId, lessonId, originalError: error }
+    );
   }
 }
 
@@ -293,35 +346,45 @@ export async function getCourseProgress(
   courseId: string
 ): Promise<{ success: boolean; data?: CourseProgress; message: string }> {
   try {
-    // 获取课程的所有课时进度
-    const { data: progressList, error: progressError } = await supabase
-      .from('learning_progress')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('course_id', courseId);
+    const { progressList, courseData } = await withRetry(async () => {
+      // 获取课程的所有课时进度
+      const { data: progressList, error: progressError } = await supabase
+        .from('learning_progress')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('course_id', courseId);
 
-    if (progressError) {
-      console.error('获取课程进度失败:', progressError);
-      return {
-        success: false,
-        message: '获取课程进度失败'
-      };
-    }
+      if (progressError) {
+        throw createError(
+          ErrorType.DATABASE_ERROR,
+          '获取课程进度失败',
+          'GET_COURSE_PROGRESS_FAILED',
+          500,
+          ErrorSeverity.MEDIUM,
+          { userId, courseId, error: progressError }
+        );
+      }
 
-    // 获取课程总课时数
-    const { data: courseData, error: courseError } = await supabase
-      .from('courses')
-      .select('lesson_count')
-      .eq('id', courseId)
-      .single();
+      // 获取课程总课时数
+      const { data: courseData, error: courseError } = await supabase
+        .from('courses')
+        .select('lesson_count')
+        .eq('id', courseId)
+        .single();
 
-    if (courseError) {
-      console.error('获取课程信息失败:', courseError);
-      return {
-        success: false,
-        message: '获取课程信息失败'
-      };
-    }
+      if (courseError) {
+        throw createError(
+          ErrorType.DATABASE_ERROR,
+          '获取课程信息失败',
+          'GET_COURSE_INFO_FAILED',
+          500,
+          ErrorSeverity.MEDIUM,
+          { courseId, error: courseError }
+        );
+      }
+
+      return { progressList, courseData };
+    }, getRetryConfig());
 
     const totalLessons = courseData.lesson_count || 0;
     const completedLessons = progressList.filter(p => p.is_completed).length;
@@ -346,11 +409,17 @@ export async function getCourseProgress(
       message: '获取课程进度成功'
     };
   } catch (error) {
-    console.error('获取课程进度时发生错误:', error);
-    return {
-      success: false,
-      message: '获取课程进度失败，请稍后重试'
-    };
+    if (error instanceof AppError) {
+      throw error;
+    }
+    throw createError(
+      ErrorType.DATABASE_ERROR,
+      '获取课程进度失败，请稍后重试',
+      'GET_COURSE_PROGRESS_ERROR',
+      500,
+      ErrorSeverity.MEDIUM,
+      { userId, courseId, originalError: error }
+    );
   }
 }
 
@@ -369,19 +438,26 @@ export async function getLearningStats(
   userId: string
 ): Promise<{ success: boolean; data?: LearningStats; message: string }> {
   try {
-    // 获取所有学习进度
-    const { data: allProgress, error: progressError } = await supabase
-      .from('learning_progress')
-      .select('*')
-      .eq('user_id', userId);
+    const allProgress = await withRetry(async () => {
+      // 获取所有学习进度
+      const { data: allProgress, error: progressError } = await supabase
+        .from('learning_progress')
+        .select('*')
+        .eq('user_id', userId);
 
-    if (progressError) {
-      console.error('获取学习统计失败:', progressError);
-      return {
-        success: false,
-        message: '获取学习统计失败'
-      };
-    }
+      if (progressError) {
+        throw createError(
+          ErrorType.DATABASE_ERROR,
+          '获取学习统计失败',
+          'GET_LEARNING_STATS_FAILED',
+          500,
+          ErrorSeverity.MEDIUM,
+          { userId, error: progressError }
+        );
+      }
+
+      return allProgress;
+    }, getRetryConfig());
 
     // 计算总学习时长
     const totalStudyTime = allProgress.reduce((sum, p) => sum + p.current_time_seconds, 0);
@@ -441,11 +517,17 @@ export async function getLearningStats(
       message: '获取学习统计成功'
     };
   } catch (error) {
-    console.error('获取学习统计时发生错误:', error);
-    return {
-      success: false,
-      message: '获取学习统计失败，请稍后重试'
-    };
+    if (error instanceof AppError) {
+      throw error;
+    }
+    throw createError(
+      ErrorType.DATABASE_ERROR,
+      '获取学习统计失败，请稍后重试',
+      'GET_LEARNING_STATS_ERROR',
+      500,
+      ErrorSeverity.MEDIUM,
+      { userId, originalError: error }
+    );
   }
 }
 
@@ -470,35 +552,46 @@ export async function markLessonCompleted(
   lessonId: string
 ): Promise<{ success: boolean; message: string }> {
   try {
-    const { error } = await supabase
-      .from('learning_progress')
-      .update({
-        is_completed: true,
-        progress_percentage: 100,
-        last_updated_at: new Date().toISOString()
-      })
-      .eq('user_id', userId)
-      .eq('course_id', courseId)
-      .eq('lesson_id', lessonId);
+    await withRetry(async () => {
+      const { error } = await supabase
+        .from('learning_progress')
+        .update({
+          is_completed: true,
+          progress_percentage: 100,
+          last_updated_at: new Date().toISOString()
+        })
+        .eq('user_id', userId)
+        .eq('course_id', courseId)
+        .eq('lesson_id', lessonId);
 
-    if (error) {
-      console.error('标记课时完成失败:', error);
-      return {
-        success: false,
-        message: '标记课时完成失败'
-      };
-    }
+      if (error) {
+        throw createError(
+          ErrorType.DATABASE_ERROR,
+          '标记课时完成失败',
+          'MARK_LESSON_COMPLETED_FAILED',
+          500,
+          ErrorSeverity.MEDIUM,
+          { userId, courseId, lessonId, error }
+        );
+      }
+    }, getRetryConfig());
 
     return {
       success: true,
       message: '课时已标记为完成'
     };
   } catch (error) {
-    console.error('标记课时完成时发生错误:', error);
-    return {
-      success: false,
-      message: '标记课时完成失败，请稍后重试'
-    };
+    if (error instanceof AppError) {
+      throw error;
+    }
+    throw createError(
+      ErrorType.DATABASE_ERROR,
+      '标记课时完成失败，请稍后重试',
+      'MARK_LESSON_COMPLETED_ERROR',
+      500,
+      ErrorSeverity.MEDIUM,
+      { userId, courseId, lessonId, originalError: error }
+    );
   }
 }
 
@@ -523,36 +616,47 @@ export async function resetLessonProgress(
   lessonId: string
 ): Promise<{ success: boolean; message: string }> {
   try {
-    const { error } = await supabase
-      .from('learning_progress')
-      .update({
-        current_time_seconds: 0,
-        progress_percentage: 0,
-        is_completed: false,
-        last_updated_at: new Date().toISOString()
-      })
-      .eq('user_id', userId)
-      .eq('course_id', courseId)
-      .eq('lesson_id', lessonId);
+    await withRetry(async () => {
+      const { error } = await supabase
+        .from('learning_progress')
+        .update({
+          current_time_seconds: 0,
+          progress_percentage: 0,
+          is_completed: false,
+          last_updated_at: new Date().toISOString()
+        })
+        .eq('user_id', userId)
+        .eq('course_id', courseId)
+        .eq('lesson_id', lessonId);
 
-    if (error) {
-      console.error('重置课时进度失败:', error);
-      return {
-        success: false,
-        message: '重置课时进度失败'
-      };
-    }
+      if (error) {
+        throw createError(
+          ErrorType.DATABASE_ERROR,
+          '重置课时进度失败',
+          'RESET_LESSON_PROGRESS_FAILED',
+          500,
+          ErrorSeverity.MEDIUM,
+          { userId, courseId, lessonId, error }
+        );
+      }
+    }, getRetryConfig());
 
     return {
       success: true,
       message: '课时进度已重置'
     };
   } catch (error) {
-    console.error('重置课时进度时发生错误:', error);
-    return {
-      success: false,
-      message: '重置课时进度失败，请稍后重试'
-    };
+    if (error instanceof AppError) {
+      throw error;
+    }
+    throw createError(
+      ErrorType.DATABASE_ERROR,
+      '重置课时进度失败，请稍后重试',
+      'RESET_LESSON_PROGRESS_ERROR',
+      500,
+      ErrorSeverity.MEDIUM,
+      { userId, courseId, lessonId, originalError: error }
+    );
   }
 }
 

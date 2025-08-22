@@ -6,20 +6,20 @@
 import { createClient } from '@supabase/supabase-js'
 
 // 获取环境变量
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://test.supabase.co'
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'test-anon-key'
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'test-service-key'
 
 /**
  * 前端Supabase客户端
- * 使用匿名密钥，适用于客户端操作
+ * 用于客户端操作，使用匿名密钥
  * @returns Supabase客户端实例
  */
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 /**
  * 后端Supabase客户端
- * 使用服务角色密钥，具有管理员权限，仅用于服务端
+ * 用于服务端操作，使用服务角色密钥
  * @returns Supabase服务端客户端实例
  */
 export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)

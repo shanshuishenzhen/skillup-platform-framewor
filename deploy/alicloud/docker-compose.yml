@@ -1,0 +1,123 @@
+# 阿里云生产环境 Docker Compose 配置
+version: '3.8'
+
+services:
+  # Next.js 应用服务
+  skillup-app:
+    build:
+      context: ../..
+      dockerfile: deploy/alicloud/Dockerfile
+    container_name: skillup-platform
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      # 数据库配置
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      # 阿里云配置
+      - ALICLOUD_ACCESS_KEY_ID=${ALICLOUD_ACCESS_KEY_ID}
+      - ALICLOUD_ACCESS_KEY_SECRET=${ALICLOUD_ACCESS_KEY_SECRET}
+      - ALICLOUD_REGION=${ALICLOUD_REGION}
+      - ALICLOUD_OSS_BUCKET=${ALICLOUD_OSS_BUCKET}
+      - ALICLOUD_OSS_ENDPOINT=${ALICLOUD_OSS_ENDPOINT}
+      - ALICLOUD_RDS_HOST=${ALICLOUD_RDS_HOST}
+      - ALICLOUD_RDS_PORT=${ALICLOUD_RDS_PORT}
+      - ALICLOUD_RDS_DATABASE=${ALICLOUD_RDS_DATABASE}
+      - ALICLOUD_RDS_USERNAME=${ALICLOUD_RDS_USERNAME}
+      - ALICLOUD_RDS_PASSWORD=${ALICLOUD_RDS_PASSWORD}
+      - ALICLOUD_CDN_DOMAIN=${ALICLOUD_CDN_DOMAIN}
+      # 安全配置
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - API_SECRET_KEY=${API_SECRET_KEY}
+      - SESSION_SECRET=${SESSION_SECRET}
+      # AI 服务配置
+      - BAIDU_API_KEY=${BAIDU_API_KEY}
+      - BAIDU_SECRET_KEY=${BAIDU_SECRET_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - app_data:/app/data
+      - app_logs:/app/logs
+    networks:
+      - skillup-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+
+  # Nginx 反向代理
+  nginx:
+    image: nginx:alpine
+    container_name: skillup-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - skillup-app
+    networks:
+      - skillup-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # Redis 缓存服务
+  redis:
+    image: redis:7-alpine
+    container_name: skillup-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - skillup-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+volumes:
+  app_data:
+    driver: local
+  app_logs:
+    driver: local
+  nginx_logs:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  skillup-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

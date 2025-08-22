@@ -1,0 +1,273 @@
+# 阿里云 Kubernetes 部署配置
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: skillup-platform
+  labels:
+    name: skillup-platform
+    environment: production
+
+---
+# ConfigMap 配置
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: skillup-config
+  namespace: skillup-platform
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  NEXT_TELEMETRY_DISABLED: "1"
+
+---
+# Secret 配置
+apiVersion: v1
+kind: Secret
+metadata:
+  name: skillup-secrets
+  namespace: skillup-platform
+type: Opaque
+stringData:
+  # 数据库配置
+  NEXT_PUBLIC_SUPABASE_URL: "your-supabase-url"
+  SUPABASE_SERVICE_ROLE_KEY: "your-supabase-service-role-key"
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: "your-supabase-anon-key"
+  # 阿里云配置
+  ALICLOUD_ACCESS_KEY_ID: "your-access-key-id"
+  ALICLOUD_ACCESS_KEY_SECRET: "your-access-key-secret"
+  ALICLOUD_REGION: "cn-shenzhen"
+  ALICLOUD_OSS_BUCKET: "your-oss-bucket"
+  ALICLOUD_OSS_ENDPOINT: "your-oss-endpoint"
+  ALICLOUD_RDS_HOST: "your-rds-host"
+  ALICLOUD_RDS_PORT: "3306"
+  ALICLOUD_RDS_DATABASE: "skillup_platform"
+  ALICLOUD_RDS_USERNAME: "your-rds-username"
+  ALICLOUD_RDS_PASSWORD: "your-rds-password"
+  ALICLOUD_CDN_DOMAIN: "your-cdn-domain"
+  # 安全配置
+  ENCRYPTION_KEY: "your-encryption-key"
+  API_SECRET_KEY: "your-api-secret-key"
+  SESSION_SECRET: "your-session-secret"
+  # AI 服务配置
+  BAIDU_API_KEY: "your-baidu-api-key"
+  BAIDU_SECRET_KEY: "your-baidu-secret-key"
+  OPENAI_API_KEY: "your-openai-api-key"
+
+---
+# PersistentVolumeClaim 持久化存储
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: skillup-data-pvc
+  namespace: skillup-platform
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: alicloud-disk-ssd
+
+---
+# Deployment 应用部署
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: skillup-app
+  namespace: skillup-platform
+  labels:
+    app: skillup-app
+    version: v1
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: skillup-app
+  template:
+    metadata:
+      labels:
+        app: skillup-app
+        version: v1
+    spec:
+      containers:
+      - name: skillup-app
+        image: registry.cn-shenzhen.aliyuncs.com/skillup/skillup-platform:latest
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: NODE_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: skillup-config
+              key: NODE_ENV
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: skillup-config
+              key: PORT
+        - name: NEXT_TELEMETRY_DISABLED
+          valueFrom:
+            configMapKeyRef:
+              name: skillup-config
+              key: NEXT_TELEMETRY_DISABLED
+        envFrom:
+        - secretRef:
+            name: skillup-secrets
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: data-volume
+          mountPath: /app/data
+        - name: logs-volume
+          mountPath: /app/logs
+      volumes:
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: skillup-data-pvc
+      - name: logs-volume
+        emptyDir: {}
+      imagePullSecrets:
+      - name: alicloud-registry-secret
+
+---
+# Service 服务
+apiVersion: v1
+kind: Service
+metadata:
+  name: skillup-app-service
+  namespace: skillup-platform
+  labels:
+    app: skillup-app
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 3000
+    protocol: TCP
+    name: http
+  selector:
+    app: skillup-app
+
+---
+# Ingress 入口配置
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: skillup-ingress
+  namespace: skillup-platform
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  tls:
+  - hosts:
+    - your-domain.com
+    - www.your-domain.com
+    secretName: skillup-tls-secret
+  rules:
+  - host: your-domain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: skillup-app-service
+            port:
+              number: 80
+  - host: www.your-domain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: skillup-app-service
+            port:
+              number: 80
+
+---
+# HorizontalPodAutoscaler 自动扩缩容
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: skillup-hpa
+  namespace: skillup-platform
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: skillup-app
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+
+---
+# PodDisruptionBudget 中断预算
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: skillup-pdb
+  namespace: skillup-platform
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: skillup-app

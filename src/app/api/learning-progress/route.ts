@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import learningProgressService from '@/services/learningProgressService';
 import { verifyToken } from '@/services/userService';
+import { ErrorHandler, AppError, ErrorType } from '@/utils/errorHandler';
 
 /**
  * 学习进度API接口
@@ -91,11 +92,21 @@ export async function GET(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('获取学习进度失败:', error);
-    return NextResponse.json(
-      { success: false, message: '服务器内部错误' },
-      { status: 500 }
+    // 使用统一的错误处理机制
+    if (error instanceof AppError) {
+      return ErrorHandler.handleApiError(error);
+    }
+    
+    // 处理未知错误
+    const apiError = new AppError(
+      '获取学习进度失败',
+      ErrorType.API_ERROR,
+      500,
+      'GET_LEARNING_PROGRESS_ERROR',
+      { originalError: error instanceof Error ? error.message : String(error) }
     );
+    
+    return ErrorHandler.handleApiError(apiError);
   }
 }
 
@@ -166,11 +177,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result);
     
   } catch (error) {
-    console.error('保存学习进度失败:', error);
-    return NextResponse.json(
-      { success: false, message: '服务器内部错误' },
-      { status: 500 }
+    // 使用统一的错误处理机制
+    if (error instanceof AppError) {
+      return ErrorHandler.handleApiError(error);
+    }
+    
+    // 处理未知错误
+    const apiError = new AppError(
+      '保存学习进度失败',
+      ErrorType.API_ERROR,
+      500,
+      'SAVE_LEARNING_PROGRESS_ERROR',
+      { originalError: error instanceof Error ? error.message : String(error) }
     );
+    
+    return ErrorHandler.handleApiError(apiError);
   }
 }
 
@@ -227,11 +248,21 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json(result);
     
   } catch (error) {
-    console.error('更新课时完成状态失败:', error);
-    return NextResponse.json(
-      { success: false, message: '服务器内部错误' },
-      { status: 500 }
+    // 使用统一的错误处理机制
+    if (error instanceof AppError) {
+      return ErrorHandler.handleApiError(error);
+    }
+    
+    // 处理未知错误
+    const apiError = new AppError(
+      '更新课时完成状态失败',
+      ErrorType.API_ERROR,
+      500,
+      'UPDATE_LESSON_STATUS_ERROR',
+      { originalError: error instanceof Error ? error.message : String(error) }
     );
+    
+    return ErrorHandler.handleApiError(apiError);
   }
 }
 

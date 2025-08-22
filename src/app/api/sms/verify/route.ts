@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyCode } from '@/services/smsService';
+import { ErrorHandler, AppError, ErrorType } from '@/utils/errorHandler';
 
 // 请求体接口定义
 interface VerifySmsRequest {
@@ -103,15 +104,17 @@ export async function POST(request: NextRequest): Promise<NextResponse<VerifySms
     return NextResponse.json(result, { status: statusCode });
 
   } catch (error) {
-    console.error('短信验证API异常:', error);
+    if (error instanceof AppError) {
+      return ErrorHandler.handleApiError(error);
+    }
     
-    return NextResponse.json(
-      {
-        success: false,
-        message: '服务器内部错误，请稍后重试'
-      },
-      { status: 500 }
+    const apiError = new AppError(
+      ErrorType.API_ERROR,
+      '短信验证服务异常',
+      error instanceof Error ? error.message : '未知错误'
     );
+    
+    return ErrorHandler.handleApiError(apiError);
   }
 }
 

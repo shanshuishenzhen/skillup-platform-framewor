@@ -3,7 +3,8 @@
  * 提供验证码生成、发送、验证等功能
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase';
+import { getEnvConfig } from '@/utils/envConfig';
 
 // 验证码存储接口
 /*
@@ -28,10 +29,8 @@ interface SmsVerificationRecord {
   updated_at: string;
 }
 
-// 初始化Supabase客户端
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+// 使用管理员客户端进行服务端操作
+const supabase = supabaseAdmin;
 
 // 短信验证码接口定义
 interface SmsVerificationCode {

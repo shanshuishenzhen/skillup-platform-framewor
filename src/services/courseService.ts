@@ -4,6 +4,14 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { 
+  withRetry, 
+  createError, 
+  AppError, 
+  ErrorType, 
+  ErrorSeverity,
+  RetryConfig 
+} from '../utils/errorHandler';
 
 export interface Course {
   id: string;
@@ -62,70 +70,107 @@ export interface CourseFilters {
 }
 
 /**
+ * 获取重试配置
+ * @returns 重试配置
+ */
+function getRetryConfig(): RetryConfig {
+  return {
+    maxAttempts: 3,
+    baseDelay: 1000,
+    maxDelay: 5000,
+    backoffMultiplier: 2,
+    jitter: true,
+    retryableErrors: [
+      ErrorType.NETWORK_ERROR,
+      ErrorType.TIMEOUT_ERROR,
+      ErrorType.DATABASE_ERROR,
+      ErrorType.SERVICE_UNAVAILABLE_ERROR
+    ]
+  };
+}
+
+/**
  * 获取所有课程
  * @param filters 筛选条件
  * @returns 课程列表
  */
 export async function getAllCourses(filters: CourseFilters = {}): Promise<Course[]> {
   try {
-    let query = supabase
-      .from('courses')
-      .select(`
-        *,
-        instructor:instructors(*)
-      `);
+    // 使用重试机制进行数据库查询
+    const courses = await withRetry(async () => {
+      let query = supabase
+        .from('courses')
+        .select(`
+          *,
+          instructor:instructors(*)
+        `);
 
-    // 应用筛选条件
-    if (filters.level) {
-      query = query.eq('level', filters.level);
-    }
+      // 应用筛选条件
+      if (filters.level) {
+        query = query.eq('level', filters.level);
+      }
 
-    if (filters.priceRange === 'free') {
-      query = query.eq('price', 0);
-    } else if (filters.priceRange === 'paid') {
-      query = query.gt('price', 0);
-    }
+      if (filters.priceRange === 'free') {
+        query = query.eq('price', 0);
+      } else if (filters.priceRange === 'paid') {
+        query = query.gt('price', 0);
+      }
 
-    if (filters.instructor) {
-      query = query.eq('instructor_id', filters.instructor);
-    }
+      if (filters.instructor) {
+        query = query.eq('instructor_id', filters.instructor);
+      }
 
-    // 排序
-    switch (filters.sortBy) {
-      case 'popularity':
-        query = query.order('created_at', { ascending: false });
-        break;
-      case 'rating':
-        query = query.order('created_at', { ascending: false });
-        break;
-      case 'price':
-        query = query.order('price', { ascending: true });
-        break;
-      case 'newest':
-        query = query.order('created_at', { ascending: false });
-        break;
-      default:
-        query = query.order('created_at', { ascending: false });
-    }
+      // 排序
+      switch (filters.sortBy) {
+        case 'popularity':
+          query = query.order('created_at', { ascending: false });
+          break;
+        case 'rating':
+          query = query.order('created_at', { ascending: false });
+          break;
+        case 'price':
+          query = query.order('price', { ascending: true });
+          break;
+        case 'newest':
+          query = query.order('created_at', { ascending: false });
+          break;
+        default:
+          query = query.order('created_at', { ascending: false });
+      }
 
-    // 分页
-    if (filters.limit) {
-      query = query.limit(filters.limit);
-    }
-    if (filters.offset) {
-      query = query.range(filters.offset, filters.offset + (filters.limit || 10) - 1);
-    }
+      // 分页
+      if (filters.limit) {
+        query = query.limit(filters.limit);
+      }
+      if (filters.offset) {
+        query = query.range(filters.offset, filters.offset + (filters.limit || 10) - 1);
+      }
 
-    const { data: courses, error } = await query;
+      const { data: courses, error } = await query;
 
-    if (error) {
-      console.error('获取课程列表失败:', error);
-      return [];
-    }
+      if (error) {
+        throw createError(
+          ErrorType.DATABASE_ERROR,
+          '获取课程列表失败',
+          {
+            code: 'COURSES_FETCH_FAILED',
+            statusCode: 500,
+            severity: ErrorSeverity.HIGH,
+            originalError: error
+          }
+        );
+      }
 
-    return courses?.map(transformCourseData) || [];
+      return courses || [];
+    }, getRetryConfig());
+
+    return courses.map(transformCourseData);
   } catch (error) {
-    console.error('获取课程列表过程中发生错误:', error);
+    if (error instanceof AppError) {
+      console.error('获取课程列表失败:', error.message);
+    } else {
+      console.error('获取课程列表过程中发生错误:', error);
+    }
     return [];
   }
 }
@@ -141,26 +186,72 @@ export async function getCourseById(
   includeChapters: boolean = false
 ): Promise<Course | null> {
   try {
-    const query = supabase
-      .from('courses')
-      .select(`
-        *,
-        instructor:instructors(*)
-        ${includeChapters ? ',chapters(*, videos(*))' : ''}
-      `)
-      .eq('id', courseId)
-      .single();
+    // 使用重试机制进行数据库查询
+    const course = await withRetry(async () => {
+      const query = supabase
+        .from('courses')
+        .select(`
+          *,
+          instructor:instructors(*)
+          ${includeChapters ? ',chapters(*, videos(*))' : ''}
+        `)
+        .eq('id', courseId)
+        .single();
 
-    const { data: course, error } = await query;
+      const { data: course, error } = await query;
 
-    if (error || !course) {
-      console.error('获取课程详情失败:', error);
-      return null;
-    }
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // 记录未找到
+          throw createError(
+            ErrorType.NOT_FOUND_ERROR,
+            '课程不存在',
+            {
+              code: 'COURSE_NOT_FOUND',
+              statusCode: 404,
+              severity: ErrorSeverity.MEDIUM
+            }
+          );
+        }
+        
+        throw createError(
+          ErrorType.DATABASE_ERROR,
+          '获取课程详情失败',
+          {
+            code: 'COURSE_FETCH_FAILED',
+            statusCode: 500,
+            severity: ErrorSeverity.HIGH,
+            originalError: error
+          }
+        );
+      }
+
+      if (!course) {
+        throw createError(
+          ErrorType.NOT_FOUND_ERROR,
+          '课程不存在',
+          {
+            code: 'COURSE_NOT_FOUND',
+            statusCode: 404,
+            severity: ErrorSeverity.MEDIUM
+          }
+        );
+      }
+
+      return course;
+    }, getRetryConfig());
 
     return transformCourseData(course);
   } catch (error) {
-    console.error('获取课程详情过程中发生错误:', error);
+    if (error instanceof AppError && error.context?.code === 'COURSE_NOT_FOUND') {
+      return null;
+    }
+    
+    if (error instanceof AppError) {
+      console.error('获取课程详情失败:', error.message);
+    } else {
+      console.error('获取课程详情过程中发生错误:', error);
+    }
     return null;
   }
 }
@@ -180,47 +271,67 @@ export async function searchCourses(
       return getAllCourses(filters);
     }
 
-    let dbQuery = supabase
-      .from('courses')
-      .select(`
-        *,
-        instructor:instructors(*)
-      `)
-      .or(`title.ilike.%${query}%,description.ilike.%${query}%`);
+    // 使用重试机制进行数据库查询
+    const courses = await withRetry(async () => {
+      let dbQuery = supabase
+        .from('courses')
+        .select(`
+          *,
+          instructor:instructors(*)
+        `)
+        .or(`title.ilike.%${query}%,description.ilike.%${query}%`);
 
-    // 应用其他筛选条件
-    if (filters.level) {
-      dbQuery = dbQuery.eq('level', filters.level);
-    }
+      // 应用其他筛选条件
+      if (filters.level) {
+        dbQuery = dbQuery.eq('level', filters.level);
+      }
 
-    if (filters.priceRange === 'free') {
-      dbQuery = dbQuery.eq('price', 0);
-    } else if (filters.priceRange === 'paid') {
-      dbQuery = dbQuery.gt('price', 0);
-    }
+      if (filters.priceRange === 'free') {
+        dbQuery = dbQuery.eq('price', 0);
+      } else if (filters.priceRange === 'paid') {
+        dbQuery = dbQuery.gt('price', 0);
+      }
 
-    // 排序
-    switch (filters.sortBy) {
-      case 'popularity':
-        dbQuery = dbQuery.order('created_at', { ascending: false });
-        break;
-      case 'rating':
-        dbQuery = dbQuery.order('created_at', { ascending: false });
-        break;
-      default:
-        dbQuery = dbQuery.order('created_at', { ascending: false });
-    }
+      // 排序
+      switch (filters.sortBy) {
+        case 'popularity':
+          dbQuery = dbQuery.order('created_at', { ascending: false });
+          break;
+        case 'rating':
+          dbQuery = dbQuery.order('created_at', { ascending: false });
+          break;
+        case 'price':
+          dbQuery = dbQuery.order('price', { ascending: true });
+          break;
+        default:
+          dbQuery = dbQuery.order('created_at', { ascending: false });
+      }
 
-    const { data: courses, error } = await dbQuery;
+      const { data: courses, error } = await dbQuery;
 
-    if (error) {
-      console.error('搜索课程失败:', error);
-      return [];
-    }
+      if (error) {
+        throw createError(
+          ErrorType.DATABASE_ERROR,
+          '搜索课程失败',
+          {
+            code: 'COURSE_SEARCH_FAILED',
+            statusCode: 500,
+            severity: ErrorSeverity.HIGH,
+            originalError: error
+          }
+        );
+      }
 
-    return courses?.map(transformCourseData) || [];
+      return courses || [];
+    }, getRetryConfig());
+
+    return courses.map(transformCourseData);
   } catch (error) {
-    console.error('搜索课程过程中发生错误:', error);
+    if (error instanceof AppError) {
+      console.error('搜索课程失败:', error.message);
+    } else {
+      console.error('搜索课程过程中发生错误:', error);
+    }
     return [];
   }
 }
@@ -236,51 +347,68 @@ export async function getCoursesByCategory(
   filters: CourseFilters = {}
 ): Promise<Course[]> {
   try {
-    let query = supabase
-      .from('courses')
-      .select(`
-        *,
-        instructor:instructors(*)
-      `)
-      .contains('tags', [category]);
+    // 使用重试机制进行数据库查询
+    const courses = await withRetry(async () => {
+      let query = supabase
+        .from('courses')
+        .select(`
+          *,
+          instructor:instructors(*)
+        `)
+        .contains('tags', [category]);
 
-    // 应用其他筛选条件
-    if (filters.level) {
-      query = query.eq('level', filters.level);
-    }
+      // 应用其他筛选条件
+      if (filters.level) {
+        query = query.eq('level', filters.level);
+      }
 
-    if (filters.priceRange === 'free') {
-      query = query.eq('price', 0);
-    } else if (filters.priceRange === 'paid') {
-      query = query.gt('price', 0);
-    }
+      if (filters.priceRange === 'free') {
+        query = query.eq('price', 0);
+      } else if (filters.priceRange === 'paid') {
+        query = query.gt('price', 0);
+      }
 
-    // 排序
-    switch (filters.sortBy) {
-      case 'popularity':
-        query = query.order('created_at', { ascending: false });
-        break;
-      case 'rating':
-        query = query.order('created_at', { ascending: false });
-        break;
-      default:
-        query = query.order('created_at', { ascending: false });
-    }
+      // 排序
+      switch (filters.sortBy) {
+        case 'popularity':
+          query = query.order('created_at', { ascending: false });
+          break;
+        case 'rating':
+          query = query.order('created_at', { ascending: false });
+          break;
+        default:
+          query = query.order('created_at', { ascending: false });
+      }
 
-    if (filters.limit) {
-      query = query.limit(filters.limit);
-    }
+      if (filters.limit) {
+        query = query.limit(filters.limit);
+      }
 
-    const { data: courses, error } = await query;
+      const { data: courses, error } = await query;
 
-    if (error) {
-      console.error('获取分类课程失败:', error);
-      return [];
-    }
+      if (error) {
+        throw createError(
+          ErrorType.DATABASE_ERROR,
+          '获取分类课程失败',
+          {
+            code: 'CATEGORY_COURSES_FETCH_FAILED',
+            statusCode: 500,
+            severity: ErrorSeverity.HIGH,
+            originalError: error
+          }
+        );
+      }
 
-    return courses?.map(transformCourseData) || [];
+      return courses || [];
+    }, getRetryConfig());
+
+    return courses.map(transformCourseData);
   } catch (error) {
-    console.error('获取分类课程过程中发生错误:', error);
+    if (error instanceof AppError) {
+      console.error('获取分类课程失败:', error.message);
+    } else {
+      console.error('获取分类课程过程中发生错误:', error);
+    }
     return [];
   }
 }
@@ -290,26 +418,42 @@ export async function getCoursesByCategory(
  * @param limit 返回数量限制
  * @returns 热门课程列表
  */
-export async function getPopularCourses(limit: number = 4): Promise<Course[]> {
+export async function getPopularCourses(limit: number = 10): Promise<Course[]> {
   try {
-    const { data: courses, error } = await supabase
-      .from('courses')
-      .select(`
-        *,
-        instructor:instructors(*)
-      `)
-      .eq('is_published', true)
-      .order('created_at', { ascending: false })
-      .limit(limit);
+    // 使用重试机制进行数据库查询
+    const courses = await withRetry(async () => {
+      const { data: courses, error } = await supabase
+        .from('courses')
+        .select(`
+          *,
+          instructor:instructors(*)
+        `)
+        .order('rating', { ascending: false })
+        .limit(limit);
 
-    if (error) {
-      console.error('获取热门课程失败:', error);
-      return [];
-    }
+      if (error) {
+        throw createError(
+          ErrorType.DATABASE_ERROR,
+          '获取热门课程失败',
+          {
+            code: 'POPULAR_COURSES_FETCH_FAILED',
+            statusCode: 500,
+            severity: ErrorSeverity.HIGH,
+            originalError: error
+          }
+        );
+      }
 
-    return courses?.map(transformCourseData) || [];
+      return courses || [];
+    }, getRetryConfig());
+
+    return courses.map(transformCourseData);
   } catch (error) {
-    console.error('获取热门课程过程中发生错误:', error);
+    if (error instanceof AppError) {
+      console.error('获取热门课程失败:', error.message);
+    } else {
+      console.error('获取热门课程过程中发生错误:', error);
+    }
     return [];
   }
 }
@@ -319,31 +463,43 @@ export async function getPopularCourses(limit: number = 4): Promise<Course[]> {
  * @param limit 返回数量限制
  * @returns 免费课程列表
  */
-export async function getFreeCourses(limit?: number): Promise<Course[]> {
+export async function getFreeCourses(limit: number = 10): Promise<Course[]> {
   try {
-    let query = supabase
-      .from('courses')
-      .select(`
-        *,
-        instructor:instructors(*)
-      `)
-      .eq('price', 0)
-      .order('created_at', { ascending: false });
+    // 使用重试机制进行数据库查询
+    const courses = await withRetry(async () => {
+      const { data: courses, error } = await supabase
+        .from('courses')
+        .select(`
+          *,
+          instructor:instructors(*)
+        `)
+        .eq('price', 0)
+        .order('created_at', { ascending: false })
+        .limit(limit);
 
-    if (limit) {
-      query = query.limit(limit);
-    }
+      if (error) {
+        throw createError(
+          ErrorType.DATABASE_ERROR,
+          '获取免费课程失败',
+          {
+            code: 'FREE_COURSES_FETCH_FAILED',
+            statusCode: 500,
+            severity: ErrorSeverity.HIGH,
+            originalError: error
+          }
+        );
+      }
 
-    const { data: courses, error } = await query;
+      return courses || [];
+    }, getRetryConfig());
 
-    if (error) {
-      console.error('获取免费课程失败:', error);
-      return [];
-    }
-
-    return courses?.map(transformCourseData) || [];
+    return courses.map(transformCourseData);
   } catch (error) {
-    console.error('获取免费课程过程中发生错误:', error);
+    if (error instanceof AppError) {
+      console.error('获取免费课程失败:', error.message);
+    } else {
+      console.error('获取免费课程过程中发生错误:', error);
+    }
     return [];
   }
 }
@@ -355,21 +511,34 @@ export async function getFreeCourses(limit?: number): Promise<Course[]> {
  */
 export async function getCourseChapters(courseId: string): Promise<Chapter[]> {
   try {
-    const { data: chapters, error } = await supabase
-      .from('chapters')
-      .select(`
-        *,
-        videos(*)
-      `)
-      .eq('course_id', courseId)
-      .order('order_index', { ascending: true });
+    // 使用重试机制进行数据库查询
+    const chapters = await withRetry(async () => {
+      const { data: chapters, error } = await supabase
+        .from('chapters')
+        .select(`
+          *,
+          videos(*)
+        `)
+        .eq('course_id', courseId)
+        .order('order_index', { ascending: true });
 
-    if (error) {
-      console.error('获取课程章节失败:', error);
-      return [];
-    }
+      if (error) {
+        throw createError(
+          ErrorType.DATABASE_ERROR,
+          '获取课程章节失败',
+          {
+            code: 'COURSE_CHAPTERS_FETCH_FAILED',
+            statusCode: 500,
+            severity: ErrorSeverity.HIGH,
+            originalError: error
+          }
+        );
+      }
 
-    return chapters?.map(chapter => ({
+      return chapters || [];
+    }, getRetryConfig());
+
+    return chapters.map(chapter => ({
       id: chapter.id,
       courseId: chapter.course_id,
       title: chapter.title,
@@ -386,9 +555,13 @@ export async function getCourseChapters(courseId: string): Promise<Chapter[]> {
         orderIndex: video.order_index,
         isPreview: video.is_preview
       })).sort((a: Video, b: Video) => a.orderIndex - b.orderIndex) || []
-    })) || [];
+    }));
   } catch (error) {
-    console.error('获取课程章节过程中发生错误:', error);
+    if (error instanceof AppError) {
+      console.error('获取课程章节失败:', error.message);
+    } else {
+      console.error('获取课程章节过程中发生错误:', error);
+    }
     return [];
   }
 }
@@ -400,22 +573,35 @@ export async function getCourseChapters(courseId: string): Promise<Chapter[]> {
  */
 export async function getCoursePreviewVideos(courseId: string): Promise<Video[]> {
   try {
-    const { data: videos, error } = await supabase
-      .from('videos')
-      .select(`
-        *,
-        chapter:chapters!inner(course_id)
-      `)
-      .eq('chapter.course_id', courseId)
-      .eq('is_preview', true)
-      .order('order_index', { ascending: true });
+    // 使用重试机制进行数据库查询
+    const videos = await withRetry(async () => {
+      const { data: videos, error } = await supabase
+        .from('videos')
+        .select(`
+          *,
+          chapter:chapters!inner(course_id)
+        `)
+        .eq('chapter.course_id', courseId)
+        .eq('is_preview', true)
+        .order('order_index', { ascending: true });
 
-    if (error) {
-      console.error('获取预览视频失败:', error);
-      return [];
-    }
+      if (error) {
+        throw createError(
+          ErrorType.DATABASE_ERROR,
+          '获取课程预览视频失败',
+          {
+            code: 'COURSE_PREVIEW_VIDEOS_FETCH_FAILED',
+            statusCode: 500,
+            severity: ErrorSeverity.HIGH,
+            originalError: error
+          }
+        );
+      }
 
-    return videos?.map(video => ({
+      return videos || [];
+    }, getRetryConfig());
+
+    return videos.map(video => ({
       id: video.id,
       chapterId: video.chapter_id,
       title: video.title,
@@ -424,9 +610,13 @@ export async function getCoursePreviewVideos(courseId: string): Promise<Video[]>
       duration: video.duration,
       orderIndex: video.order_index,
       isPreview: video.is_preview
-    })) || [];
+    }));
   } catch (error) {
-    console.error('获取预览视频过程中发生错误:', error);
+    if (error instanceof AppError) {
+      console.error('获取课程预览视频失败:', error.message);
+    } else {
+      console.error('获取课程预览视频过程中发生错误:', error);
+    }
     return [];
   }
 }
@@ -487,10 +677,81 @@ function transformCourseData(dbCourse: Record<string, unknown>): Course {
  */
 export async function getCoursePreviewVideo(courseId: string): Promise<Video | null> {
   try {
-    const videos = await getCoursePreviewVideos(courseId);
-    return videos.length > 0 ? videos[0] : null;
+    // 使用重试机制进行数据库查询
+    const video = await withRetry(async () => {
+      const { data: video, error } = await supabase
+        .from('videos')
+        .select(`
+          *,
+          chapter:chapters!inner(course_id)
+        `)
+        .eq('chapter.course_id', courseId)
+        .eq('is_preview', true)
+        .order('order_index', { ascending: true })
+        .limit(1)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // 记录未找到
+          throw createError(
+            ErrorType.NOT_FOUND_ERROR,
+            '课程预览视频不存在',
+            {
+              code: 'COURSE_PREVIEW_VIDEO_NOT_FOUND',
+              statusCode: 404,
+              severity: ErrorSeverity.MEDIUM
+            }
+          );
+        }
+        
+        throw createError(
+          ErrorType.DATABASE_ERROR,
+          '获取课程预览视频失败',
+          {
+            code: 'COURSE_PREVIEW_VIDEO_FETCH_FAILED',
+            statusCode: 500,
+            severity: ErrorSeverity.HIGH,
+            originalError: error
+          }
+        );
+      }
+
+      if (!video) {
+        throw createError(
+          ErrorType.NOT_FOUND_ERROR,
+          '课程预览视频不存在',
+          {
+            code: 'COURSE_PREVIEW_VIDEO_NOT_FOUND',
+            statusCode: 404,
+            severity: ErrorSeverity.MEDIUM
+          }
+        );
+      }
+
+      return video;
+    }, getRetryConfig());
+
+    return {
+      id: video.id,
+      chapterId: video.chapter_id,
+      title: video.title,
+      description: video.description,
+      videoUrl: video.video_url,
+      duration: video.duration,
+      orderIndex: video.order_index,
+      isPreview: video.is_preview
+    };
   } catch (error) {
-    console.error('获取课程预览视频过程中发生错误:', error);
+    if (error instanceof AppError && error.context?.code === 'COURSE_PREVIEW_VIDEO_NOT_FOUND') {
+      return null;
+    }
+    
+    if (error instanceof AppError) {
+      console.error('获取课程预览视频失败:', error.message);
+    } else {
+      console.error('获取课程预览视频过程中发生错误:', error);
+    }
     return null;
   }
 }

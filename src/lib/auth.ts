@@ -79,6 +79,12 @@ export function hasPermission(requiredLevel: number, user?: User | null): boolea
   }
   
   const userLevel = USER_TYPE_TO_PERMISSION[currentUser.userType];
+  
+  // 如果需要付费权限，还需要检查人脸验证状态
+  if (requiredLevel === PERMISSION_LEVELS.PREMIUM && userLevel >= PERMISSION_LEVELS.PREMIUM) {
+    return isFaceVerified(currentUser);
+  }
+  
   return userLevel >= requiredLevel;
 }
 

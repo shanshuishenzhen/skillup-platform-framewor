@@ -11,6 +11,7 @@ import {
   getFreeCourses,
   searchCourses 
 } from '@/services/courseService';
+import { ErrorHandler, AppError, ErrorType } from '@/utils/errorHandler';
 
 /**
  * 获取课程列表接口
@@ -67,10 +68,20 @@ export async function GET(request: NextRequest) {
       message: '获取课程列表成功'
     });
   } catch (error) {
-    console.error('获取课程列表API错误:', error);
-    return NextResponse.json(
-      { error: '服务器内部错误' },
-      { status: 500 }
+    // 使用统一的错误处理机制
+    if (error instanceof AppError) {
+      return ErrorHandler.handleApiError(error);
+    }
+    
+    // 处理未知错误
+    const apiError = new AppError(
+      '获取课程列表失败',
+      ErrorType.API_ERROR,
+      500,
+      'COURSE_LIST_ERROR',
+      { originalError: error instanceof Error ? error.message : String(error) }
     );
+    
+    return ErrorHandler.handleApiError(apiError);
   }
 }
