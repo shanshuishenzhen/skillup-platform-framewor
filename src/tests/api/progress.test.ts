@@ -1,1013 +1,1155 @@
 /**
- * 学习进度API路由集成测试
- * 测试学习进度的记录、查询、统计等功能
+ * 学习进度API集成测试
+ * 
+ * 测试学习进度相关的API端点，包括：
+ * - 课程进度跟踪
+ * - 课时完成记录
+ * - 学习会话管理
+ * - 进度统计分析
+ * - 学习路径推荐
+ * - 成就解锁机制
+ * - 学习目标设定
+ * - 知识点掌握度
  */
 
-import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { NextRequest, NextResponse } from 'next/server';
-import { GET, POST, PUT } from '@/app/api/progress/route';
-import { GET as GetProgressById } from '@/app/api/progress/[id]/route';
-import { GET as GetUserProgress } from '@/app/api/users/[id]/progress/route';
-import { POST as UpdateLessonProgress } from '@/app/api/lessons/[id]/progress/route';
-import { testUtils } from '../setup';
+import request from 'supertest';
+import { app } from '../../app';
+import { supabaseClient } from '../../utils/supabase';
+import { cacheService } from '../../services/cacheService';
+import { auditService } from '../../services/auditService';
+import { analyticsService } from '../../services/analyticsService';
+import { learningProgressService } from '../../services/learningProgressService';
+import { aiService } from '../../services/aiService';
+import { envConfig } from '../../config/envConfig';
+import jwt from 'jsonwebtoken';
 
-// 模拟依赖
-const mockSupabase = {
-  from: jest.fn(() => ({
-    select: jest.fn(() => ({
-      eq: jest.fn(() => ({
-        single: jest.fn(),
-        order: jest.fn(() => ({
-          limit: jest.fn(() => ({
-            range: jest.fn()
-          }))
-        }))
-      })),
-      order: jest.fn(() => ({
-        limit: jest.fn(() => ({
-          range: jest.fn()
-        }))
-      })),
-      limit: jest.fn(() => ({
-        range: jest.fn()
-      })),
-      range: jest.fn()
-    })),
-    insert: jest.fn(() => ({
-      select: jest.fn(() => ({
-        single: jest.fn()
-      }))
-    })),
-    update: jest.fn(() => ({
-      eq: jest.fn(() => ({
-        select: jest.fn(() => ({
-          single: jest.fn()
-        }))
-      }))
-    })),
-    upsert: jest.fn(() => ({
-      select: jest.fn(() => ({
-        single: jest.fn()
-      }))
-    }))
-  })),
+// Mock 依赖
+jest.mock('../../utils/supabase');
+jest.mock('../../services/cacheService');
+jest.mock('../../services/auditService');
+jest.mock('../../services/analyticsService');
+jest.mock('../../services/learningProgressService');
+jest.mock('../../services/aiService');
+jest.mock('../../config/envConfig');
+jest.mock('jsonwebtoken');
+
+// 类型定义
+interface CourseProgress {
+  id: string;
+  userId: string;
+  courseId: string;
+  progress: number; // 0-100
+  status: 'not_started' | 'in_progress' | 'completed' | 'paused';
+  startedAt: Date;
+  completedAt?: Date;
+  lastAccessedAt: Date;
+  totalTimeSpent: number; // 分钟
+  completedLessons: number;
+  totalLessons: number;
+  currentLessonId?: string;
+  metadata: {
+    averageScore?: number;
+    quizzesPassed?: number;
+    assignmentsCompleted?: number;
+    certificateEarned?: boolean;
+  };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface LessonProgress {
+  id: string;
+  userId: string;
+  courseId: string;
+  lessonId: string;
+  progress: number; // 0-100
+  status: 'not_started' | 'in_progress' | 'completed';
+  startedAt: Date;
+  completedAt?: Date;
+  timeSpent: number; // 分钟
+  watchTime?: number; // 视频观看时间（秒）
+  readingProgress?: number; // 阅读进度百分比
+  interactionCount: number; // 互动次数
+  lastPosition?: number; // 最后观看/阅读位置
+  metadata: {
+    notes?: string;
+    bookmarks?: number[];
+    highlights?: string[];
+    quizScore?: number;
+  };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface LearningSession {
+  id: string;
+  userId: string;
+  courseId?: string;
+  lessonId?: string;
+  startTime: Date;
+  endTime?: Date;
+  duration: number; // 分钟
+  activityType: 'video' | 'reading' | 'quiz' | 'assignment' | 'discussion';
+  progress: number;
+  metadata: {
+    device?: string;
+    browser?: string;
+    location?: string;
+    interactions?: number;
+    pauseCount?: number;
+    seekCount?: number;
+  };
+  createdAt: Date;
+}
+
+interface LearningGoal {
+  id: string;
+  userId: string;
+  title: string;
+  description: string;
+  type: 'course_completion' | 'skill_mastery' | 'time_based' | 'custom';
+  targetValue: number;
+  currentValue: number;
+  unit: 'courses' | 'hours' | 'skills' | 'points';
+  deadline?: Date;
+  status: 'active' | 'completed' | 'paused' | 'cancelled';
+  priority: 'low' | 'medium' | 'high';
+  relatedCourses?: string[];
+  relatedSkills?: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface SkillMastery {
+  id: string;
+  userId: string;
+  skillId: string;
+  skillName: string;
+  level: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  masteryScore: number; // 0-100
+  practiceTime: number; // 分钟
+  assessmentsPassed: number;
+  projectsCompleted: number;
+  lastPracticed: Date;
+  strengthAreas: string[];
+  weaknessAreas: string[];
+  recommendedActions: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface LearningPath {
+  id: string;
+  userId: string;
+  title: string;
+  description: string;
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  estimatedDuration: number; // 小时
+  courses: {
+    courseId: string;
+    order: number;
+    isRequired: boolean;
+    prerequisites?: string[];
+  }[];
+  skills: string[];
+  progress: number;
+  status: 'not_started' | 'in_progress' | 'completed';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Mock 实例
+const mockSupabaseClient = {
+  from: jest.fn().mockReturnThis(),
+  select: jest.fn().mockReturnThis(),
+  insert: jest.fn().mockReturnThis(),
+  update: jest.fn().mockReturnThis(),
+  delete: jest.fn().mockReturnThis(),
+  eq: jest.fn().mockReturnThis(),
+  neq: jest.fn().mockReturnThis(),
+  in: jest.fn().mockReturnThis(),
+  gte: jest.fn().mockReturnThis(),
+  lte: jest.fn().mockReturnThis(),
+  like: jest.fn().mockReturnThis(),
+  order: jest.fn().mockReturnThis(),
+  limit: jest.fn().mockReturnThis(),
+  offset: jest.fn().mockReturnThis(),
+  range: jest.fn().mockReturnThis(),
+  single: jest.fn(),
+  then: jest.fn(),
+  count: jest.fn().mockReturnThis(),
   rpc: jest.fn()
 };
 
-const mockSecurity = {
-  validateApiKey: jest.fn(),
-  checkRateLimit: jest.fn(),
-  validatePermissions: jest.fn(),
-  verifyToken: jest.fn()
+const mockCacheService = {
+  get: jest.fn(),
+  set: jest.fn(),
+  del: jest.fn(),
+  mget: jest.fn(),
+  mset: jest.fn(),
+  expire: jest.fn(),
+  zadd: jest.fn(),
+  zrange: jest.fn(),
+  incr: jest.fn(),
+  decr: jest.fn()
 };
 
-const mockApiMonitor = {
-  startCall: jest.fn(() => 'call-id-123'),
-  endCall: jest.fn(),
-  recordError: jest.fn()
+const mockAuditService = {
+  log: jest.fn(),
+  logUserActivity: jest.fn()
+};
+
+const mockAnalyticsService = {
+  track: jest.fn(),
+  increment: jest.fn(),
+  gauge: jest.fn(),
+  histogram: jest.fn()
+};
+
+const mockLearningProgressService = {
+  startLearningSession: jest.fn(),
+  endLearningSession: jest.fn(),
+  updateCourseProgress: jest.fn(),
+  updateLessonProgress: jest.fn(),
+  getUserProgress: jest.fn(),
+  getCourseProgress: jest.fn(),
+  getLessonProgress: jest.fn(),
+  calculateProgress: jest.fn(),
+  generateLearningPath: jest.fn(),
+  updateSkillMastery: jest.fn(),
+  getSkillMastery: jest.fn(),
+  createLearningGoal: jest.fn(),
+  updateLearningGoal: jest.fn(),
+  getLearningGoals: jest.fn(),
+  checkGoalProgress: jest.fn(),
+  getRecommendations: jest.fn()
 };
 
 const mockAiService = {
-  analyzeProgress: jest.fn(),
-  generateRecommendations: jest.fn(),
-  predictPerformance: jest.fn()
+  generatePersonalizedRecommendations: jest.fn(),
+  analyzeLearningPattern: jest.fn(),
+  predictLearningOutcome: jest.fn(),
+  generateLearningPath: jest.fn(),
+  identifyKnowledgeGaps: jest.fn()
 };
 
-jest.mock('@/utils/supabase', () => ({
-  createClient: () => mockSupabase
-}));
+const mockEnvConfig = {
+  progress: {
+    sessionTimeout: 30, // 分钟
+    autoSaveInterval: 60, // 秒
+    maxSessionDuration: 480, // 8小时
+    progressUpdateThreshold: 5, // 5%进度变化才更新
+    cacheExpiry: 300 // 5分钟
+  },
+  recommendations: {
+    maxRecommendations: 10,
+    refreshInterval: 3600, // 1小时
+    enableAI: true
+  }
+};
 
-jest.mock('@/middleware/security', () => ({
-  security: mockSecurity
-}));
+const mockJwt = {
+  verify: jest.fn(),
+  sign: jest.fn()
+};
 
-jest.mock('@/utils/apiMonitor', () => ({
-  apiMonitor: mockApiMonitor
-}));
+// 设置 Mock
+(supabaseClient as any) = mockSupabaseClient;
+(cacheService as any) = mockCacheService;
+(auditService as any) = mockAuditService;
+(analyticsService as any) = mockAnalyticsService;
+(learningProgressService as any) = mockLearningProgressService;
+(aiService as any) = mockAiService;
+(envConfig as any) = mockEnvConfig;
+(jwt as any) = mockJwt;
 
-jest.mock('@/services/aiService', () => ({
-  aiService: mockAiService
-}));
+// 测试数据
+const testCourseProgress: CourseProgress = {
+  id: 'progress-123',
+  userId: 'user-123456',
+  courseId: 'course-123',
+  progress: 65,
+  status: 'in_progress',
+  startedAt: new Date('2024-01-01'),
+  lastAccessedAt: new Date(),
+  totalTimeSpent: 180, // 3小时
+  completedLessons: 8,
+  totalLessons: 12,
+  currentLessonId: 'lesson-9',
+  metadata: {
+    averageScore: 85,
+    quizzesPassed: 6,
+    assignmentsCompleted: 3,
+    certificateEarned: false
+  },
+  createdAt: new Date('2024-01-01'),
+  updatedAt: new Date()
+};
 
-describe('学习进度API路由', () => {
+const testLessonProgress: LessonProgress = {
+  id: 'lesson-progress-123',
+  userId: 'user-123456',
+  courseId: 'course-123',
+  lessonId: 'lesson-9',
+  progress: 75,
+  status: 'in_progress',
+  startedAt: new Date(),
+  timeSpent: 25,
+  watchTime: 1200, // 20分钟
+  readingProgress: 80,
+  interactionCount: 5,
+  lastPosition: 1200,
+  metadata: {
+    notes: '重要概念：闭包的应用',
+    bookmarks: [300, 800, 1200],
+    highlights: ['闭包', '作用域链'],
+    quizScore: 90
+  },
+  createdAt: new Date(),
+  updatedAt: new Date()
+};
+
+const testLearningSession: LearningSession = {
+  id: 'session-123',
+  userId: 'user-123456',
+  courseId: 'course-123',
+  lessonId: 'lesson-9',
+  startTime: new Date(),
+  duration: 45,
+  activityType: 'video',
+  progress: 75,
+  metadata: {
+    device: 'desktop',
+    browser: 'chrome',
+    location: 'Beijing',
+    interactions: 8,
+    pauseCount: 3,
+    seekCount: 2
+  },
+  createdAt: new Date()
+};
+
+const testLearningGoal: LearningGoal = {
+  id: 'goal-123',
+  userId: 'user-123456',
+  title: '完成前端开发课程',
+  description: '在3个月内完成所有前端开发相关课程',
+  type: 'course_completion',
+  targetValue: 5,
+  currentValue: 2,
+  unit: 'courses',
+  deadline: new Date('2024-06-01'),
+  status: 'active',
+  priority: 'high',
+  relatedCourses: ['course-123', 'course-456'],
+  relatedSkills: ['javascript', 'react', 'css'],
+  createdAt: new Date(),
+  updatedAt: new Date()
+};
+
+const testSkillMastery: SkillMastery = {
+  id: 'skill-mastery-123',
+  userId: 'user-123456',
+  skillId: 'skill-javascript',
+  skillName: 'JavaScript',
+  level: 'intermediate',
+  masteryScore: 75,
+  practiceTime: 120,
+  assessmentsPassed: 8,
+  projectsCompleted: 3,
+  lastPracticed: new Date(),
+  strengthAreas: ['ES6语法', '异步编程'],
+  weaknessAreas: ['设计模式', '性能优化'],
+  recommendedActions: ['练习设计模式', '学习性能优化技巧'],
+  createdAt: new Date(),
+  updatedAt: new Date()
+};
+
+// 认证中间件模拟
+const mockAuthUser = {
+  id: 'user-123456',
+  email: 'test@skillup.com',
+  role: 'student'
+};
+
+describe('Progress API', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     
-    // 设置默认的成功响应
-    mockSecurity.validateApiKey.mockResolvedValue({ valid: true, keyId: 'test-key' });
-    mockSecurity.checkRateLimit.mockResolvedValue({ allowed: true });
-    mockSecurity.validatePermissions.mockResolvedValue({ allowed: true });
-    mockSecurity.verifyToken.mockResolvedValue({ valid: true, userId: 'user-123' });
-  });
-
-  describe('GET /api/progress', () => {
-    it('应该成功获取进度列表', async () => {
-      const mockProgressList = [
-        {
-          id: 'progress-1',
-          user_id: 'user-123',
-          course_id: 'course-1',
-          lesson_id: 'lesson-1',
-          status: 'completed',
-          progress_percentage: 100,
-          time_spent: 1800, // 30分钟
-          score: 95,
-          completed_at: '2024-01-15T10:30:00Z',
-          created_at: '2024-01-15T10:00:00Z',
-          updated_at: '2024-01-15T10:30:00Z'
-        },
-        {
-          id: 'progress-2',
-          user_id: 'user-123',
-          course_id: 'course-1',
-          lesson_id: 'lesson-2',
-          status: 'in_progress',
-          progress_percentage: 60,
-          time_spent: 900, // 15分钟
-          score: null,
-          completed_at: null,
-          created_at: '2024-01-15T11:00:00Z',
-          updated_at: '2024-01-15T11:15:00Z'
-        }
-      ];
-      
-      const mockSupabaseResponse = {
-        data: mockProgressList,
-        error: null,
-        count: 2
-      };
-      
-      mockSupabase.from().select().order().limit().range.mockResolvedValue(mockSupabaseResponse);
-      
-      const request = testUtils.createMockRequest('GET', '/api/progress');
-      const response = await GET(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.data.progress).toHaveLength(2);
-      expect(data.data.progress[0].status).toBe('completed');
-      expect(data.data.progress[1].status).toBe('in_progress');
-      expect(data.data.pagination.total).toBe(2);
-      expect(mockApiMonitor.startCall).toHaveBeenCalledWith('GET', '/api/progress');
-      expect(mockApiMonitor.endCall).toHaveBeenCalledWith('call-id-123', 200);
+    // 设置默认的mock返回值
+    mockCacheService.get.mockResolvedValue(null);
+    mockCacheService.set.mockResolvedValue(true);
+    mockCacheService.mget.mockResolvedValue([]);
+    
+    mockAuditService.log.mockResolvedValue(true);
+    mockAnalyticsService.track.mockResolvedValue(true);
+    
+    mockLearningProgressService.getUserProgress.mockResolvedValue(testCourseProgress);
+    mockLearningProgressService.getCourseProgress.mockResolvedValue(testCourseProgress);
+    mockLearningProgressService.getLessonProgress.mockResolvedValue(testLessonProgress);
+    mockLearningProgressService.updateCourseProgress.mockResolvedValue(testCourseProgress);
+    mockLearningProgressService.updateLessonProgress.mockResolvedValue(testLessonProgress);
+    mockLearningProgressService.startLearningSession.mockResolvedValue(testLearningSession);
+    mockLearningProgressService.endLearningSession.mockResolvedValue(testLearningSession);
+    
+    mockAiService.generatePersonalizedRecommendations.mockResolvedValue([
+      {
+        type: 'course',
+        id: 'course-456',
+        title: 'React进阶',
+        reason: '基于您的JavaScript基础',
+        confidence: 0.85
+      }
+    ]);
+    
+    // 设置JWT验证
+    mockJwt.verify.mockReturnValue(mockAuthUser);
+    
+    // 设置Supabase默认返回值
+    mockSupabaseClient.single.mockResolvedValue({
+      data: testCourseProgress,
+      error: null
     });
-
-    it('应该支持按用户筛选进度', async () => {
-      const mockUserProgress = [
-        {
-          id: 'progress-user-1',
-          user_id: 'user-456',
-          course_id: 'course-1',
-          lesson_id: 'lesson-1',
-          status: 'completed',
-          progress_percentage: 100
-        }
-      ];
-      
-      const mockSupabaseResponse = {
-        data: mockUserProgress,
-        error: null,
-        count: 1
-      };
-      
-      mockSupabase.from().select().eq().order().limit().range.mockResolvedValue(mockSupabaseResponse);
-      
-      const request = testUtils.createMockRequest('GET', '/api/progress?user_id=user-456');
-      const response = await GET(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(200);
-      expect(data.data.progress).toHaveLength(1);
-      expect(data.data.progress[0].user_id).toBe('user-456');
-    });
-
-    it('应该支持按课程筛选进度', async () => {
-      const mockCourseProgress = [
-        {
-          id: 'progress-course-1',
-          user_id: 'user-123',
-          course_id: 'course-2',
-          lesson_id: 'lesson-3',
-          status: 'in_progress',
-          progress_percentage: 45
-        }
-      ];
-      
-      const mockSupabaseResponse = {
-        data: mockCourseProgress,
-        error: null,
-        count: 1
-      };
-      
-      mockSupabase.from().select().eq().order().limit().range.mockResolvedValue(mockSupabaseResponse);
-      
-      const request = testUtils.createMockRequest('GET', '/api/progress?course_id=course-2');
-      const response = await GET(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(200);
-      expect(data.data.progress).toHaveLength(1);
-      expect(data.data.progress[0].course_id).toBe('course-2');
-    });
-
-    it('应该支持按状态筛选进度', async () => {
-      const mockCompletedProgress = [
-        {
-          id: 'progress-completed-1',
-          user_id: 'user-123',
-          status: 'completed',
-          progress_percentage: 100,
-          completed_at: '2024-01-15T10:30:00Z'
-        }
-      ];
-      
-      const mockSupabaseResponse = {
-        data: mockCompletedProgress,
-        error: null,
-        count: 1
-      };
-      
-      mockSupabase.from().select().eq().order().limit().range.mockResolvedValue(mockSupabaseResponse);
-      
-      const request = testUtils.createMockRequest('GET', '/api/progress?status=completed');
-      const response = await GET(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(200);
-      expect(data.data.progress).toHaveLength(1);
-      expect(data.data.progress[0].status).toBe('completed');
-    });
-
-    it('应该验证用户权限', async () => {
-      mockSecurity.validatePermissions.mockResolvedValue({ 
-        allowed: false, 
-        error: 'Cannot access progress data' 
-      });
-      
-      const request = testUtils.createMockRequest('GET', '/api/progress');
-      const response = await GET(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(403);
-      expect(data.success).toBe(false);
-      expect(data.error).toBe('Cannot access progress data');
+    
+    mockSupabaseClient.then.mockResolvedValue({
+      data: [testCourseProgress],
+      error: null,
+      count: 1
     });
   });
 
-  describe('POST /api/progress', () => {
-    it('应该成功创建学习进度记录', async () => {
-      const newProgress = {
-        user_id: 'user-123',
-        course_id: 'course-1',
-        lesson_id: 'lesson-1',
-        status: 'in_progress',
-        progress_percentage: 25,
-        time_spent: 600 // 10分钟
-      };
-      
-      const mockCreatedProgress = {
-        id: 'new-progress-123',
-        ...newProgress,
-        score: null,
-        completed_at: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      
-      mockSupabase.from().insert().select().single.mockResolvedValue({
-        data: mockCreatedProgress,
-        error: null
-      });
-      
-      const request = testUtils.createMockRequest('POST', '/api/progress', newProgress);
-      const response = await POST(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(201);
-      expect(data.success).toBe(true);
-      expect(data.data.progress.id).toBe('new-progress-123');
-      expect(data.data.progress.user_id).toBe('user-123');
-      expect(data.data.progress.progress_percentage).toBe(25);
-    });
-
-    it('应该验证必需字段', async () => {
-      const invalidProgress = {
-        user_id: 'user-123',
-        // 缺少 course_id, lesson_id 等必需字段
-      };
-      
-      const request = testUtils.createMockRequest('POST', '/api/progress', invalidProgress);
-      const response = await POST(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(400);
-      expect(data.success).toBe(false);
-      expect(data.error).toContain('Missing required field');
-    });
-
-    it('应该验证进度百分比范围', async () => {
-      const invalidProgress = {
-        user_id: 'user-123',
-        course_id: 'course-1',
-        lesson_id: 'lesson-1',
-        status: 'in_progress',
-        progress_percentage: 150 // 超出范围
-      };
-      
-      const request = testUtils.createMockRequest('POST', '/api/progress', invalidProgress);
-      const response = await POST(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(400);
-      expect(data.success).toBe(false);
-      expect(data.error).toContain('Progress percentage must be between 0 and 100');
-    });
-
-    it('应该验证状态值', async () => {
-      const invalidProgress = {
-        user_id: 'user-123',
-        course_id: 'course-1',
-        lesson_id: 'lesson-1',
-        status: 'invalid_status', // 无效状态
-        progress_percentage: 50
-      };
-      
-      const request = testUtils.createMockRequest('POST', '/api/progress', invalidProgress);
-      const response = await POST(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(400);
-      expect(data.success).toBe(false);
-      expect(data.error).toContain('Invalid status value');
-    });
-
-    it('应该处理重复进度记录', async () => {
-      const duplicateProgress = {
-        user_id: 'user-123',
-        course_id: 'course-1',
-        lesson_id: 'lesson-1',
-        status: 'in_progress',
-        progress_percentage: 30
-      };
-      
-      const duplicateError = {
-        code: '23505',
-        message: 'duplicate key value violates unique constraint'
-      };
-      
-      mockSupabase.from().insert().select().single.mockResolvedValue({
-        data: null,
-        error: duplicateError
-      });
-      
-      const request = testUtils.createMockRequest('POST', '/api/progress', duplicateProgress);
-      const response = await POST(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(409);
-      expect(data.success).toBe(false);
-      expect(data.error).toBe('Progress record already exists for this lesson');
-    });
-
-    it('应该自动计算完成时间', async () => {
-      const completedProgress = {
-        user_id: 'user-123',
-        course_id: 'course-1',
-        lesson_id: 'lesson-1',
-        status: 'completed',
-        progress_percentage: 100,
-        score: 95
-      };
-      
-      const mockCreatedProgress = {
-        id: 'completed-progress-123',
-        ...completedProgress,
-        completed_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      
-      mockSupabase.from().insert().select().single.mockResolvedValue({
-        data: mockCreatedProgress,
-        error: null
-      });
-      
-      const request = testUtils.createMockRequest('POST', '/api/progress', completedProgress);
-      const response = await POST(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(201);
-      expect(data.success).toBe(true);
-      expect(data.data.progress.completed_at).toBeTruthy();
-      expect(data.data.progress.status).toBe('completed');
-    });
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
-  describe('PUT /api/progress', () => {
-    it('应该成功更新学习进度', async () => {
-      const updateData = {
-        id: 'progress-update-123',
-        progress_percentage: 75,
-        time_spent: 1200, // 20分钟
-        status: 'in_progress'
-      };
+  /**
+   * 课程进度获取测试
+   */
+  describe('GET /api/progress/courses/:courseId', () => {
+    it('应该获取课程进度', async () => {
+      const response = await request(app)
+        .get('/api/progress/courses/course-123')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(200);
       
-      const mockUpdatedProgress = {
-        id: 'progress-update-123',
-        user_id: 'user-123',
-        course_id: 'course-1',
-        lesson_id: 'lesson-1',
-        status: 'in_progress',
-        progress_percentage: 75,
-        time_spent: 1200,
-        score: null,
-        completed_at: null,
-        updated_at: new Date().toISOString()
-      };
-      
-      mockSupabase.from().update().eq().select().single.mockResolvedValue({
-        data: mockUpdatedProgress,
-        error: null
-      });
-      
-      const request = testUtils.createMockRequest('PUT', '/api/progress', updateData);
-      const response = await PUT(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.data.progress.progress_percentage).toBe(75);
-      expect(data.data.progress.time_spent).toBe(1200);
-    });
-
-    it('应该支持批量更新进度', async () => {
-      const batchUpdateData = {
-        updates: [
-          {
-            id: 'progress-1',
-            progress_percentage: 80,
-            time_spent: 1500
-          },
-          {
-            id: 'progress-2',
-            progress_percentage: 90,
-            status: 'completed',
-            score: 88
-          }
-        ]
-      };
-      
-      const mockUpdatedProgress = [
-        {
-          id: 'progress-1',
-          progress_percentage: 80,
-          time_spent: 1500,
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: 'progress-2',
-          progress_percentage: 90,
-          status: 'completed',
-          score: 88,
-          completed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-      ];
-      
-      mockSupabase.from().upsert().select.mockResolvedValue({
-        data: mockUpdatedProgress,
-        error: null
-      });
-      
-      const request = testUtils.createMockRequest('PUT', '/api/progress', batchUpdateData);
-      const response = await PUT(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.data.progress).toHaveLength(2);
-      expect(data.data.progress[1].status).toBe('completed');
-    });
-
-    it('应该验证更新权限', async () => {
-      mockSecurity.validatePermissions.mockResolvedValue({ 
-        allowed: false, 
-        error: 'Cannot update this progress record' 
-      });
-      
-      const updateData = {
-        id: 'progress-update-123',
-        progress_percentage: 85
-      };
-      
-      const request = testUtils.createMockRequest('PUT', '/api/progress', updateData);
-      const response = await PUT(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(403);
-      expect(data.success).toBe(false);
-      expect(data.error).toBe('Cannot update this progress record');
-    });
-
-    it('应该处理进度不存在', async () => {
-      const updateData = {
-        id: 'non-existent-progress',
-        progress_percentage: 85
-      };
-      
-      mockSupabase.from().update().eq().select().single.mockResolvedValue({
-        data: null,
-        error: { code: 'PGRST116', message: 'The result contains 0 rows' }
-      });
-      
-      const request = testUtils.createMockRequest('PUT', '/api/progress', updateData);
-      const response = await PUT(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(404);
-      expect(data.success).toBe(false);
-      expect(data.error).toBe('Progress record not found');
-    });
-  });
-
-  describe('GET /api/progress/[id]', () => {
-    it('应该成功获取进度详情', async () => {
-      const mockProgress = {
-        id: 'progress-detail-123',
-        user_id: 'user-123',
-        course_id: 'course-1',
-        lesson_id: 'lesson-1',
-        status: 'completed',
-        progress_percentage: 100,
-        time_spent: 1800,
-        score: 95,
-        completed_at: '2024-01-15T10:30:00Z',
-        created_at: '2024-01-15T10:00:00Z',
-        updated_at: '2024-01-15T10:30:00Z',
-        // 关联数据
-        course: {
-          id: 'course-1',
-          title: '课程标题',
-          description: '课程描述'
-        },
-        lesson: {
-          id: 'lesson-1',
-          title: '课程章节',
-          duration: 1800
-        },
-        user: {
-          id: 'user-123',
-          username: 'testuser',
-          full_name: '测试用户'
-        }
-      };
-      
-      mockSupabase.from().select().eq().single.mockResolvedValue({
-        data: mockProgress,
-        error: null
-      });
-      
-      const request = testUtils.createMockRequest('GET', '/api/progress/progress-detail-123');
-      const response = await GetProgressById(request, { params: { id: 'progress-detail-123' } });
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.data.progress.id).toBe('progress-detail-123');
-      expect(data.data.progress.course.title).toBe('课程标题');
-      expect(data.data.progress.lesson.title).toBe('课程章节');
-    });
-
-    it('应该处理进度不存在', async () => {
-      mockSupabase.from().select().eq().single.mockResolvedValue({
-        data: null,
-        error: { code: 'PGRST116', message: 'The result contains 0 rows' }
-      });
-      
-      const request = testUtils.createMockRequest('GET', '/api/progress/non-existent');
-      const response = await GetProgressById(request, { params: { id: 'non-existent' } });
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(404);
-      expect(data.success).toBe(false);
-      expect(data.error).toBe('Progress record not found');
-    });
-  });
-
-  describe('GET /api/users/[id]/progress', () => {
-    it('应该成功获取用户学习进度', async () => {
-      const mockUserProgress = {
-        user_id: 'user-123',
-        total_courses: 5,
-        completed_courses: 2,
-        in_progress_courses: 2,
-        not_started_courses: 1,
-        total_lessons: 50,
-        completed_lessons: 25,
-        total_time_spent: 18000, // 5小时
-        average_score: 87.5,
-        progress_by_course: [
-          {
-            course_id: 'course-1',
-            course_title: '前端开发基础',
-            progress_percentage: 100,
-            status: 'completed',
-            lessons_completed: 10,
-            total_lessons: 10,
-            time_spent: 7200,
-            average_score: 92
-          },
-          {
-            course_id: 'course-2',
-            course_title: 'JavaScript进阶',
-            progress_percentage: 60,
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          data: expect.objectContaining({
+            courseId: 'course-123',
+            progress: 65,
             status: 'in_progress',
-            lessons_completed: 6,
-            total_lessons: 10,
-            time_spent: 5400,
-            average_score: 85
+            completedLessons: 8,
+            totalLessons: 12
+          })
+        })
+      );
+      
+      expect(mockLearningProgressService.getCourseProgress).toHaveBeenCalledWith(
+        'user-123456',
+        'course-123'
+      );
+    });
+
+    it('应该处理课程不存在的情况', async () => {
+      mockLearningProgressService.getCourseProgress.mockResolvedValue(null);
+      
+      const response = await request(app)
+        .get('/api/progress/courses/nonexistent-course')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(404);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: false,
+          message: '课程进度不存在'
+        })
+      );
+    });
+
+    it('应该使用缓存', async () => {
+      const cacheKey = 'course_progress_user-123456_course-123';
+      mockCacheService.get.mockResolvedValue(JSON.stringify(testCourseProgress));
+      
+      const response = await request(app)
+        .get('/api/progress/courses/course-123')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(200);
+      
+      expect(mockCacheService.get).toHaveBeenCalledWith(cacheKey);
+      expect(response.body.data.progress).toBe(65);
+    });
+  });
+
+  /**
+   * 课程进度更新测试
+   */
+  describe('PUT /api/progress/courses/:courseId', () => {
+    it('应该更新课程进度', async () => {
+      const updateData = {
+        progress: 75,
+        currentLessonId: 'lesson-10',
+        timeSpent: 30
+      };
+      
+      const response = await request(app)
+        .put('/api/progress/courses/course-123')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .send(updateData)
+        .expect(200);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          message: '课程进度更新成功'
+        })
+      );
+      
+      expect(mockLearningProgressService.updateCourseProgress).toHaveBeenCalledWith(
+        'user-123456',
+        'course-123',
+        expect.objectContaining(updateData)
+      );
+      
+      expect(mockAnalyticsService.track).toHaveBeenCalledWith(
+        'course.progress.update',
+        expect.objectContaining({
+          userId: 'user-123456',
+          courseId: 'course-123',
+          progress: 75
+        })
+      );
+    });
+
+    it('应该验证进度值范围', async () => {
+      const response = await request(app)
+        .put('/api/progress/courses/course-123')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .send({
+          progress: 150 // 超出范围
+        })
+        .expect(400);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: false,
+          message: '请求参数验证失败',
+          errors: expect.arrayContaining([
+            expect.objectContaining({
+              field: 'progress',
+              message: '进度值必须在0-100之间'
+            })
+          ])
+        })
+      );
+    });
+
+    it('应该自动完成课程', async () => {
+      const response = await request(app)
+        .put('/api/progress/courses/course-123')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .send({
+          progress: 100
+        })
+        .expect(200);
+      
+      expect(mockLearningProgressService.updateCourseProgress).toHaveBeenCalledWith(
+        'user-123456',
+        'course-123',
+        expect.objectContaining({
+          progress: 100,
+          status: 'completed',
+          completedAt: expect.any(String)
+        })
+      );
+    });
+  });
+
+  /**
+   * 课时进度获取测试
+   */
+  describe('GET /api/progress/lessons/:lessonId', () => {
+    it('应该获取课时进度', async () => {
+      const response = await request(app)
+        .get('/api/progress/lessons/lesson-9')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(200);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          data: expect.objectContaining({
+            lessonId: 'lesson-9',
+            progress: 75,
+            status: 'in_progress',
+            timeSpent: 25,
+            watchTime: 1200
+          })
+        })
+      );
+    });
+
+    it('应该包含学习元数据', async () => {
+      const response = await request(app)
+        .get('/api/progress/lessons/lesson-9')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(200);
+      
+      expect(response.body.data.metadata).toEqual(
+        expect.objectContaining({
+          notes: '重要概念：闭包的应用',
+          bookmarks: [300, 800, 1200],
+          highlights: ['闭包', '作用域链'],
+          quizScore: 90
+        })
+      );
+    });
+  });
+
+  /**
+   * 课时进度更新测试
+   */
+  describe('PUT /api/progress/lessons/:lessonId', () => {
+    it('应该更新课时进度', async () => {
+      const updateData = {
+        progress: 90,
+        watchTime: 1500,
+        lastPosition: 1500,
+        interactionCount: 8
+      };
+      
+      const response = await request(app)
+        .put('/api/progress/lessons/lesson-9')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .send(updateData)
+        .expect(200);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          message: '课时进度更新成功'
+        })
+      );
+      
+      expect(mockLearningProgressService.updateLessonProgress).toHaveBeenCalledWith(
+        'user-123456',
+        'lesson-9',
+        expect.objectContaining(updateData)
+      );
+    });
+
+    it('应该支持添加笔记', async () => {
+      const response = await request(app)
+        .put('/api/progress/lessons/lesson-9')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .send({
+          metadata: {
+            notes: '新增笔记：异步编程的最佳实践'
           }
-        ],
-        recent_activities: [
-          {
-            id: 'activity-1',
-            lesson_id: 'lesson-5',
-            lesson_title: 'React组件',
-            action: 'completed',
-            score: 95,
-            timestamp: '2024-01-15T10:30:00Z'
+        })
+        .expect(200);
+      
+      expect(mockLearningProgressService.updateLessonProgress).toHaveBeenCalledWith(
+        'user-123456',
+        'lesson-9',
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            notes: '新增笔记：异步编程的最佳实践'
+          })
+        })
+      );
+    });
+
+    it('应该支持添加书签', async () => {
+      const response = await request(app)
+        .put('/api/progress/lessons/lesson-9')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .send({
+          metadata: {
+            bookmarks: [300, 800, 1200, 1800]
           }
+        })
+        .expect(200);
+      
+      expect(mockLearningProgressService.updateLessonProgress).toHaveBeenCalledWith(
+        'user-123456',
+        'lesson-9',
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            bookmarks: [300, 800, 1200, 1800]
+          })
+        })
+      );
+    });
+  });
+
+  /**
+   * 学习会话管理测试
+   */
+  describe('POST /api/progress/sessions', () => {
+    it('应该开始学习会话', async () => {
+      const sessionData = {
+        courseId: 'course-123',
+        lessonId: 'lesson-9',
+        activityType: 'video'
+      };
+      
+      const response = await request(app)
+        .post('/api/progress/sessions')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .send(sessionData)
+        .expect(201);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          message: '学习会话开始',
+          data: expect.objectContaining({
+            sessionId: expect.any(String),
+            startTime: expect.any(String)
+          })
+        })
+      );
+      
+      expect(mockLearningProgressService.startLearningSession).toHaveBeenCalledWith(
+        'user-123456',
+        expect.objectContaining(sessionData)
+      );
+    });
+
+    it('应该检查并发会话限制', async () => {
+      mockLearningProgressService.startLearningSession.mockRejectedValue(
+        new Error('用户已有活跃的学习会话')
+      );
+      
+      const response = await request(app)
+        .post('/api/progress/sessions')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .send({
+          courseId: 'course-123',
+          lessonId: 'lesson-9',
+          activityType: 'video'
+        })
+        .expect(409);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: false,
+          message: '用户已有活跃的学习会话'
+        })
+      );
+    });
+  });
+
+  /**
+   * 学习会话结束测试
+   */
+  describe('PUT /api/progress/sessions/:sessionId/end', () => {
+    it('应该结束学习会话', async () => {
+      const endData = {
+        progress: 85,
+        interactions: 12
+      };
+      
+      const response = await request(app)
+        .put('/api/progress/sessions/session-123/end')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .send(endData)
+        .expect(200);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          message: '学习会话结束',
+          data: expect.objectContaining({
+            duration: expect.any(Number),
+            progress: 85
+          })
+        })
+      );
+      
+      expect(mockLearningProgressService.endLearningSession).toHaveBeenCalledWith(
+        'session-123',
+        expect.objectContaining(endData)
+      );
+    });
+
+    it('应该自动保存进度', async () => {
+      const response = await request(app)
+        .put('/api/progress/sessions/session-123/end')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .send({
+          progress: 100
+        })
+        .expect(200);
+      
+      expect(mockLearningProgressService.endLearningSession).toHaveBeenCalled();
+      expect(mockAnalyticsService.track).toHaveBeenCalledWith(
+        'learning.session.complete',
+        expect.objectContaining({
+          sessionId: 'session-123',
+          progress: 100
+        })
+      );
+    });
+  });
+
+  /**
+   * 用户总体进度获取测试
+   */
+  describe('GET /api/progress/overview', () => {
+    it('应该获取用户学习概览', async () => {
+      const overviewData = {
+        totalCourses: 15,
+        completedCourses: 8,
+        inProgressCourses: 7,
+        totalLearningTime: 2400,
+        streakDays: 15,
+        level: 8,
+        pointsEarned: 8500,
+        recentActivities: []
+      };
+      
+      mockLearningProgressService.getUserProgress.mockResolvedValue(overviewData);
+      
+      const response = await request(app)
+        .get('/api/progress/overview')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(200);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          data: expect.objectContaining({
+            totalCourses: 15,
+            completedCourses: 8,
+            inProgressCourses: 7,
+            totalLearningTime: 2400,
+            streakDays: 15,
+            level: 8
+          })
+        })
+      );
+    });
+
+    it('应该支持时间范围筛选', async () => {
+      const response = await request(app)
+        .get('/api/progress/overview?period=month')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(200);
+      
+      expect(mockLearningProgressService.getUserProgress).toHaveBeenCalledWith(
+        'user-123456',
+        expect.objectContaining({
+          period: 'month'
+        })
+      );
+    });
+  });
+
+  /**
+   * 学习目标管理测试
+   */
+  describe('POST /api/progress/goals', () => {
+    it('应该创建学习目标', async () => {
+      const goalData = {
+        title: '掌握React框架',
+        description: '在2个月内完成React相关课程',
+        type: 'skill_mastery',
+        targetValue: 3,
+        unit: 'courses',
+        deadline: '2024-06-01',
+        priority: 'high',
+        relatedSkills: ['react', 'javascript']
+      };
+      
+      mockLearningProgressService.createLearningGoal.mockResolvedValue(testLearningGoal);
+      
+      const response = await request(app)
+        .post('/api/progress/goals')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .send(goalData)
+        .expect(201);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          message: '学习目标创建成功',
+          data: expect.objectContaining({
+            id: expect.any(String),
+            title: goalData.title,
+            type: goalData.type
+          })
+        })
+      );
+    });
+
+    it('应该验证目标数据', async () => {
+      const response = await request(app)
+        .post('/api/progress/goals')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .send({
+          title: '', // 空标题
+          targetValue: -1, // 负数
+          deadline: '2020-01-01' // 过去的日期
+        })
+        .expect(400);
+      
+      expect(response.body.errors).toContainEqual(
+        expect.objectContaining({
+          field: 'title',
+          message: '目标标题不能为空'
+        })
+      );
+    });
+  });
+
+  /**
+   * 学习目标获取测试
+   */
+  describe('GET /api/progress/goals', () => {
+    it('应该获取用户学习目标列表', async () => {
+      mockLearningProgressService.getLearningGoals.mockResolvedValue([testLearningGoal]);
+      
+      const response = await request(app)
+        .get('/api/progress/goals')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(200);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          data: expect.arrayContaining([
+            expect.objectContaining({
+              id: 'goal-123',
+              title: '完成前端开发课程',
+              status: 'active',
+              progress: expect.any(Number)
+            })
+          ])
+        })
+      );
+    });
+
+    it('应该支持状态筛选', async () => {
+      const response = await request(app)
+        .get('/api/progress/goals?status=active')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(200);
+      
+      expect(mockLearningProgressService.getLearningGoals).toHaveBeenCalledWith(
+        'user-123456',
+        expect.objectContaining({
+          status: 'active'
+        })
+      );
+    });
+  });
+
+  /**
+   * 技能掌握度测试
+   */
+  describe('GET /api/progress/skills', () => {
+    it('应该获取技能掌握度', async () => {
+      mockLearningProgressService.getSkillMastery.mockResolvedValue([testSkillMastery]);
+      
+      const response = await request(app)
+        .get('/api/progress/skills')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(200);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          data: expect.arrayContaining([
+            expect.objectContaining({
+              skillName: 'JavaScript',
+              level: 'intermediate',
+              masteryScore: 75,
+              strengthAreas: expect.any(Array),
+              weaknessAreas: expect.any(Array)
+            })
+          ])
+        })
+      );
+    });
+  });
+
+  /**
+   * 学习推荐测试
+   */
+  describe('GET /api/progress/recommendations', () => {
+    it('应该获取个性化推荐', async () => {
+      const response = await request(app)
+        .get('/api/progress/recommendations')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(200);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          data: expect.objectContaining({
+            courses: expect.any(Array),
+            skills: expect.any(Array),
+            learningPaths: expect.any(Array)
+          })
+        })
+      );
+      
+      expect(mockAiService.generatePersonalizedRecommendations).toHaveBeenCalledWith(
+        'user-123456'
+      );
+    });
+
+    it('应该支持推荐类型筛选', async () => {
+      const response = await request(app)
+        .get('/api/progress/recommendations?type=courses')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(200);
+      
+      expect(mockAiService.generatePersonalizedRecommendations).toHaveBeenCalledWith(
+        'user-123456',
+        expect.objectContaining({
+          type: 'courses'
+        })
+      );
+    });
+  });
+
+  /**
+   * 学习路径生成测试
+   */
+  describe('POST /api/progress/learning-paths', () => {
+    it('应该生成个性化学习路径', async () => {
+      const pathData = {
+        targetSkills: ['react', 'nodejs'],
+        currentLevel: 'beginner',
+        timeAvailable: 10, // 每周小时数
+        deadline: '2024-12-31'
+      };
+      
+      const generatedPath = {
+        id: 'path-123',
+        title: 'Full Stack JavaScript开发路径',
+        estimatedDuration: 240, // 小时
+        courses: [
+          { courseId: 'course-js-basics', order: 1, isRequired: true },
+          { courseId: 'course-react', order: 2, isRequired: true },
+          { courseId: 'course-nodejs', order: 3, isRequired: true }
         ]
       };
       
-      mockSupabase.rpc.mockResolvedValue({
-        data: mockUserProgress,
-        error: null
-      });
+      mockAiService.generateLearningPath.mockResolvedValue(generatedPath);
       
-      const request = testUtils.createMockRequest('GET', '/api/users/user-123/progress');
-      const response = await GetUserProgress(request, { params: { id: 'user-123' } });
-      const data = await testUtils.parseResponse(response);
+      const response = await request(app)
+        .post('/api/progress/learning-paths')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .send(pathData)
+        .expect(201);
       
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.data.progress.total_courses).toBe(5);
-      expect(data.data.progress.completed_courses).toBe(2);
-      expect(data.data.progress.progress_by_course).toHaveLength(2);
-      expect(data.data.progress.recent_activities).toHaveLength(1);
-    });
-
-    it('应该支持AI分析和建议', async () => {
-      const mockUserProgress = {
-        user_id: 'user-123',
-        total_courses: 3,
-        completed_courses: 1,
-        in_progress_courses: 2,
-        average_score: 78
-      };
-      
-      const mockAiAnalysis = {
-        performance_level: 'intermediate',
-        strengths: ['前端基础扎实', '学习积极性高'],
-        weaknesses: ['JavaScript异步编程需要加强', '项目实践经验不足'],
-        recommendations: [
-          {
-            type: 'course',
-            title: 'JavaScript异步编程专项训练',
-            reason: '提升异步编程能力',
-            priority: 'high'
-          },
-          {
-            type: 'practice',
-            title: '完成一个完整的前端项目',
-            reason: '增加实践经验',
-            priority: 'medium'
-          }
-        ],
-        predicted_completion_time: '2024-03-15',
-        difficulty_adjustment: 'maintain' // maintain, increase, decrease
-      };
-      
-      mockSupabase.rpc.mockResolvedValue({
-        data: mockUserProgress,
-        error: null
-      });
-      
-      mockAiService.analyzeProgress.mockResolvedValue({
-        success: true,
-        analysis: mockAiAnalysis
-      });
-      
-      const request = testUtils.createMockRequest('GET', '/api/users/user-123/progress?include_ai_analysis=true');
-      const response = await GetUserProgress(request, { params: { id: 'user-123' } });
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.data.ai_analysis.performance_level).toBe('intermediate');
-      expect(data.data.ai_analysis.recommendations).toHaveLength(2);
-      expect(mockAiService.analyzeProgress).toHaveBeenCalledWith(mockUserProgress);
-    });
-
-    it('应该验证用户访问权限', async () => {
-      mockSecurity.validatePermissions.mockResolvedValue({ 
-        allowed: false, 
-        error: 'Cannot access this user progress' 
-      });
-      
-      const request = testUtils.createMockRequest('GET', '/api/users/other-user-123/progress');
-      const response = await GetUserProgress(request, { params: { id: 'other-user-123' } });
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(403);
-      expect(data.success).toBe(false);
-      expect(data.error).toBe('Cannot access this user progress');
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          message: '学习路径生成成功',
+          data: expect.objectContaining({
+            title: 'Full Stack JavaScript开发路径',
+            estimatedDuration: 240,
+            courses: expect.any(Array)
+          })
+        })
+      );
     });
   });
 
-  describe('POST /api/lessons/[id]/progress', () => {
-    it('应该成功更新课程进度', async () => {
-      const progressUpdate = {
-        progress_percentage: 100,
-        time_spent: 1800,
-        score: 95,
-        status: 'completed'
-      };
+  /**
+   * 错误处理测试
+   */
+  describe('Error Handling', () => {
+    it('应该处理服务不可用错误', async () => {
+      mockLearningProgressService.getCourseProgress.mockRejectedValue(
+        new Error('Service temporarily unavailable')
+      );
       
-      const mockUpdatedProgress = {
-        id: 'lesson-progress-123',
-        user_id: 'user-123',
-        course_id: 'course-1',
-        lesson_id: 'lesson-1',
-        status: 'completed',
-        progress_percentage: 100,
-        time_spent: 1800,
-        score: 95,
-        completed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
+      const response = await request(app)
+        .get('/api/progress/courses/course-123')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(500);
       
-      mockSupabase.from().upsert().select().single.mockResolvedValue({
-        data: mockUpdatedProgress,
-        error: null
-      });
-      
-      const request = testUtils.createMockRequest('POST', '/api/lessons/lesson-1/progress', progressUpdate);
-      const response = await UpdateLessonProgress(request, { params: { id: 'lesson-1' } });
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.data.progress.status).toBe('completed');
-      expect(data.data.progress.score).toBe(95);
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: false,
+          message: '服务器内部错误'
+        })
+      );
     });
 
-    it('应该自动更新课程整体进度', async () => {
-      const progressUpdate = {
-        progress_percentage: 100,
-        status: 'completed'
-      };
+    it('应该处理无效的课程ID', async () => {
+      const response = await request(app)
+        .get('/api/progress/courses/invalid-id')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(400);
       
-      const mockLessonProgress = {
-        id: 'lesson-progress-123',
-        user_id: 'user-123',
-        course_id: 'course-1',
-        lesson_id: 'lesson-1',
-        status: 'completed',
-        progress_percentage: 100
-      };
-      
-      const mockCourseProgress = {
-        user_id: 'user-123',
-        course_id: 'course-1',
-        overall_progress: 75, // 课程整体进度
-        completed_lessons: 3,
-        total_lessons: 4
-      };
-      
-      mockSupabase.from().upsert().select().single.mockResolvedValue({
-        data: mockLessonProgress,
-        error: null
-      });
-      
-      mockSupabase.rpc.mockResolvedValue({
-        data: mockCourseProgress,
-        error: null
-      });
-      
-      const request = testUtils.createMockRequest('POST', '/api/lessons/lesson-1/progress', progressUpdate);
-      const response = await UpdateLessonProgress(request, { params: { id: 'lesson-1' } });
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.data.course_progress.overall_progress).toBe(75);
-      expect(data.data.course_progress.completed_lessons).toBe(3);
-    });
-
-    it('应该验证课程访问权限', async () => {
-      mockSecurity.validatePermissions.mockResolvedValue({ 
-        allowed: false, 
-        error: 'Not enrolled in this course' 
-      });
-      
-      const progressUpdate = {
-        progress_percentage: 50
-      };
-      
-      const request = testUtils.createMockRequest('POST', '/api/lessons/lesson-1/progress', progressUpdate);
-      const response = await UpdateLessonProgress(request, { params: { id: 'lesson-1' } });
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(403);
-      expect(data.success).toBe(false);
-      expect(data.error).toBe('Not enrolled in this course');
-    });
-
-    it('应该处理课程不存在', async () => {
-      const progressUpdate = {
-        progress_percentage: 50
-      };
-      
-      mockSupabase.from().upsert().select().single.mockResolvedValue({
-        data: null,
-        error: { code: '23503', message: 'foreign key constraint violation' }
-      });
-      
-      const request = testUtils.createMockRequest('POST', '/api/lessons/non-existent-lesson/progress', progressUpdate);
-      const response = await UpdateLessonProgress(request, { params: { id: 'non-existent-lesson' } });
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(404);
-      expect(data.success).toBe(false);
-      expect(data.error).toBe('Lesson not found');
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: false,
+          message: '无效的课程ID格式'
+        })
+      );
     });
   });
 
-  describe('错误处理和边界情况', () => {
-    it('应该处理数据库连接错误', async () => {
-      const connectionError = new Error('Database connection failed');
-      mockSupabase.from().select().order().limit().range.mockRejectedValue(connectionError);
-      
-      const request = testUtils.createMockRequest('GET', '/api/progress');
-      const response = await GET(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(500);
-      expect(data.success).toBe(false);
-      expect(data.error).toBe('Database connection failed');
-      expect(mockApiMonitor.recordError).toHaveBeenCalledWith('call-id-123', connectionError);
-    });
-
-    it('应该处理AI服务错误', async () => {
-      const mockUserProgress = {
-        user_id: 'user-123',
-        total_courses: 3
-      };
-      
-      const aiError = new Error('AI service unavailable');
-      
-      mockSupabase.rpc.mockResolvedValue({
-        data: mockUserProgress,
-        error: null
-      });
-      
-      mockAiService.analyzeProgress.mockRejectedValue(aiError);
-      
-      const request = testUtils.createMockRequest('GET', '/api/users/user-123/progress?include_ai_analysis=true');
-      const response = await GetUserProgress(request, { params: { id: 'user-123' } });
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.data.progress).toBeDefined();
-      expect(data.data.ai_analysis).toBeUndefined(); // AI分析失败时不包含
-      expect(data.warnings).toContain('AI analysis unavailable');
-    });
-
-    it('应该处理无效的进度数据', async () => {
-      const invalidProgress = {
-        user_id: 'user-123',
-        course_id: 'course-1',
-        lesson_id: 'lesson-1',
-        progress_percentage: -10, // 无效值
-        time_spent: 'invalid' // 无效类型
-      };
-      
-      const request = testUtils.createMockRequest('POST', '/api/progress', invalidProgress);
-      const response = await POST(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(400);
-      expect(data.success).toBe(false);
-      expect(data.error).toContain('Invalid progress data');
-    });
-
-    it('应该处理并发更新冲突', async () => {
-      const updateData = {
-        id: 'progress-123',
-        progress_percentage: 80
-      };
-      
-      const conflictError = {
-        code: '40001',
-        message: 'serialization_failure'
-      };
-      
-      mockSupabase.from().update().eq().select().single.mockResolvedValue({
-        data: null,
-        error: conflictError
-      });
-      
-      const request = testUtils.createMockRequest('PUT', '/api/progress', updateData);
-      const response = await PUT(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(409);
-      expect(data.success).toBe(false);
-      expect(data.error).toBe('Progress update conflict, please retry');
-    });
-  });
-
-  describe('性能测试', () => {
-    it('应该高效处理大量进度查询', async () => {
-      const largeProgressList = Array.from({ length: 100 }, (_, i) => ({
-        id: `progress-${i}`,
-        user_id: `user-${i % 10}`,
-        course_id: `course-${i % 5}`,
-        lesson_id: `lesson-${i}`,
-        status: i % 3 === 0 ? 'completed' : 'in_progress',
-        progress_percentage: Math.floor(Math.random() * 100)
-      }));
-      
-      mockSupabase.from().select().order().limit().range.mockResolvedValue({
-        data: largeProgressList,
-        error: null,
-        count: 100
-      });
-      
+  /**
+   * 性能测试
+   */
+  describe('Performance Tests', () => {
+    it('应该在合理时间内返回进度数据', async () => {
       const startTime = Date.now();
-      const request = testUtils.createMockRequest('GET', '/api/progress?limit=100');
-      const response = await GET(request);
-      const endTime = Date.now();
       
-      expect(response.status).toBe(200);
-      expect(endTime - startTime).toBeLessThan(2000); // 应该在2秒内完成
+      await request(app)
+        .get('/api/progress/overview')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(200);
+      
+      const executionTime = Date.now() - startTime;
+      expect(executionTime).toBeLessThan(500); // 500ms内完成
     });
 
-    it('应该高效处理批量进度更新', async () => {
-      const batchUpdates = Array.from({ length: 50 }, (_, i) => ({
-        id: `progress-${i}`,
-        progress_percentage: Math.floor(Math.random() * 100),
-        time_spent: Math.floor(Math.random() * 3600)
-      }));
+    it('应该有效利用缓存', async () => {
+      const cacheKey = 'course_progress_user-123456_course-123';
+      mockCacheService.get.mockResolvedValue(JSON.stringify(testCourseProgress));
       
-      const batchUpdateData = {
-        updates: batchUpdates
-      };
+      await request(app)
+        .get('/api/progress/courses/course-123')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(200);
       
-      mockSupabase.from().upsert().select.mockResolvedValue({
-        data: batchUpdates,
-        error: null
-      });
-      
-      const startTime = Date.now();
-      const request = testUtils.createMockRequest('PUT', '/api/progress', batchUpdateData);
-      const response = await PUT(request);
-      const endTime = Date.now();
-      
-      expect(response.status).toBe(200);
-      expect(endTime - startTime).toBeLessThan(3000); // 应该在3秒内完成
+      expect(mockCacheService.get).toHaveBeenCalledWith(cacheKey);
+      expect(mockLearningProgressService.getCourseProgress).not.toHaveBeenCalled();
     });
 
-    it('应该高效处理并发进度更新', async () => {
-      const progressUpdate = {
-        progress_percentage: 75,
-        time_spent: 1200
-      };
+    it('应该批量处理进度更新', async () => {
+      const batchUpdates = [
+        { lessonId: 'lesson-1', progress: 100 },
+        { lessonId: 'lesson-2', progress: 50 },
+        { lessonId: 'lesson-3', progress: 25 }
+      ];
       
-      mockSupabase.from().upsert().select().single.mockResolvedValue({
-        data: {
-          id: 'concurrent-progress',
-          ...progressUpdate,
-          updated_at: new Date().toISOString()
-        },
-        error: null
-      });
+      const response = await request(app)
+        .put('/api/progress/batch')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .send({ updates: batchUpdates })
+        .expect(200);
       
-      const promises = Array.from({ length: 10 }, (_, i) => {
-        const request = testUtils.createMockRequest('POST', `/api/lessons/lesson-${i}/progress`, progressUpdate);
-        return UpdateLessonProgress(request, { params: { id: `lesson-${i}` } });
-      });
-      
-      const startTime = Date.now();
-      const responses = await Promise.all(promises);
-      const endTime = Date.now();
-      
-      expect(responses).toHaveLength(10);
-      expect(responses.every(r => r.status === 200)).toBe(true);
-      expect(endTime - startTime).toBeLessThan(5000); // 应该在5秒内完成
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          message: '批量更新成功',
+          data: expect.objectContaining({
+            updated: 3,
+            failed: 0
+          })
+        })
+      );
     });
   });
 });

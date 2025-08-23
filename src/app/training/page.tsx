@@ -1,210 +1,219 @@
-import Link from 'next/link'
+'use client';
+
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
+import { RefreshCw, Clock, Award, DollarSign } from 'lucide-react';
+import { aiDataGeneratorService } from '@/services/aiDataGeneratorService';
+import type { VirtualTraining } from '@/services/aiDataGeneratorService';
 
 export default function TrainingPage() {
-  const trainingCourses = [
-    {
-      id: 1,
-      title: "包装设计师",
-      description: "包装设计属于广告设计里面的一个细项，通过培训培养能在商品生产、流通领域，从事包装工艺设计、储运包装设计、销售包装设计等工作的专业人才。",
-      duration: "3个月",
-      level: "中级",
-      price: "¥3,800",
-      image: "/api/placeholder/300/200",
-      features: ["理论课程", "实操训练", "项目实战", "证书认证"]
-    },
-    {
-      id: 2,
-      title: "广告设计师",
-      description: "广告设计师指采用现代设计观念、程序和方法从事以平面广告设计为主的策划、创意与制作的专业人员。",
-      duration: "4个月",
-      level: "中级",
-      price: "¥4,200",
-      image: "/api/placeholder/300/200",
-      features: ["创意设计", "软件应用", "品牌策划", "作品集制作"]
-    },
-    {
-      id: 3,
-      title: "美容师",
-      description: "美容师是一种专业美容领域的职业称谓，主要工作在能为顾客提供美容服务的场所，工作职责是为顾客提供美容服务，包括皮肤护理、化妆、美甲等。",
-      duration: "2个月",
-      level: "初级",
-      price: "¥2,800",
-      image: "/api/placeholder/300/200",
-      features: ["基础理论", "实操技能", "产品知识", "服务礼仪"]
-    },
-    {
-      id: 4,
-      title: "形象设计师",
-      description: "通过提升人的内在素养、协调和美化外在形象，使其更加具有独特魅力的工作统称为形象设计。",
-      duration: "3个月",
-      level: "中级",
-      price: "¥3,600",
-      image: "/api/placeholder/300/200",
-      features: ["色彩搭配", "风格定位", "造型设计", "形象管理"]
-    },
-    {
-      id: 5,
-      title: "室内装饰设计师",
-      description: "室内装饰设计师负责室内空间的设计规划，包括空间布局、色彩搭配、材料选择、家具配置等，创造美观实用的室内环境。",
-      duration: "6个月",
-      level: "高级",
-      price: "¥6,800",
-      image: "/api/placeholder/300/200",
-      features: ["空间设计", "材料应用", "施工管理", "项目管理"]
-    },
-    {
-      id: 6,
-      title: "工业设计师",
-      description: "工业设计师专注于产品的外观设计、功能设计和用户体验设计，将创意转化为实用的工业产品。",
-      duration: "5个月",
-      level: "高级",
-      price: "¥5,500",
-      image: "/api/placeholder/300/200",
-      features: ["产品设计", "3D建模", "原型制作", "市场调研"]
+  const [trainingCourses, setTrainingCourses] = useState<VirtualTraining[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // 加载虚拟培训数据
+  const loadTraining = async () => {
+    try {
+      setLoading(true);
+      const virtualTraining = await aiDataGeneratorService.generateTraining(9);
+      setTrainingCourses(virtualTraining);
+    } catch (error) {
+      console.error('加载培训数据失败:', error);
+    } finally {
+      setLoading(false);
     }
-  ]
+  };
+
+  // 刷新培训数据
+  const refreshTraining = async () => {
+    try {
+      setRefreshing(true);
+      const virtualTraining = await aiDataGeneratorService.generateTraining(9, true);
+      setTrainingCourses(virtualTraining);
+    } catch (error) {
+      console.error('刷新培训数据失败:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // 初始化加载
+  useEffect(() => {
+    loadTraining();
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* 页面头部 */}
-      <div className="bg-white border-b">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex items-center space-x-4 mb-6">
-            <Link href="/" className="text-blue-600 hover:underline">首页</Link>
-            <span>/</span>
-            <span className="text-gray-600">评价与培训</span>
-          </div>
-          <h1 className="text-3xl font-bold mb-4">评价与培训</h1>
-          <p className="text-gray-600">专业的职业技能培训，助力您的职业发展</p>
-        </div>
-      </div>
-
-      {/* 培训介绍 */}
-      <div className="bg-blue-600 text-white py-12">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-2xl font-bold mb-4">为什么选择我们的培训？</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-8">
-            <div>
-              <div className="text-3xl mb-2">🎯</div>
-              <h3 className="font-semibold mb-2">专业认证</h3>
-              <p className="text-blue-100">获得国家认可的职业技能等级证书</p>
-            </div>
-            <div>
-              <div className="text-3xl mb-2">👨‍🏫</div>
-              <h3 className="font-semibold mb-2">名师授课</h3>
-              <p className="text-blue-100">行业资深专家亲自授课指导</p>
-            </div>
-            <div>
-              <div className="text-3xl mb-2">💼</div>
-              <h3 className="font-semibold mb-2">就业保障</h3>
-              <p className="text-blue-100">提供就业指导和推荐服务</p>
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <h1 className="text-4xl font-bold mb-4">虚拟技能培训</h1>
+            <p className="text-xl text-blue-100 max-w-3xl mx-auto">
+              AI生成的虚拟职业技能培训项目，展示多样化的培训内容
+            </p>
+            <div className="mt-6">
+              <button
+                onClick={refreshTraining}
+                disabled={refreshing}
+                className="inline-flex items-center px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                {refreshing ? '刷新中...' : '刷新培训数据'}
+              </button>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* 课程列表 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {trainingCourses.map((course) => (
-            <div key={course.id} className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-lg transition-shadow">
-              <div className="h-48 bg-gray-200 relative">
-                <div className="absolute top-4 right-4">
-                  <span className="px-3 py-1 text-xs font-semibold text-white bg-green-600 rounded-full">
-                    {course.level}
-                  </span>
+        <h2 className="text-3xl font-bold text-center mb-12 text-gray-900">虚拟培训课程</h2>
+        
+        {loading ? (
+          <div className="flex justify-center items-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <span className="ml-3 text-gray-600">加载培训数据中...</span>
+          </div>
+        ) : trainingCourses.length === 0 ? (
+          <div className="text-center py-20">
+            <div className="text-gray-400 text-6xl mb-4">📚</div>
+            <h3 className="text-xl font-semibold text-gray-600 mb-2">暂无培训课程</h3>
+            <p className="text-gray-500 mb-6">请稍后再试或点击刷新按钮重新加载</p>
+            <button
+              onClick={loadTraining}
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              重新加载
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {trainingCourses.map((course) => (
+              <div key={course.id} className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
+                <div className="relative h-48 overflow-hidden">
+                  <Image 
+                    src={course.image} 
+                    alt={course.title}
+                    fill
+                    className="object-cover transition-transform duration-300 hover:scale-105"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = '/api/placeholder/300/200';
+                    }}
+                  />
+                  <div className="absolute top-4 right-4">
+                    <span className="bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-sm font-medium text-gray-700">
+                      {course.category}
+                    </span>
+                  </div>
                 </div>
-              </div>
-              <div className="p-6">
-                <h3 className="font-semibold text-xl mb-3">{course.title}</h3>
-                <p className="text-gray-600 text-sm mb-4 line-clamp-3">{course.description}</p>
                 
-                <div className="flex justify-between items-center mb-4">
-                  <div className="text-sm text-gray-500">
-                    <span>培训时长：{course.duration}</span>
+                <div className="p-6">
+                  <h3 className="text-xl font-bold mb-3 text-gray-900 line-clamp-2">{course.title}</h3>
+                  <p className="text-gray-600 mb-4 line-clamp-3 text-sm leading-relaxed">{course.description}</p>
+                  
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center space-x-4 text-sm text-gray-500">
+                      <div className="flex items-center">
+                        <Clock className="w-4 h-4 mr-1" />
+                        <span>{course.duration}</span>
+                      </div>
+                      <div className="flex items-center">
+                        <Award className="w-4 h-4 mr-1" />
+                        <span>{course.level}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center text-lg font-bold text-blue-600">
+                      <DollarSign className="w-5 h-5" />
+                      <span>{course.price}</span>
+                    </div>
                   </div>
-                  <div className="text-lg font-bold text-blue-600">
-                    {course.price}
+                  
+                  <div className="mb-6">
+                    <h4 className="font-semibold mb-3 text-gray-900">课程特色：</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {course.features.map((feature, index) => (
+                        <span key={index} className="bg-gradient-to-r from-blue-50 to-purple-50 text-blue-700 px-3 py-1 rounded-full text-sm font-medium border border-blue-100">
+                          {feature}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </div>
-
-                <div className="mb-6">
-                  <h4 className="font-semibold text-sm mb-2">课程特色：</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {course.features.map((feature, index) => (
-                      <span 
-                        key={index}
-                        className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded"
-                      >
-                        {feature}
-                      </span>
-                    ))}
+                  
+                  <div className="flex space-x-3">
+                    <button className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-4 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 font-medium">
+                      咨询客服
+                    </button>
+                    <Link 
+                      href={`/training/${course.id}`}
+                      className="flex-1 border-2 border-blue-600 text-blue-600 py-3 px-4 rounded-lg hover:bg-blue-50 transition-colors font-medium text-center"
+                    >
+                      查看详情
+                    </Link>
                   </div>
-                </div>
-
-                <div className="flex space-x-3">
-                  <button className="flex-1 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition-colors">
-                    咨询客服
-                  </button>
-                  <Link 
-                    href={`/training/${course.id}`}
-                    className="flex-1 border border-blue-600 text-blue-600 py-2 px-4 rounded hover:bg-blue-50 transition-colors text-center"
-                  >
-                    查看详情
-                  </Link>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         {/* 培训优势 */}
-        <div className="mt-16 bg-white rounded-lg p-8 shadow-sm">
-          <h2 className="text-2xl font-bold mb-8 text-center">培训优势</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="text-center">
-              <div className="text-4xl mb-4">📚</div>
-              <h3 className="font-semibold mb-2">系统课程</h3>
-              <p className="text-gray-600 text-sm">完善的课程体系，理论与实践相结合</p>
-            </div>
-            <div className="text-center">
-              <div className="text-4xl mb-4">🎓</div>
-              <h3 className="font-semibold mb-2">权威认证</h3>
-              <p className="text-gray-600 text-sm">国家认可的职业技能等级证书</p>
-            </div>
-            <div className="text-center">
-              <div className="text-4xl mb-4">👥</div>
-              <h3 className="font-semibold mb-2">小班教学</h3>
-              <p className="text-gray-600 text-sm">小班制教学，确保学习效果</p>
-            </div>
-            <div className="text-center">
-              <div className="text-4xl mb-4">💡</div>
-              <h3 className="font-semibold mb-2">实战项目</h3>
-              <p className="text-gray-600 text-sm">真实项目实战，积累工作经验</p>
+        <div className="bg-gradient-to-br from-gray-50 to-blue-50 py-16 mt-16">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 className="text-3xl font-bold text-center mb-12 text-gray-900">虚拟培训优势</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+              <div className="text-center group">
+                <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <span className="text-3xl">🎓</span>
+                </div>
+                <h3 className="font-bold mb-3 text-gray-900">AI智能认证</h3>
+                <p className="text-gray-600 text-sm leading-relaxed">虚拟智能化职业技能认证体系</p>
+              </div>
+              <div className="text-center group">
+                <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <span className="text-3xl">🤖</span>
+                </div>
+                <h3 className="font-bold mb-3 text-gray-900">虚拟导师</h3>
+                <p className="text-gray-600 text-sm leading-relaxed">AI生成的专业虚拟导师团队</p>
+              </div>
+              <div className="text-center group">
+                <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <span className="text-3xl">💡</span>
+                </div>
+                <h3 className="font-bold mb-3 text-gray-900">智能推荐</h3>
+                <p className="text-gray-600 text-sm leading-relaxed">个性化虚拟学习路径规划</p>
+              </div>
+              <div className="text-center group">
+                <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <span className="text-3xl">🚀</span>
+                </div>
+                <h3 className="font-bold mb-3 text-gray-900">虚拟实战</h3>
+                <p className="text-gray-600 text-sm leading-relaxed">模拟真实项目的虚拟实践环境</p>
+              </div>
             </div>
           </div>
         </div>
 
         {/* 联系方式 */}
-        <div className="mt-12 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg p-8 text-center">
-          <h2 className="text-2xl font-bold mb-4">立即咨询报名</h2>
-          <p className="mb-6">专业顾问为您提供详细的课程信息和报名指导</p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <div className="text-lg font-semibold mb-2">课程咨询</div>
-              <div className="text-2xl font-bold">18923703302</div>
-            </div>
-            <div>
-              <div className="text-lg font-semibold mb-2">培训服务</div>
-              <div className="text-2xl font-bold">18128859061</div>
-            </div>
-            <div>
-              <div className="text-lg font-semibold mb-2">报考咨询</div>
-              <div className="text-2xl font-bold">18823319017</div>
+        <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 text-white py-16">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2 className="text-3xl font-bold mb-8">开启虚拟学习之旅</h2>
+            <p className="text-blue-100 mb-8 max-w-2xl mx-auto text-lg leading-relaxed">
+              体验AI生成的虚拟培训内容，探索未来教育的无限可能
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button className="bg-white text-blue-600 px-8 py-4 rounded-xl font-bold hover:bg-gray-100 transition-all duration-200 transform hover:scale-105 shadow-lg">
+                体验虚拟咨询
+              </button>
+              <button className="border-2 border-white text-white px-8 py-4 rounded-xl font-bold hover:bg-white hover:text-blue-600 transition-all duration-200 transform hover:scale-105">
+                探索更多虚拟课程
+              </button>
             </div>
           </div>
         </div>
       </div>
     </div>
   )
-} 
+}

@@ -1,1110 +1,1397 @@
 /**
- * 用户API路由集成测试
- * 测试用户的CRUD操作、认证、权限控制等功能
+ * 用户API集成测试
+ * 
+ * 测试用户相关的API端点，包括：
+ * - 用户信息管理
+ * - 用户资料更新
+ * - 用户偏好设置
+ * - 用户学习记录
+ * - 用户成就系统
+ * - 用户社交功能
+ * - 用户权限管理
+ * - 用户数据导出
  */
 
-import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { NextRequest, NextResponse } from 'next/server';
-import { GET, POST, PUT, DELETE } from '@/app/api/users/route';
-import { GET as GetUserById, PUT as UpdateUser, DELETE as DeleteUser } from '@/app/api/users/[id]/route';
-import { POST as LoginUser } from '@/app/api/auth/login/route';
-import { POST as RegisterUser } from '@/app/api/auth/register/route';
-import { testUtils } from '../setup';
+import request from 'supertest';
+import { app } from '../../app';
+import { supabaseClient } from '../../utils/supabase';
+import { cacheService } from '../../services/cacheService';
+import { auditService } from '../../services/auditService';
+import { analyticsService } from '../../services/analyticsService';
+import { learningProgressService } from '../../services/learningProgressService';
+import { emailService } from '../../services/emailService';
+import { smsService } from '../../services/smsService';
+import { baiduFaceService } from '../../services/baiduFaceService';
+import { envConfig } from '../../config/envConfig';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
-// 模拟依赖
-const mockSupabase = {
-  from: jest.fn(() => ({
-    select: jest.fn(() => ({
-      eq: jest.fn(() => ({
-        single: jest.fn(),
-        order: jest.fn(() => ({
-          limit: jest.fn(() => ({
-            range: jest.fn()
-          }))
-        }))
-      })),
-      order: jest.fn(() => ({
-        limit: jest.fn(() => ({
-          range: jest.fn()
-        }))
-      })),
-      limit: jest.fn(() => ({
-        range: jest.fn()
-      })),
-      range: jest.fn()
-    })),
-    insert: jest.fn(() => ({
-      select: jest.fn(() => ({
-        single: jest.fn()
-      }))
-    })),
-    update: jest.fn(() => ({
-      eq: jest.fn(() => ({
-        select: jest.fn(() => ({
-          single: jest.fn()
-        }))
-      }))
-    })),
-    delete: jest.fn(() => ({
-      eq: jest.fn()
-    }))
-  })),
-  auth: {
-    signUp: jest.fn(),
-    signInWithPassword: jest.fn(),
-    signOut: jest.fn(),
-    getUser: jest.fn()
+// Mock 依赖
+jest.mock('../../utils/supabase');
+jest.mock('../../services/cacheService');
+jest.mock('../../services/auditService');
+jest.mock('../../services/analyticsService');
+jest.mock('../../services/learningProgressService');
+jest.mock('../../services/emailService');
+jest.mock('../../services/smsService');
+jest.mock('../../services/baiduFaceService');
+jest.mock('../../config/envConfig');
+jest.mock('jsonwebtoken');
+jest.mock('bcryptjs');
+jest.mock('crypto');
+
+// 类型定义
+interface User {
+  id: string;
+  email: string;
+  username: string;
+  firstName: string;
+  lastName: string;
+  displayName: string;
+  avatar: string;
+  bio: string;
+  phone: string;
+  dateOfBirth: Date;
+  gender: 'male' | 'female' | 'other' | 'prefer_not_to_say';
+  location: {
+    country: string;
+    city: string;
+    timezone: string;
+  };
+  preferences: {
+    language: string;
+    theme: 'light' | 'dark' | 'auto';
+    notifications: {
+      email: boolean;
+      sms: boolean;
+      push: boolean;
+      marketing: boolean;
+    };
+    privacy: {
+      profileVisibility: 'public' | 'friends' | 'private';
+      showProgress: boolean;
+      showAchievements: boolean;
+    };
+  };
+  role: 'student' | 'instructor' | 'admin' | 'moderator';
+  status: 'active' | 'inactive' | 'suspended' | 'pending_verification';
+  emailVerified: boolean;
+  phoneVerified: boolean;
+  twoFactorEnabled: boolean;
+  lastLoginAt: Date;
+  lastActiveAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface UserProfile {
+  id: string;
+  userId: string;
+  education: {
+    level: string;
+    institution: string;
+    major: string;
+    graduationYear: number;
+  }[];
+  experience: {
+    company: string;
+    position: string;
+    startDate: Date;
+    endDate?: Date;
+    description: string;
+  }[];
+  skills: {
+    name: string;
+    level: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+    verified: boolean;
+  }[];
+  interests: string[];
+  goals: string[];
+  socialLinks: {
+    platform: string;
+    url: string;
+  }[];
+  certifications: {
+    name: string;
+    issuer: string;
+    issueDate: Date;
+    expiryDate?: Date;
+    credentialId: string;
+    url?: string;
+  }[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface UserAchievement {
+  id: string;
+  userId: string;
+  achievementId: string;
+  unlockedAt: Date;
+  progress: number;
+  metadata: Record<string, any>;
+}
+
+interface UserLearningStats {
+  totalCourses: number;
+  completedCourses: number;
+  inProgressCourses: number;
+  totalLearningTime: number; // 分钟
+  streakDays: number;
+  longestStreak: number;
+  averageSessionTime: number;
+  skillsLearned: number;
+  certificatesEarned: number;
+  pointsEarned: number;
+  rank: number;
+  level: number;
+}
+
+interface UserActivity {
+  id: string;
+  userId: string;
+  type: 'course_start' | 'lesson_complete' | 'quiz_pass' | 'achievement_unlock' | 'certificate_earn';
+  entityType: 'course' | 'lesson' | 'quiz' | 'achievement' | 'certificate';
+  entityId: string;
+  metadata: Record<string, any>;
+  createdAt: Date;
+}
+
+interface UserFollowing {
+  id: string;
+  followerId: string;
+  followingId: string;
+  createdAt: Date;
+}
+
+// Mock 实例
+const mockSupabaseClient = {
+  from: jest.fn().mockReturnThis(),
+  select: jest.fn().mockReturnThis(),
+  insert: jest.fn().mockReturnThis(),
+  update: jest.fn().mockReturnThis(),
+  delete: jest.fn().mockReturnThis(),
+  eq: jest.fn().mockReturnThis(),
+  neq: jest.fn().mockReturnThis(),
+  in: jest.fn().mockReturnThis(),
+  gte: jest.fn().mockReturnThis(),
+  lte: jest.fn().mockReturnThis(),
+  like: jest.fn().mockReturnThis(),
+  ilike: jest.fn().mockReturnThis(),
+  contains: jest.fn().mockReturnThis(),
+  order: jest.fn().mockReturnThis(),
+  limit: jest.fn().mockReturnThis(),
+  offset: jest.fn().mockReturnThis(),
+  range: jest.fn().mockReturnThis(),
+  single: jest.fn(),
+  then: jest.fn(),
+  count: jest.fn().mockReturnThis(),
+  rpc: jest.fn(),
+  storage: {
+    from: jest.fn().mockReturnThis(),
+    upload: jest.fn(),
+    download: jest.fn(),
+    remove: jest.fn(),
+    getPublicUrl: jest.fn()
   }
 };
 
-const mockSecurity = {
-  validateApiKey: jest.fn(),
-  checkRateLimit: jest.fn(),
-  validatePermissions: jest.fn(),
-  hashPassword: jest.fn(),
-  verifyPassword: jest.fn(),
-  generateToken: jest.fn(),
-  verifyToken: jest.fn()
+const mockCacheService = {
+  get: jest.fn(),
+  set: jest.fn(),
+  del: jest.fn(),
+  mget: jest.fn(),
+  mset: jest.fn(),
+  expire: jest.fn(),
+  zadd: jest.fn(),
+  zrange: jest.fn(),
+  zrem: jest.fn(),
+  incr: jest.fn(),
+  decr: jest.fn()
 };
 
-const mockApiMonitor = {
-  startCall: jest.fn(() => 'call-id-123'),
-  endCall: jest.fn(),
-  recordError: jest.fn()
+const mockAuditService = {
+  log: jest.fn(),
+  logUserActivity: jest.fn()
 };
 
-const mockFaceRecognition = {
+const mockAnalyticsService = {
+  track: jest.fn(),
+  increment: jest.fn(),
+  gauge: jest.fn()
+};
+
+const mockLearningProgressService = {
+  getUserStats: jest.fn(),
+  getUserAchievements: jest.fn(),
+  getUserActivities: jest.fn(),
+  calculateUserLevel: jest.fn()
+};
+
+const mockEmailService = {
+  sendEmail: jest.fn(),
+  sendVerificationEmail: jest.fn(),
+  sendPasswordResetEmail: jest.fn()
+};
+
+const mockSmsService = {
+  sendSms: jest.fn(),
+  sendVerificationCode: jest.fn()
+};
+
+const mockBaiduFaceService = {
   detectFace: jest.fn(),
   compareFaces: jest.fn(),
-  verifyIdentity: jest.fn()
+  addUser: jest.fn(),
+  updateUser: jest.fn(),
+  deleteUser: jest.fn()
 };
 
-const mockCloudStorage = {
-  uploadFile: jest.fn(),
-  deleteFile: jest.fn(),
-  getFileUrl: jest.fn()
+const mockEnvConfig = {
+  users: {
+    maxAvatarSize: 5 * 1024 * 1024, // 5MB
+    allowedAvatarFormats: ['jpg', 'jpeg', 'png', 'webp'],
+    enableFaceVerification: true,
+    enableSocialLogin: true,
+    defaultCacheExpiry: 1800, // 30分钟
+    maxBioLength: 500,
+    maxUsernameLength: 50,
+    minPasswordLength: 8
+  },
+  pagination: {
+    defaultLimit: 20,
+    maxLimit: 100
+  }
 };
 
-jest.mock('@/utils/supabase', () => ({
-  createClient: () => mockSupabase
-}));
+const mockJwt = {
+  verify: jest.fn(),
+  sign: jest.fn()
+};
 
-jest.mock('@/middleware/security', () => ({
-  security: mockSecurity
-}));
+const mockBcrypt = {
+  hash: jest.fn(),
+  compare: jest.fn()
+};
 
-jest.mock('@/utils/apiMonitor', () => ({
-  apiMonitor: mockApiMonitor
-}));
+const mockCrypto = {
+  randomBytes: jest.fn(),
+  createHash: jest.fn().mockReturnThis(),
+  update: jest.fn().mockReturnThis(),
+  digest: jest.fn()
+};
 
-jest.mock('@/services/faceRecognitionService', () => ({
-  faceRecognitionService: mockFaceRecognition
-}));
+// 设置 Mock
+(supabaseClient as any) = mockSupabaseClient;
+(cacheService as any) = mockCacheService;
+(auditService as any) = mockAuditService;
+(analyticsService as any) = mockAnalyticsService;
+(learningProgressService as any) = mockLearningProgressService;
+(emailService as any) = mockEmailService;
+(smsService as any) = mockSmsService;
+(baiduFaceService as any) = mockBaiduFaceService;
+(envConfig as any) = mockEnvConfig;
+(jwt as any) = mockJwt;
+(bcrypt as any) = mockBcrypt;
+(crypto as any) = mockCrypto;
 
-jest.mock('@/services/cloudStorageService', () => ({
-  cloudStorageService: mockCloudStorage
-}));
+// 测试数据
+const testUser: User = {
+  id: 'user-123456',
+  email: 'test@skillup.com',
+  username: 'testuser',
+  firstName: '张',
+  lastName: '三',
+  displayName: '张三',
+  avatar: 'https://example.com/avatar.jpg',
+  bio: '热爱学习的程序员，专注于前端开发技术。',
+  phone: '+86-13800138000',
+  dateOfBirth: new Date('1990-01-01'),
+  gender: 'male',
+  location: {
+    country: 'China',
+    city: 'Beijing',
+    timezone: 'Asia/Shanghai'
+  },
+  preferences: {
+    language: 'zh-CN',
+    theme: 'light',
+    notifications: {
+      email: true,
+      sms: false,
+      push: true,
+      marketing: false
+    },
+    privacy: {
+      profileVisibility: 'public',
+      showProgress: true,
+      showAchievements: true
+    }
+  },
+  role: 'student',
+  status: 'active',
+  emailVerified: true,
+  phoneVerified: false,
+  twoFactorEnabled: false,
+  lastLoginAt: new Date(),
+  lastActiveAt: new Date(),
+  createdAt: new Date('2024-01-01'),
+  updatedAt: new Date()
+};
 
-describe('用户API路由', () => {
+const testProfile: UserProfile = {
+  id: 'profile-123',
+  userId: 'user-123456',
+  education: [
+    {
+      level: '本科',
+      institution: '北京大学',
+      major: '计算机科学与技术',
+      graduationYear: 2012
+    }
+  ],
+  experience: [
+    {
+      company: '腾讯科技',
+      position: '前端开发工程师',
+      startDate: new Date('2020-01-01'),
+      endDate: new Date('2023-12-31'),
+      description: '负责微信小程序前端开发'
+    }
+  ],
+  skills: [
+    {
+      name: 'JavaScript',
+      level: 'advanced',
+      verified: true
+    },
+    {
+      name: 'React',
+      level: 'intermediate',
+      verified: false
+    }
+  ],
+  interests: ['前端开发', '人工智能', '区块链'],
+  goals: ['成为全栈开发者', '学习机器学习'],
+  socialLinks: [
+    {
+      platform: 'github',
+      url: 'https://github.com/testuser'
+    }
+  ],
+  certifications: [
+    {
+      name: 'AWS Certified Developer',
+      issuer: 'Amazon Web Services',
+      issueDate: new Date('2023-06-01'),
+      credentialId: 'AWS-123456',
+      url: 'https://aws.amazon.com/verification'
+    }
+  ],
+  createdAt: new Date(),
+  updatedAt: new Date()
+};
+
+const testLearningStats: UserLearningStats = {
+  totalCourses: 15,
+  completedCourses: 8,
+  inProgressCourses: 7,
+  totalLearningTime: 2400, // 40小时
+  streakDays: 15,
+  longestStreak: 30,
+  averageSessionTime: 45,
+  skillsLearned: 12,
+  certificatesEarned: 3,
+  pointsEarned: 8500,
+  rank: 156,
+  level: 8
+};
+
+// 认证中间件模拟
+const mockAuthUser = {
+  id: 'user-123456',
+  email: 'test@skillup.com',
+  role: 'student'
+};
+
+const mockInstructorUser = {
+  id: 'user-instructor',
+  email: 'instructor@skillup.com',
+  role: 'instructor'
+};
+
+const mockAdminUser = {
+  id: 'user-admin',
+  email: 'admin@skillup.com',
+  role: 'admin'
+};
+
+describe('Users API', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     
-    // 设置默认的成功响应
-    mockSecurity.validateApiKey.mockResolvedValue({ valid: true, keyId: 'test-key' });
-    mockSecurity.checkRateLimit.mockResolvedValue({ allowed: true });
-    mockSecurity.validatePermissions.mockResolvedValue({ allowed: true });
-    mockSecurity.hashPassword.mockResolvedValue('hashed-password-123');
-    mockSecurity.verifyPassword.mockResolvedValue(true);
-    mockSecurity.generateToken.mockResolvedValue('jwt-token-123');
-    mockSecurity.verifyToken.mockResolvedValue({ valid: true, userId: 'user-123' });
-  });
-
-  describe('GET /api/users', () => {
-    it('应该成功获取用户列表', async () => {
-      const mockUsers = [
-        {
-          id: 'user-1',
-          email: 'user1@example.com',
-          username: 'user1',
-          full_name: '用户一',
-          role: 'student',
-          status: 'active',
-          created_at: '2024-01-01T00:00:00Z',
-          last_login: '2024-01-15T10:30:00Z'
-        },
-        {
-          id: 'user-2',
-          email: 'user2@example.com',
-          username: 'user2',
-          full_name: '用户二',
-          role: 'instructor',
-          status: 'active',
-          created_at: '2024-01-02T00:00:00Z',
-          last_login: '2024-01-16T09:15:00Z'
-        }
-      ];
-      
-      const mockSupabaseResponse = {
-        data: mockUsers,
-        error: null,
-        count: 2
-      };
-      
-      mockSupabase.from().select().order().limit().range.mockResolvedValue(mockSupabaseResponse);
-      
-      const request = testUtils.createMockRequest('GET', '/api/users');
-      const response = await GET(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.data.users).toHaveLength(2);
-      expect(data.data.users[0].email).toBe('user1@example.com');
-      expect(data.data.pagination.total).toBe(2);
-      expect(mockApiMonitor.startCall).toHaveBeenCalledWith('GET', '/api/users');
-      expect(mockApiMonitor.endCall).toHaveBeenCalledWith('call-id-123', 200);
+    // 设置默认的mock返回值
+    mockCacheService.get.mockResolvedValue(null);
+    mockCacheService.set.mockResolvedValue(true);
+    mockCacheService.mget.mockResolvedValue([]);
+    mockCacheService.mset.mockResolvedValue(true);
+    
+    mockAuditService.log.mockResolvedValue(true);
+    mockAnalyticsService.track.mockResolvedValue(true);
+    
+    mockLearningProgressService.getUserStats.mockResolvedValue(testLearningStats);
+    mockLearningProgressService.getUserAchievements.mockResolvedValue([]);
+    mockLearningProgressService.getUserActivities.mockResolvedValue([]);
+    mockLearningProgressService.calculateUserLevel.mockResolvedValue(8);
+    
+    mockEmailService.sendEmail.mockResolvedValue(true);
+    mockSmsService.sendSms.mockResolvedValue(true);
+    
+    mockBaiduFaceService.detectFace.mockResolvedValue({
+      faces: [{ confidence: 0.95 }]
     });
-
-    it('应该支持用户筛选', async () => {
-      const mockFilteredUsers = [
-        {
-          id: 'instructor-1',
-          email: 'instructor@example.com',
-          role: 'instructor',
-          status: 'active'
-        }
-      ];
-      
-      const mockSupabaseResponse = {
-        data: mockFilteredUsers,
-        error: null,
-        count: 1
-      };
-      
-      mockSupabase.from().select().eq().order().limit().range.mockResolvedValue(mockSupabaseResponse);
-      
-      const request = testUtils.createMockRequest('GET', '/api/users?role=instructor&status=active');
-      const response = await GET(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(200);
-      expect(data.data.users).toHaveLength(1);
-      expect(data.data.users[0].role).toBe('instructor');
-      expect(data.data.users[0].status).toBe('active');
+    
+    // 设置JWT验证
+    mockJwt.verify.mockReturnValue(mockAuthUser);
+    mockJwt.sign.mockReturnValue('jwt-token-123');
+    
+    // 设置密码加密
+    mockBcrypt.hash.mockResolvedValue('hashed-password');
+    mockBcrypt.compare.mockResolvedValue(true);
+    
+    // 设置随机数生成
+    mockCrypto.randomBytes.mockReturnValue(Buffer.from('random-bytes'));
+    mockCrypto.digest.mockReturnValue('random-hash');
+    
+    // 设置Supabase默认返回值
+    mockSupabaseClient.single.mockResolvedValue({
+      data: testUser,
+      error: null
     });
-
-    it('应该支持用户搜索', async () => {
-      const mockSearchResults = [
-        {
-          id: 'user-1',
-          email: 'john.doe@example.com',
-          username: 'johndoe',
-          full_name: 'John Doe'
-        }
-      ];
-      
-      const mockSupabaseResponse = {
-        data: mockSearchResults,
-        error: null,
-        count: 1
-      };
-      
-      mockSupabase.from().select().order().limit().range.mockResolvedValue(mockSupabaseResponse);
-      
-      const request = testUtils.createMockRequest('GET', '/api/users?search=john');
-      const response = await GET(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(200);
-      expect(data.data.users).toHaveLength(1);
-      expect(data.data.users[0].username).toContain('john');
+    
+    mockSupabaseClient.then.mockResolvedValue({
+      data: [testUser],
+      error: null,
+      count: 1
     });
-
-    it('应该验证管理员权限', async () => {
-      mockSecurity.validatePermissions.mockResolvedValue({ 
-        allowed: false, 
-        error: 'Admin access required' 
-      });
-      
-      const request = testUtils.createMockRequest('GET', '/api/users');
-      const response = await GET(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(403);
-      expect(data.success).toBe(false);
-      expect(data.error).toBe('Admin access required');
+    
+    mockSupabaseClient.count.mockResolvedValue({
+      data: null,
+      error: null,
+      count: 1
+    });
+    
+    mockSupabaseClient.storage.getPublicUrl.mockReturnValue({
+      data: { publicUrl: 'https://example.com/avatar.jpg' }
     });
   });
 
-  describe('POST /api/users', () => {
-    it('应该成功创建用户', async () => {
-      const newUser = {
-        email: 'newuser@example.com',
-        username: 'newuser',
-        password: 'SecurePassword123!',
-        full_name: '新用户',
-        role: 'student'
-      };
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  /**
+   * 用户信息获取测试
+   */
+  describe('GET /api/users/me', () => {
+    it('应该获取当前用户信息', async () => {
+      const response = await request(app)
+        .get('/api/users/me')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(200);
       
-      const mockCreatedUser = {
-        id: 'new-user-123',
-        email: 'newuser@example.com',
-        username: 'newuser',
-        full_name: '新用户',
-        role: 'student',
-        status: 'active',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          data: expect.objectContaining({
+            id: 'user-123456',
+            email: 'test@skillup.com',
+            username: 'testuser',
+            displayName: '张三',
+            avatar: 'https://example.com/avatar.jpg',
+            role: 'student',
+            status: 'active'
+          })
+        })
+      );
       
-      mockSupabase.auth.signUp.mockResolvedValue({
-        data: {
-          user: { id: 'new-user-123', email: 'newuser@example.com' },
-          session: null
-        },
-        error: null
-      });
-      
-      mockSupabase.from().insert().select().single.mockResolvedValue({
-        data: mockCreatedUser,
-        error: null
-      });
-      
-      const request = testUtils.createMockRequest('POST', '/api/users', newUser);
-      const response = await POST(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(201);
-      expect(data.success).toBe(true);
-      expect(data.data.user.id).toBe('new-user-123');
-      expect(data.data.user.email).toBe('newuser@example.com');
-      expect(data.data.user).not.toHaveProperty('password');
+      expect(mockSupabaseClient.eq).toHaveBeenCalledWith('id', 'user-123456');
+      expect(mockAnalyticsService.track).toHaveBeenCalledWith(
+        'user.profile.view',
+        expect.objectContaining({
+          userId: 'user-123456'
+        })
+      );
     });
 
-    it('应该验证必需字段', async () => {
-      const invalidUser = {
-        username: 'incomplete',
-        // 缺少 email, password 等必需字段
-      };
+    it('应该处理未认证请求', async () => {
+      const response = await request(app)
+        .get('/api/users/me')
+        .expect(401);
       
-      const request = testUtils.createMockRequest('POST', '/api/users', invalidUser);
-      const response = await POST(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(400);
-      expect(data.success).toBe(false);
-      expect(data.error).toContain('Missing required field');
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: false,
+          message: '未授权访问'
+        })
+      );
     });
 
-    it('应该验证邮箱格式', async () => {
-      const invalidUser = {
-        email: 'invalid-email-format',
-        username: 'testuser',
-        password: 'Password123!',
-        full_name: '测试用户'
-      };
+    it('应该使用缓存', async () => {
+      const cacheKey = 'user_profile_user-123456';
+      mockCacheService.get.mockResolvedValue(JSON.stringify(testUser));
       
-      const request = testUtils.createMockRequest('POST', '/api/users', invalidUser);
-      const response = await POST(request);
-      const data = await testUtils.parseResponse(response);
+      const response = await request(app)
+        .get('/api/users/me')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(200);
       
-      expect(response.status).toBe(400);
-      expect(data.success).toBe(false);
-      expect(data.error).toContain('Invalid email format');
-    });
-
-    it('应该验证密码强度', async () => {
-      const weakPasswordUser = {
-        email: 'test@example.com',
-        username: 'testuser',
-        password: '123', // 弱密码
-        full_name: '测试用户'
-      };
-      
-      const request = testUtils.createMockRequest('POST', '/api/users', weakPasswordUser);
-      const response = await POST(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(400);
-      expect(data.success).toBe(false);
-      expect(data.error).toContain('Password does not meet requirements');
-    });
-
-    it('应该处理重复邮箱', async () => {
-      const duplicateError = {
-        message: 'User already registered'
-      };
-      
-      mockSupabase.auth.signUp.mockResolvedValue({
-        data: { user: null, session: null },
-        error: duplicateError
-      });
-      
-      const duplicateUser = {
-        email: 'existing@example.com',
-        username: 'existinguser',
-        password: 'Password123!',
-        full_name: '重复用户'
-      };
-      
-      const request = testUtils.createMockRequest('POST', '/api/users', duplicateUser);
-      const response = await POST(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(409);
-      expect(data.success).toBe(false);
-      expect(data.error).toBe('Email already exists');
-    });
-
-    it('应该支持头像上传', async () => {
-      const userWithAvatar = {
-        email: 'avatar@example.com',
-        username: 'avataruser',
-        password: 'Password123!',
-        full_name: '头像用户',
-        avatar: 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...'
-      };
-      
-      mockCloudStorage.uploadFile.mockResolvedValue({
-        success: true,
-        url: 'https://storage.example.com/avatars/avatar-123.jpg',
-        key: 'avatars/avatar-123.jpg'
-      });
-      
-      const mockCreatedUser = {
-        id: 'avatar-user-123',
-        email: 'avatar@example.com',
-        username: 'avataruser',
-        full_name: '头像用户',
-        avatar_url: 'https://storage.example.com/avatars/avatar-123.jpg',
-        role: 'student',
-        status: 'active'
-      };
-      
-      mockSupabase.auth.signUp.mockResolvedValue({
-        data: {
-          user: { id: 'avatar-user-123', email: 'avatar@example.com' },
-          session: null
-        },
-        error: null
-      });
-      
-      mockSupabase.from().insert().select().single.mockResolvedValue({
-        data: mockCreatedUser,
-        error: null
-      });
-      
-      const request = testUtils.createMockRequest('POST', '/api/users', userWithAvatar);
-      const response = await POST(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(201);
-      expect(data.success).toBe(true);
-      expect(data.data.user.avatar_url).toBe('https://storage.example.com/avatars/avatar-123.jpg');
-      expect(mockCloudStorage.uploadFile).toHaveBeenCalled();
+      expect(mockCacheService.get).toHaveBeenCalledWith(cacheKey);
+      expect(response.body.data.id).toBe('user-123456');
     });
   });
 
-  describe('POST /api/auth/register', () => {
-    it('应该成功注册用户', async () => {
-      const registerData = {
-        email: 'register@example.com',
-        password: 'SecurePassword123!',
-        username: 'registeruser',
-        full_name: '注册用户'
-      };
-      
-      const mockRegisteredUser = {
-        id: 'register-user-123',
-        email: 'register@example.com',
-        username: 'registeruser',
-        full_name: '注册用户',
-        role: 'student',
-        status: 'active'
-      };
-      
-      mockSupabase.auth.signUp.mockResolvedValue({
-        data: {
-          user: { id: 'register-user-123', email: 'register@example.com' },
-          session: { access_token: 'access-token-123' }
-        },
-        error: null
-      });
-      
-      mockSupabase.from().insert().select().single.mockResolvedValue({
-        data: mockRegisteredUser,
-        error: null
-      });
-      
-      const request = testUtils.createMockRequest('POST', '/api/auth/register', registerData);
-      const response = await RegisterUser(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(201);
-      expect(data.success).toBe(true);
-      expect(data.data.user.email).toBe('register@example.com');
-      expect(data.data.token).toBe('access-token-123');
-    });
-
-    it('应该支持人脸识别注册', async () => {
-      const faceRegisterData = {
-        email: 'face@example.com',
-        password: 'SecurePassword123!',
-        username: 'faceuser',
-        full_name: '人脸用户',
-        faceImage: 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...'
-      };
-      
-      mockFaceRecognition.detectFace.mockResolvedValue({
-        success: true,
-        faces: [{
-          confidence: 0.95,
-          boundingBox: { x: 100, y: 100, width: 200, height: 200 }
-        }],
-        faceEncoding: 'face-encoding-data-123'
-      });
-      
-      const mockRegisteredUser = {
-        id: 'face-user-123',
-        email: 'face@example.com',
-        username: 'faceuser',
-        full_name: '人脸用户',
-        face_encoding: 'face-encoding-data-123',
-        role: 'student',
-        status: 'active'
-      };
-      
-      mockSupabase.auth.signUp.mockResolvedValue({
-        data: {
-          user: { id: 'face-user-123', email: 'face@example.com' },
-          session: { access_token: 'access-token-123' }
-        },
-        error: null
-      });
-      
-      mockSupabase.from().insert().select().single.mockResolvedValue({
-        data: mockRegisteredUser,
-        error: null
-      });
-      
-      const request = testUtils.createMockRequest('POST', '/api/auth/register', faceRegisterData);
-      const response = await RegisterUser(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(201);
-      expect(data.success).toBe(true);
-      expect(data.data.user.face_encoding).toBe('face-encoding-data-123');
-      expect(mockFaceRecognition.detectFace).toHaveBeenCalled();
-    });
-
-    it('应该处理人脸检测失败', async () => {
-      const faceRegisterData = {
-        email: 'noface@example.com',
-        password: 'SecurePassword123!',
-        username: 'nofaceuser',
-        full_name: '无人脸用户',
-        faceImage: 'data:image/jpeg;base64,invalid-image-data'
-      };
-      
-      mockFaceRecognition.detectFace.mockResolvedValue({
-        success: false,
-        error: 'No face detected in image'
-      });
-      
-      const request = testUtils.createMockRequest('POST', '/api/auth/register', faceRegisterData);
-      const response = await RegisterUser(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(400);
-      expect(data.success).toBe(false);
-      expect(data.error).toBe('No face detected in image');
-    });
-  });
-
-  describe('POST /api/auth/login', () => {
-    it('应该成功登录用户', async () => {
-      const loginData = {
-        email: 'login@example.com',
-        password: 'Password123!'
-      };
-      
-      const mockUser = {
-        id: 'login-user-123',
-        email: 'login@example.com',
-        username: 'loginuser',
-        full_name: '登录用户',
-        role: 'student',
-        status: 'active'
-      };
-      
-      mockSupabase.auth.signInWithPassword.mockResolvedValue({
-        data: {
-          user: { id: 'login-user-123', email: 'login@example.com' },
-          session: { access_token: 'login-token-123' }
-        },
-        error: null
-      });
-      
-      mockSupabase.from().select().eq().single.mockResolvedValue({
-        data: mockUser,
-        error: null
-      });
-      
-      const request = testUtils.createMockRequest('POST', '/api/auth/login', loginData);
-      const response = await LoginUser(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.data.user.email).toBe('login@example.com');
-      expect(data.data.token).toBe('login-token-123');
-    });
-
-    it('应该支持人脸识别登录', async () => {
-      const faceLoginData = {
-        faceImage: 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...'
-      };
-      
-      mockFaceRecognition.detectFace.mockResolvedValue({
-        success: true,
-        faces: [{
-          confidence: 0.95,
-          boundingBox: { x: 100, y: 100, width: 200, height: 200 }
-        }],
-        faceEncoding: 'login-face-encoding'
-      });
-      
-      const mockMatchedUser = {
-        id: 'face-login-user-123',
-        email: 'facelogin@example.com',
-        username: 'faceloginuser',
-        full_name: '人脸登录用户',
-        face_encoding: 'stored-face-encoding',
-        role: 'student',
-        status: 'active'
-      };
-      
-      mockFaceRecognition.compareFaces.mockResolvedValue({
-        success: true,
-        similarity: 0.92,
-        isMatch: true
-      });
-      
-      mockSupabase.from().select().mockResolvedValue({
-        data: [mockMatchedUser],
-        error: null
-      });
-      
-      mockSecurity.generateToken.mockResolvedValue('face-login-token-123');
-      
-      const request = testUtils.createMockRequest('POST', '/api/auth/login', faceLoginData);
-      const response = await LoginUser(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.data.user.email).toBe('facelogin@example.com');
-      expect(data.data.token).toBe('face-login-token-123');
-      expect(mockFaceRecognition.compareFaces).toHaveBeenCalled();
-    });
-
-    it('应该处理无效凭据', async () => {
-      const invalidLoginData = {
-        email: 'invalid@example.com',
-        password: 'wrongpassword'
-      };
-      
-      mockSupabase.auth.signInWithPassword.mockResolvedValue({
-        data: { user: null, session: null },
-        error: { message: 'Invalid login credentials' }
-      });
-      
-      const request = testUtils.createMockRequest('POST', '/api/auth/login', invalidLoginData);
-      const response = await LoginUser(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(401);
-      expect(data.success).toBe(false);
-      expect(data.error).toBe('Invalid credentials');
-    });
-
-    it('应该处理人脸识别不匹配', async () => {
-      const faceLoginData = {
-        faceImage: 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...'
-      };
-      
-      mockFaceRecognition.detectFace.mockResolvedValue({
-        success: true,
-        faces: [{ confidence: 0.95 }],
-        faceEncoding: 'unknown-face-encoding'
-      });
-      
-      mockFaceRecognition.compareFaces.mockResolvedValue({
-        success: true,
-        similarity: 0.45,
-        isMatch: false
-      });
-      
-      mockSupabase.from().select().mockResolvedValue({
-        data: [{
-          id: 'user-123',
-          face_encoding: 'different-face-encoding'
-        }],
-        error: null
-      });
-      
-      const request = testUtils.createMockRequest('POST', '/api/auth/login', faceLoginData);
-      const response = await LoginUser(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(401);
-      expect(data.success).toBe(false);
-      expect(data.error).toBe('Face not recognized');
-    });
-
-    it('应该处理账户被禁用', async () => {
-      const loginData = {
-        email: 'disabled@example.com',
-        password: 'Password123!'
-      };
-      
-      const mockDisabledUser = {
-        id: 'disabled-user-123',
-        email: 'disabled@example.com',
-        status: 'disabled'
-      };
-      
-      mockSupabase.auth.signInWithPassword.mockResolvedValue({
-        data: {
-          user: { id: 'disabled-user-123', email: 'disabled@example.com' },
-          session: { access_token: 'token-123' }
-        },
-        error: null
-      });
-      
-      mockSupabase.from().select().eq().single.mockResolvedValue({
-        data: mockDisabledUser,
-        error: null
-      });
-      
-      const request = testUtils.createMockRequest('POST', '/api/auth/login', loginData);
-      const response = await LoginUser(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(403);
-      expect(data.success).toBe(false);
-      expect(data.error).toBe('Account is disabled');
-    });
-  });
-
-  describe('GET /api/users/[id]', () => {
-    it('应该成功获取用户详情', async () => {
-      const mockUser = {
-        id: 'user-detail-123',
-        email: 'detail@example.com',
-        username: 'detailuser',
-        full_name: '详情用户',
-        role: 'student',
-        status: 'active',
-        avatar_url: 'https://example.com/avatar.jpg',
-        bio: '用户简介',
-        created_at: '2024-01-01T00:00:00Z',
-        last_login: '2024-01-15T10:30:00Z',
-        preferences: {
-          language: 'zh-CN',
-          theme: 'light',
-          notifications: true
-        }
-      };
-      
-      mockSupabase.from().select().eq().single.mockResolvedValue({
-        data: mockUser,
-        error: null
-      });
-      
-      const request = testUtils.createMockRequest('GET', '/api/users/user-detail-123');
-      const response = await GetUserById(request, { params: { id: 'user-detail-123' } });
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.data.user.id).toBe('user-detail-123');
-      expect(data.data.user.email).toBe('detail@example.com');
-      expect(data.data.user.preferences.language).toBe('zh-CN');
-    });
-
-    it('应该处理用户不存在', async () => {
-      mockSupabase.from().select().eq().single.mockResolvedValue({
-        data: null,
-        error: { code: 'PGRST116', message: 'The result contains 0 rows' }
-      });
-      
-      const request = testUtils.createMockRequest('GET', '/api/users/non-existent');
-      const response = await GetUserById(request, { params: { id: 'non-existent' } });
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(404);
-      expect(data.success).toBe(false);
-      expect(data.error).toBe('User not found');
-    });
-
-    it('应该验证访问权限', async () => {
-      mockSecurity.validatePermissions.mockResolvedValue({ 
-        allowed: false, 
-        error: 'Cannot access this user profile' 
-      });
-      
-      const request = testUtils.createMockRequest('GET', '/api/users/other-user-123');
-      const response = await GetUserById(request, { params: { id: 'other-user-123' } });
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(403);
-      expect(data.success).toBe(false);
-      expect(data.error).toBe('Cannot access this user profile');
-    });
-  });
-
-  describe('PUT /api/users/[id]', () => {
-    it('应该成功更新用户信息', async () => {
+  /**
+   * 用户信息更新测试
+   */
+  describe('PUT /api/users/me', () => {
+    it('应该更新用户基本信息', async () => {
       const updateData = {
-        full_name: '更新的用户名',
-        bio: '更新的用户简介',
-        preferences: {
-          language: 'en-US',
-          theme: 'dark',
-          notifications: false
+        firstName: '李',
+        lastName: '四',
+        bio: '更新的个人简介',
+        location: {
+          country: 'China',
+          city: 'Shanghai',
+          timezone: 'Asia/Shanghai'
         }
       };
       
-      const mockUpdatedUser = {
-        id: 'update-user-123',
-        email: 'update@example.com',
-        username: 'updateuser',
-        full_name: '更新的用户名',
-        bio: '更新的用户简介',
-        preferences: updateData.preferences,
-        role: 'student',
-        status: 'active',
-        updated_at: new Date().toISOString()
-      };
+      const response = await request(app)
+        .put('/api/users/me')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .send(updateData)
+        .expect(200);
       
-      mockSupabase.from().update().eq().select().single.mockResolvedValue({
-        data: mockUpdatedUser,
-        error: null
-      });
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          message: '用户信息更新成功'
+        })
+      );
       
-      const request = testUtils.createMockRequest('PUT', '/api/users/update-user-123', updateData);
-      const response = await UpdateUser(request, { params: { id: 'update-user-123' } });
-      const data = await testUtils.parseResponse(response);
+      expect(mockSupabaseClient.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          first_name: '李',
+          last_name: '四',
+          bio: '更新的个人简介',
+          location: updateData.location,
+          updated_at: expect.any(String)
+        })
+      );
       
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.data.user.full_name).toBe('更新的用户名');
-      expect(data.data.user.preferences.theme).toBe('dark');
+      expect(mockCacheService.del).toHaveBeenCalledWith(
+        'user_profile_user-123456'
+      );
     });
 
-    it('应该支持头像更新', async () => {
-      const updateData = {
-        avatar: 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...'
-      };
+    it('应该验证输入数据', async () => {
+      const response = await request(app)
+        .put('/api/users/me')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .send({
+          email: 'invalid-email', // 无效邮箱
+          bio: 'a'.repeat(600), // 超长简介
+          username: 'ab' // 用户名太短
+        })
+        .expect(400);
       
-      mockCloudStorage.uploadFile.mockResolvedValue({
-        success: true,
-        url: 'https://storage.example.com/avatars/new-avatar-123.jpg',
-        key: 'avatars/new-avatar-123.jpg'
-      });
-      
-      const mockUpdatedUser = {
-        id: 'avatar-update-123',
-        email: 'avatar@example.com',
-        avatar_url: 'https://storage.example.com/avatars/new-avatar-123.jpg',
-        updated_at: new Date().toISOString()
-      };
-      
-      mockSupabase.from().update().eq().select().single.mockResolvedValue({
-        data: mockUpdatedUser,
-        error: null
-      });
-      
-      const request = testUtils.createMockRequest('PUT', '/api/users/avatar-update-123', updateData);
-      const response = await UpdateUser(request, { params: { id: 'avatar-update-123' } });
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.data.user.avatar_url).toBe('https://storage.example.com/avatars/new-avatar-123.jpg');
-      expect(mockCloudStorage.uploadFile).toHaveBeenCalled();
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: false,
+          message: '请求参数验证失败',
+          errors: expect.arrayContaining([
+            expect.objectContaining({
+              field: 'email',
+              message: '邮箱格式不正确'
+            }),
+            expect.objectContaining({
+              field: 'bio',
+              message: '个人简介不能超过500个字符'
+            }),
+            expect.objectContaining({
+              field: 'username',
+              message: '用户名长度必须在3-50个字符之间'
+            })
+          ])
+        })
+      );
     });
 
-    it('应该支持密码更新', async () => {
-      const updateData = {
-        currentPassword: 'OldPassword123!',
-        newPassword: 'NewPassword456!'
-      };
-      
-      mockSecurity.verifyPassword.mockResolvedValue(true);
-      mockSecurity.hashPassword.mockResolvedValue('new-hashed-password');
-      
-      const mockUpdatedUser = {
-        id: 'password-update-123',
-        email: 'password@example.com',
-        updated_at: new Date().toISOString()
-      };
-      
-      mockSupabase.from().update().eq().select().single.mockResolvedValue({
-        data: mockUpdatedUser,
+    it('应该检查用户名唯一性', async () => {
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: { id: 'other-user' },
         error: null
       });
       
-      const request = testUtils.createMockRequest('PUT', '/api/users/password-update-123', updateData);
-      const response = await UpdateUser(request, { params: { id: 'password-update-123' } });
-      const data = await testUtils.parseResponse(response);
+      const response = await request(app)
+        .put('/api/users/me')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .send({
+          username: 'existinguser'
+        })
+        .expect(409);
       
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.message).toBe('Password updated successfully');
-      expect(mockSecurity.verifyPassword).toHaveBeenCalledWith('OldPassword123!', expect.any(String));
-      expect(mockSecurity.hashPassword).toHaveBeenCalledWith('NewPassword456!');
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: false,
+          message: '用户名已被使用'
+        })
+      );
+    });
+  });
+
+  /**
+   * 用户偏好设置测试
+   */
+  describe('PUT /api/users/me/preferences', () => {
+    it('应该更新用户偏好设置', async () => {
+      const preferences = {
+        language: 'en-US',
+        theme: 'dark',
+        notifications: {
+          email: false,
+          sms: true,
+          push: true,
+          marketing: false
+        },
+        privacy: {
+          profileVisibility: 'friends',
+          showProgress: false,
+          showAchievements: true
+        }
+      };
+      
+      const response = await request(app)
+        .put('/api/users/me/preferences')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .send(preferences)
+        .expect(200);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          message: '偏好设置更新成功'
+        })
+      );
+      
+      expect(mockSupabaseClient.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          preferences,
+          updated_at: expect.any(String)
+        })
+      );
+    });
+
+    it('应该验证偏好设置格式', async () => {
+      const response = await request(app)
+        .put('/api/users/me/preferences')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .send({
+          theme: 'invalid-theme',
+          language: 'invalid-lang'
+        })
+        .expect(400);
+      
+      expect(response.body.errors).toContainEqual(
+        expect.objectContaining({
+          field: 'theme',
+          message: '主题必须是 light、dark 或 auto'
+        })
+      );
+    });
+  });
+
+  /**
+   * 头像上传测试
+   */
+  describe('POST /api/users/me/avatar', () => {
+    it('应该上传用户头像', async () => {
+      mockSupabaseClient.storage.upload.mockResolvedValue({
+        data: { path: 'avatars/user-123456.jpg' },
+        error: null
+      });
+      
+      const response = await request(app)
+        .post('/api/users/me/avatar')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .attach('avatar', Buffer.from('fake-image-data'), 'avatar.jpg')
+        .expect(200);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          message: '头像上传成功',
+          data: expect.objectContaining({
+            avatarUrl: 'https://example.com/avatar.jpg'
+          })
+        })
+      );
+      
+      expect(mockSupabaseClient.storage.upload).toHaveBeenCalled();
+      expect(mockSupabaseClient.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          avatar: 'https://example.com/avatar.jpg'
+        })
+      );
+    });
+
+    it('应该验证文件格式', async () => {
+      const response = await request(app)
+        .post('/api/users/me/avatar')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .attach('avatar', Buffer.from('fake-data'), 'avatar.txt')
+        .expect(400);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: false,
+          message: '不支持的文件格式，请上传 jpg、jpeg、png 或 webp 格式的图片'
+        })
+      );
+    });
+
+    it('应该验证文件大小', async () => {
+      const largeBuffer = Buffer.alloc(6 * 1024 * 1024); // 6MB
+      
+      const response = await request(app)
+        .post('/api/users/me/avatar')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .attach('avatar', largeBuffer, 'avatar.jpg')
+        .expect(400);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: false,
+          message: '文件大小不能超过 5MB'
+        })
+      );
+    });
+
+    it('应该支持人脸验证', async () => {
+      mockBaiduFaceService.detectFace.mockResolvedValue({
+        faces: [{ confidence: 0.95 }]
+      });
+      
+      const response = await request(app)
+        .post('/api/users/me/avatar')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .attach('avatar', Buffer.from('fake-image-data'), 'avatar.jpg')
+        .field('enableFaceVerification', 'true')
+        .expect(200);
+      
+      expect(mockBaiduFaceService.detectFace).toHaveBeenCalled();
+      expect(response.body.data).toEqual(
+        expect.objectContaining({
+          faceVerified: true,
+          confidence: 0.95
+        })
+      );
+    });
+  });
+
+  /**
+   * 密码修改测试
+   */
+  describe('PUT /api/users/me/password', () => {
+    it('应该修改用户密码', async () => {
+      const response = await request(app)
+        .put('/api/users/me/password')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .send({
+          currentPassword: 'oldpassword123',
+          newPassword: 'newpassword456',
+          confirmPassword: 'newpassword456'
+        })
+        .expect(200);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          message: '密码修改成功'
+        })
+      );
+      
+      expect(mockBcrypt.compare).toHaveBeenCalledWith(
+        'oldpassword123',
+        expect.any(String)
+      );
+      
+      expect(mockBcrypt.hash).toHaveBeenCalledWith(
+        'newpassword456',
+        expect.any(Number)
+      );
+      
+      expect(mockSupabaseClient.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          password_hash: 'hashed-password'
+        })
+      );
     });
 
     it('应该验证当前密码', async () => {
-      const updateData = {
-        currentPassword: 'WrongPassword',
-        newPassword: 'NewPassword456!'
-      };
+      mockBcrypt.compare.mockResolvedValue(false);
       
-      mockSecurity.verifyPassword.mockResolvedValue(false);
+      const response = await request(app)
+        .put('/api/users/me/password')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .send({
+          currentPassword: 'wrongpassword',
+          newPassword: 'newpassword456',
+          confirmPassword: 'newpassword456'
+        })
+        .expect(400);
       
-      const request = testUtils.createMockRequest('PUT', '/api/users/password-update-123', updateData);
-      const response = await UpdateUser(request, { params: { id: 'password-update-123' } });
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(400);
-      expect(data.success).toBe(false);
-      expect(data.error).toBe('Current password is incorrect');
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: false,
+          message: '当前密码不正确'
+        })
+      );
     });
 
-    it('应该验证更新权限', async () => {
-      mockSecurity.validatePermissions.mockResolvedValue({ 
-        allowed: false, 
-        error: 'Cannot update this user' 
-      });
+    it('应该验证密码确认', async () => {
+      const response = await request(app)
+        .put('/api/users/me/password')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .send({
+          currentPassword: 'oldpassword123',
+          newPassword: 'newpassword456',
+          confirmPassword: 'differentpassword'
+        })
+        .expect(400);
       
-      const updateData = {
-        full_name: '尝试更新的名字'
-      };
-      
-      const request = testUtils.createMockRequest('PUT', '/api/users/other-user-123', updateData);
-      const response = await UpdateUser(request, { params: { id: 'other-user-123' } });
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(403);
-      expect(data.success).toBe(false);
-      expect(data.error).toBe('Cannot update this user');
-    });
-  });
-
-  describe('DELETE /api/users/[id]', () => {
-    it('应该成功删除用户', async () => {
-      mockSupabase.from().delete().eq.mockResolvedValue({
-        data: null,
-        error: null
-      });
-      
-      const request = testUtils.createMockRequest('DELETE', '/api/users/delete-user-123');
-      const response = await DeleteUser(request, { params: { id: 'delete-user-123' } });
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.message).toBe('User deleted successfully');
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: false,
+          message: '新密码和确认密码不匹配'
+        })
+      );
     });
 
-    it('应该验证删除权限', async () => {
-      mockSecurity.validatePermissions.mockResolvedValue({ 
-        allowed: false, 
-        error: 'Cannot delete this user' 
-      });
+    it('应该验证密码强度', async () => {
+      const response = await request(app)
+        .put('/api/users/me/password')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .send({
+          currentPassword: 'oldpassword123',
+          newPassword: '123', // 太短
+          confirmPassword: '123'
+        })
+        .expect(400);
       
-      const request = testUtils.createMockRequest('DELETE', '/api/users/protected-user-123');
-      const response = await DeleteUser(request, { params: { id: 'protected-user-123' } });
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(403);
-      expect(data.success).toBe(false);
-      expect(data.error).toBe('Cannot delete this user');
-    });
-
-    it('应该处理删除不存在的用户', async () => {
-      mockSupabase.from().delete().eq.mockResolvedValue({
-        data: null,
-        error: { code: 'PGRST116', message: 'The result contains 0 rows' }
-      });
-      
-      const request = testUtils.createMockRequest('DELETE', '/api/users/non-existent');
-      const response = await DeleteUser(request, { params: { id: 'non-existent' } });
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(404);
-      expect(data.success).toBe(false);
-      expect(data.error).toBe('User not found');
-    });
-
-    it('应该清理用户相关数据', async () => {
-      // 模拟清理头像文件
-      mockCloudStorage.deleteFile.mockResolvedValue({
-        success: true
-      });
-      
-      // 模拟删除用户记录
-      mockSupabase.from().delete().eq.mockResolvedValue({
-        data: null,
-        error: null
-      });
-      
-      const request = testUtils.createMockRequest('DELETE', '/api/users/cleanup-user-123');
-      const response = await DeleteUser(request, { params: { id: 'cleanup-user-123' } });
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.message).toBe('User and associated data deleted successfully');
+      expect(response.body.errors).toContainEqual(
+        expect.objectContaining({
+          field: 'newPassword',
+          message: '密码长度至少8个字符'
+        })
+      );
     });
   });
 
-  describe('错误处理和边界情况', () => {
+  /**
+   * 用户资料获取测试
+   */
+  describe('GET /api/users/me/profile', () => {
+    it('应该获取用户详细资料', async () => {
+      mockSupabaseClient.single.mockResolvedValue({
+        data: testProfile,
+        error: null
+      });
+      
+      const response = await request(app)
+        .get('/api/users/me/profile')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(200);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          data: expect.objectContaining({
+            education: expect.any(Array),
+            experience: expect.any(Array),
+            skills: expect.any(Array),
+            interests: expect.any(Array),
+            certifications: expect.any(Array)
+          })
+        })
+      );
+    });
+
+    it('应该处理资料不存在的情况', async () => {
+      mockSupabaseClient.single.mockResolvedValue({
+        data: null,
+        error: { message: 'No rows returned' }
+      });
+      
+      const response = await request(app)
+        .get('/api/users/me/profile')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(200);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          data: null
+        })
+      );
+    });
+  });
+
+  /**
+   * 用户资料更新测试
+   */
+  describe('PUT /api/users/me/profile', () => {
+    it('应该更新用户资料', async () => {
+      const profileData = {
+        education: [
+          {
+            level: '硕士',
+            institution: '清华大学',
+            major: '软件工程',
+            graduationYear: 2024
+          }
+        ],
+        skills: [
+          {
+            name: 'Python',
+            level: 'advanced',
+            verified: false
+          }
+        ],
+        interests: ['机器学习', '数据科学']
+      };
+      
+      const response = await request(app)
+        .put('/api/users/me/profile')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .send(profileData)
+        .expect(200);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          message: '用户资料更新成功'
+        })
+      );
+      
+      expect(mockSupabaseClient.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          education: profileData.education,
+          skills: profileData.skills,
+          interests: profileData.interests
+        })
+      );
+    });
+  });
+
+  /**
+   * 学习统计测试
+   */
+  describe('GET /api/users/me/stats', () => {
+    it('应该获取用户学习统计', async () => {
+      const response = await request(app)
+        .get('/api/users/me/stats')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(200);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          data: expect.objectContaining({
+            totalCourses: 15,
+            completedCourses: 8,
+            inProgressCourses: 7,
+            totalLearningTime: 2400,
+            streakDays: 15,
+            level: 8,
+            pointsEarned: 8500
+          })
+        })
+      );
+      
+      expect(mockLearningProgressService.getUserStats).toHaveBeenCalledWith(
+        'user-123456'
+      );
+    });
+
+    it('应该支持时间范围筛选', async () => {
+      const response = await request(app)
+        .get('/api/users/me/stats?period=month')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(200);
+      
+      expect(mockLearningProgressService.getUserStats).toHaveBeenCalledWith(
+        'user-123456',
+        expect.objectContaining({
+          period: 'month'
+        })
+      );
+    });
+  });
+
+  /**
+   * 用户成就测试
+   */
+  describe('GET /api/users/me/achievements', () => {
+    it('应该获取用户成就列表', async () => {
+      const achievements = [
+        {
+          id: 'achievement-1',
+          name: '初学者',
+          description: '完成第一门课程',
+          icon: 'trophy',
+          unlockedAt: new Date()
+        }
+      ];
+      
+      mockLearningProgressService.getUserAchievements.mockResolvedValue(achievements);
+      
+      const response = await request(app)
+        .get('/api/users/me/achievements')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(200);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          data: expect.arrayContaining([
+            expect.objectContaining({
+              id: 'achievement-1',
+              name: '初学者',
+              unlockedAt: expect.any(String)
+            })
+          ])
+        })
+      );
+    });
+  });
+
+  /**
+   * 用户活动记录测试
+   */
+  describe('GET /api/users/me/activities', () => {
+    it('应该获取用户活动记录', async () => {
+      const activities = [
+        {
+          id: 'activity-1',
+          type: 'course_start',
+          entityType: 'course',
+          entityId: 'course-123',
+          metadata: { courseName: 'JavaScript基础' },
+          createdAt: new Date()
+        }
+      ];
+      
+      mockLearningProgressService.getUserActivities.mockResolvedValue(activities);
+      
+      const response = await request(app)
+        .get('/api/users/me/activities')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(200);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          data: expect.arrayContaining([
+            expect.objectContaining({
+              id: 'activity-1',
+              type: 'course_start',
+              entityType: 'course'
+            })
+          ])
+        })
+      );
+    });
+
+    it('应该支持分页', async () => {
+      const response = await request(app)
+        .get('/api/users/me/activities?page=2&limit=10')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(200);
+      
+      expect(mockLearningProgressService.getUserActivities).toHaveBeenCalledWith(
+        'user-123456',
+        expect.objectContaining({
+          page: 2,
+          limit: 10
+        })
+      );
+    });
+  });
+
+  /**
+   * 用户关注测试
+   */
+  describe('POST /api/users/:id/follow', () => {
+    it('应该关注其他用户', async () => {
+      const response = await request(app)
+        .post('/api/users/user-456/follow')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(201);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          message: '关注成功'
+        })
+      );
+      
+      expect(mockSupabaseClient.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          follower_id: 'user-123456',
+          following_id: 'user-456'
+        })
+      );
+    });
+
+    it('应该检查重复关注', async () => {
+      mockSupabaseClient.single.mockResolvedValue({
+        data: { id: 'follow-123' },
+        error: null
+      });
+      
+      const response = await request(app)
+        .post('/api/users/user-456/follow')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(409);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: false,
+          message: '您已经关注了该用户'
+        })
+      );
+    });
+
+    it('应该防止自己关注自己', async () => {
+      const response = await request(app)
+        .post('/api/users/user-123456/follow')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(400);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: false,
+          message: '不能关注自己'
+        })
+      );
+    });
+  });
+
+  /**
+   * 用户取消关注测试
+   */
+  describe('DELETE /api/users/:id/follow', () => {
+    it('应该取消关注用户', async () => {
+      const response = await request(app)
+        .delete('/api/users/user-456/follow')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(200);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          message: '取消关注成功'
+        })
+      );
+      
+      expect(mockSupabaseClient.delete).toHaveBeenCalled();
+      expect(mockSupabaseClient.eq).toHaveBeenCalledWith('follower_id', 'user-123456');
+      expect(mockSupabaseClient.eq).toHaveBeenCalledWith('following_id', 'user-456');
+    });
+  });
+
+  /**
+   * 用户数据导出测试
+   */
+  describe('GET /api/users/me/export', () => {
+    it('应该导出用户数据', async () => {
+      const response = await request(app)
+        .get('/api/users/me/export')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(200);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          message: '数据导出请求已提交',
+          data: expect.objectContaining({
+            exportId: expect.any(String),
+            estimatedTime: expect.any(Number)
+          })
+        })
+      );
+      
+      expect(mockAuditService.log).toHaveBeenCalledWith(
+        'user.data.export',
+        expect.objectContaining({
+          userId: 'user-123456'
+        })
+      );
+    });
+
+    it('应该支持指定导出格式', async () => {
+      const response = await request(app)
+        .get('/api/users/me/export?format=json')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(200);
+      
+      expect(response.body.data).toEqual(
+        expect.objectContaining({
+          format: 'json'
+        })
+      );
+    });
+  });
+
+  /**
+   * 账户删除测试
+   */
+  describe('DELETE /api/users/me', () => {
+    it('应该删除用户账户', async () => {
+      const response = await request(app)
+        .delete('/api/users/me')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .send({
+          password: 'userpassword123',
+          confirmation: 'DELETE'
+        })
+        .expect(200);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          message: '账户删除成功'
+        })
+      );
+      
+      expect(mockBcrypt.compare).toHaveBeenCalledWith(
+        'userpassword123',
+        expect.any(String)
+      );
+      
+      expect(mockSupabaseClient.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'deleted',
+          deleted_at: expect.any(String)
+        })
+      );
+    });
+
+    it('应该验证密码', async () => {
+      mockBcrypt.compare.mockResolvedValue(false);
+      
+      const response = await request(app)
+        .delete('/api/users/me')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .send({
+          password: 'wrongpassword',
+          confirmation: 'DELETE'
+        })
+        .expect(400);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: false,
+          message: '密码不正确'
+        })
+      );
+    });
+
+    it('应该验证确认文本', async () => {
+      const response = await request(app)
+        .delete('/api/users/me')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .send({
+          password: 'userpassword123',
+          confirmation: 'WRONG'
+        })
+        .expect(400);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: false,
+          message: '请输入 DELETE 确认删除账户'
+        })
+      );
+    });
+  });
+
+  /**
+   * 错误处理测试
+   */
+  describe('Error Handling', () => {
     it('应该处理数据库连接错误', async () => {
-      const connectionError = new Error('Database connection failed');
-      mockSupabase.from().select().order().limit().range.mockRejectedValue(connectionError);
+      mockSupabaseClient.single.mockRejectedValue(
+        new Error('Database connection failed')
+      );
       
-      const request = testUtils.createMockRequest('GET', '/api/users');
-      const response = await GET(request);
-      const data = await testUtils.parseResponse(response);
+      const response = await request(app)
+        .get('/api/users/me')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(500);
       
-      expect(response.status).toBe(500);
-      expect(data.success).toBe(false);
-      expect(data.error).toBe('Database connection failed');
-      expect(mockApiMonitor.recordError).toHaveBeenCalledWith('call-id-123', connectionError);
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: false,
+          message: '服务器内部错误'
+        })
+      );
     });
 
-    it('应该处理认证服务错误', async () => {
-      const authError = new Error('Authentication service unavailable');
-      mockSupabase.auth.signInWithPassword.mockRejectedValue(authError);
+    it('应该处理无效的用户ID', async () => {
+      const response = await request(app)
+        .get('/api/users/invalid-id')
+        .expect(400);
       
-      const loginData = {
-        email: 'test@example.com',
-        password: 'Password123!'
-      };
-      
-      const request = testUtils.createMockRequest('POST', '/api/auth/login', loginData);
-      const response = await LoginUser(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(503);
-      expect(data.success).toBe(false);
-      expect(data.error).toBe('Authentication service unavailable');
-    });
-
-    it('应该处理文件上传错误', async () => {
-      const uploadError = new Error('File upload failed');
-      mockCloudStorage.uploadFile.mockRejectedValue(uploadError);
-      
-      const userWithAvatar = {
-        email: 'upload@example.com',
-        username: 'uploaduser',
-        password: 'Password123!',
-        avatar: 'data:image/jpeg;base64,invalid-data'
-      };
-      
-      const request = testUtils.createMockRequest('POST', '/api/users', userWithAvatar);
-      const response = await POST(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(500);
-      expect(data.success).toBe(false);
-      expect(data.error).toContain('File upload failed');
-    });
-
-    it('应该处理人脸识别服务错误', async () => {
-      const faceError = new Error('Face recognition service unavailable');
-      mockFaceRecognition.detectFace.mockRejectedValue(faceError);
-      
-      const faceLoginData = {
-        faceImage: 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...'
-      };
-      
-      const request = testUtils.createMockRequest('POST', '/api/auth/login', faceLoginData);
-      const response = await LoginUser(request);
-      const data = await testUtils.parseResponse(response);
-      
-      expect(response.status).toBe(503);
-      expect(data.success).toBe(false);
-      expect(data.error).toBe('Face recognition service unavailable');
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: false,
+          message: '无效的用户ID格式'
+        })
+      );
     });
   });
 
-  describe('性能测试', () => {
-    it('应该高效处理用户列表查询', async () => {
-      const largeUserList = Array.from({ length: 100 }, (_, i) => ({
-        id: `user-${i}`,
-        email: `user${i}@example.com`,
-        username: `user${i}`,
-        full_name: `用户 ${i}`,
-        role: 'student',
-        status: 'active'
-      }));
-      
-      mockSupabase.from().select().order().limit().range.mockResolvedValue({
-        data: largeUserList,
-        error: null,
-        count: 100
-      });
-      
+  /**
+   * 性能测试
+   */
+  describe('Performance Tests', () => {
+    it('应该在合理时间内返回用户信息', async () => {
       const startTime = Date.now();
-      const request = testUtils.createMockRequest('GET', '/api/users?limit=100');
-      const response = await GET(request);
-      const endTime = Date.now();
       
-      expect(response.status).toBe(200);
-      expect(endTime - startTime).toBeLessThan(2000); // 应该在2秒内完成
+      await request(app)
+        .get('/api/users/me')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(200);
+      
+      const executionTime = Date.now() - startTime;
+      expect(executionTime).toBeLessThan(300); // 300ms内完成
     });
 
-    it('应该高效处理并发登录请求', async () => {
-      mockSupabase.auth.signInWithPassword.mockResolvedValue({
-        data: {
-          user: { id: 'concurrent-user', email: 'concurrent@example.com' },
-          session: { access_token: 'concurrent-token' }
-        },
-        error: null
-      });
+    it('应该有效利用缓存减少数据库查询', async () => {
+      const cacheKey = 'user_profile_user-123456';
+      mockCacheService.get.mockResolvedValue(JSON.stringify(testUser));
       
-      mockSupabase.from().select().eq().single.mockResolvedValue({
-        data: {
-          id: 'concurrent-user',
-          email: 'concurrent@example.com',
-          role: 'student',
-          status: 'active'
-        },
-        error: null
-      });
+      await request(app)
+        .get('/api/users/me')
+        .set('Authorization', 'Bearer jwt-token-123')
+        .expect(200);
       
-      const loginData = {
-        email: 'concurrent@example.com',
-        password: 'Password123!'
-      };
-      
-      const promises = Array.from({ length: 10 }, () => {
-        const request = testUtils.createMockRequest('POST', '/api/auth/login', loginData);
-        return LoginUser(request);
-      });
-      
-      const startTime = Date.now();
-      const responses = await Promise.all(promises);
-      const endTime = Date.now();
-      
-      expect(responses).toHaveLength(10);
-      expect(responses.every(r => r.status === 200)).toBe(true);
-      expect(endTime - startTime).toBeLessThan(5000); // 应该在5秒内完成
+      expect(mockCacheService.get).toHaveBeenCalledWith(cacheKey);
+      expect(mockSupabaseClient.from).not.toHaveBeenCalled();
     });
   });
 });

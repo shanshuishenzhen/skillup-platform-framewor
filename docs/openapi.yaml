@@ -1,0 +1,756 @@
+openapi: 3.0.3
+info:
+  title: SkillUp Platform API
+  description: |
+    SkillUp Platform 提供全面的在线学习平台 API，包括用户认证、课程管理、
+    人脸识别、监控统计等功能。
+    
+    ## 特性
+    - JWT 认证
+    - 人脸识别和验证
+    - 短信验证
+    - 学习进度跟踪
+    - 监控统计
+    - 错误追踪
+    
+    ## 环境
+    - 开发环境: https://dev-api.skillup.com
+    - 测试环境: https://staging-api.skillup.com
+    - 生产环境: https://api.skillup.com
+  version: 1.0.0
+  contact:
+    name: SkillUp Platform API Support
+    email: api-support@skillup.com
+    url: https://docs.skillup.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.skillup.com/v1
+    description: 生产环境
+  - url: https://staging-api.skillup.com/v1
+    description: 测试环境
+  - url: https://dev-api.skillup.com/v1
+    description: 开发环境
+
+security:
+  - BearerAuth: []
+
+paths:
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: 用户登录
+      description: 使用邮箱和密码进行用户登录
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  example: password123
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/monitoring/stats:
+    get:
+      tags:
+        - Monitoring
+      summary: 获取监控统计数据
+      description: 获取系统监控统计信息，支持多种导出格式
+      parameters:
+        - name: startDate
+          in: query
+          description: 开始日期
+          schema:
+            type: string
+            format: date
+            example: "2025-08-01"
+        - name: endDate
+          in: query
+          description: 结束日期
+          schema:
+            type: string
+            format: date
+            example: "2025-08-31"
+        - name: service
+          in: query
+          description: 服务名称
+          schema:
+            type: string
+            example: "skillup-platform"
+        - name: environment
+          in: query
+          description: 环境
+          schema:
+            type: string
+            enum: [development, staging, production]
+            example: "production"
+        - name: format
+          in: query
+          description: 导出格式
+          schema:
+            type: string
+            enum: [json, csv, xlsx]
+            default: json
+        - name: groupBy
+          in: query
+          description: 分组方式
+          schema:
+            type: string
+            enum: [hour, day, week]
+            default: day
+      responses:
+        '200':
+          description: 统计数据获取成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonitoringStatsResponse'
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/face/detect:
+    post:
+      tags:
+        - Face Recognition
+      summary: 人脸检测
+      description: 检测图片中的人脸并返回质量评分
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - image
+              properties:
+                image:
+                  type: string
+                  format: byte
+                  description: Base64 编码的图片数据
+                  example: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQ..."
+                options:
+                  type: object
+                  properties:
+                    returnLandmarks:
+                      type: boolean
+                      default: true
+                    returnQuality:
+                      type: boolean
+                      default: true
+      responses:
+        '200':
+          description: 人脸检测成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FaceDetectionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/face/template/generate:
+    post:
+      tags:
+        - Face Recognition
+      summary: 生成人脸模板
+      description: 为用户生成加密的人脸特征模板
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - image
+                - userId
+              properties:
+                image:
+                  type: string
+                  format: byte
+                  description: Base64 编码的图片数据
+                userId:
+                  type: string
+                  format: uuid
+                  example: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        '200':
+          description: 人脸模板生成成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FaceTemplateResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/face/verify:
+    post:
+      tags:
+        - Face Recognition
+      summary: 人脸验证
+      description: 验证当前图片与存储的人脸模板是否匹配
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - image
+                - userId
+              properties:
+                image:
+                  type: string
+                  format: byte
+                  description: Base64 编码的图片数据
+                userId:
+                  type: string
+                  format: uuid
+                  example: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        '200':
+          description: 人脸验证成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FaceVerificationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/sms/send:
+    post:
+      tags:
+        - SMS Verification
+      summary: 发送验证码
+      description: 发送短信验证码到指定手机号
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - phone
+                - purpose
+              properties:
+                phone:
+                  type: string
+                  pattern: '^\+[1-9]\d{1,14}$'
+                  example: "+8613800138000"
+                purpose:
+                  type: string
+                  enum: [register, login, reset_password, change_phone]
+                  example: "register"
+                template:
+                  type: string
+                  enum: [default, urgent]
+                  default: default
+      responses:
+        '200':
+          description: 验证码发送成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SMSSendResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /api/sms/verify:
+    post:
+      tags:
+        - SMS Verification
+      summary: 验证验证码
+      description: 验证用户输入的短信验证码
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - phone
+                - code
+                - purpose
+              properties:
+                phone:
+                  type: string
+                  pattern: '^\+[1-9]\d{1,14}$'
+                  example: "+8613800138000"
+                code:
+                  type: string
+                  pattern: '^\d{6}$'
+                  example: "123456"
+                purpose:
+                  type: string
+                  enum: [register, login, reset_password, change_phone]
+                  example: "register"
+      responses:
+        '200':
+          description: 验证码验证成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SMSVerifyResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/learning/progress:
+    post:
+      tags:
+        - Learning Progress
+      summary: 更新学习进度
+      description: 更新用户的课程学习进度
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LearningProgressUpdate'
+      responses:
+        '200':
+          description: 学习进度更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearningProgressResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/learning/progress/{userId}/{courseId}:
+    get:
+      tags:
+        - Learning Progress
+      summary: 获取学习进度
+      description: 获取用户的学习进度信息
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 学习进度获取成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserLearningProgressResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            success:
+              type: boolean
+              example: false
+            error:
+              type: object
+              properties:
+                code:
+                  type: string
+                  example: "VALIDATION_ERROR"
+                message:
+                  type: string
+                  example: "参数验证失败"
+                details:
+                  type: string
+                requestId:
+                  type: string
+                  example: "req_12345"
+
+    LoginResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                user:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    email:
+                      type: string
+                      format: email
+                    name:
+                      type: string
+                token:
+                  type: string
+                refreshToken:
+                  type: string
+                expiresIn:
+                  type: integer
+
+    MonitoringStatsResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                stats:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      date:
+                        type: string
+                        format: date
+                      hour:
+                        type: integer
+                      service:
+                        type: string
+                      environment:
+                        type: string
+                      totalRequests:
+                        type: integer
+                      errorRequests:
+                        type: integer
+                      avgResponseTime:
+                        type: number
+                      p95ResponseTime:
+                        type: number
+                      p99ResponseTime:
+                        type: number
+                metadata:
+                  type: object
+
+    FaceDetectionResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                faceCount:
+                  type: integer
+                faces:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      faceToken:
+                        type: string
+                      confidence:
+                        type: number
+                      quality:
+                        type: object
+                      landmarks:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            x:
+                              type: number
+                            y:
+                              type: number
+
+    FaceTemplateResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                templateId:
+                  type: string
+                encryptedTemplate:
+                  type: string
+                qualityScore:
+                  type: number
+                confidenceScore:
+                  type: number
+                expiresAt:
+                  type: string
+                  format: date-time
+
+    FaceVerificationResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                isMatch:
+                  type: boolean
+                confidence:
+                  type: number
+                similarity:
+                  type: number
+                verificationId:
+                  type: string
+
+    SMSSendResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                messageId:
+                  type: string
+                phone:
+                  type: string
+                expiresIn:
+                  type: integer
+                rateLimitRemaining:
+                  type: integer
+
+    SMSVerifyResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                verified:
+                  type: boolean
+                verificationId:
+                  type: string
+
+    LearningProgressUpdate:
+      type: object
+      required:
+        - userId
+        - courseId
+        - lessonId
+        - progress
+      properties:
+        userId:
+          type: string
+          format: uuid
+        courseId:
+          type: string
+        lessonId:
+          type: string
+        progress:
+          type: number
+          minimum: 0
+          maximum: 100
+        timeSpent:
+          type: integer
+          minimum: 0
+        lastPosition:
+          type: integer
+          minimum: 0
+        completed:
+          type: boolean
+
+    LearningProgressResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                progressId:
+                  type: string
+                userId:
+                  type: string
+                  format: uuid
+                courseId:
+                  type: string
+                lessonId:
+                  type: string
+                progressPercentage:
+                  type: number
+                timeSpent:
+                  type: integer
+                lastPosition:
+                  type: integer
+                completionStatus:
+                  type: string
+                  enum: [not_started, in_progress, completed, paused]
+                updatedAt:
+                  type: string
+                  format: date-time
+
+    UserLearningProgressResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                courseProgress:
+                  type: object
+                  properties:
+                    courseId:
+                      type: string
+                    totalLessons:
+                      type: integer
+                    completedLessons:
+                      type: integer
+                    overallProgress:
+                      type: number
+                    totalTimeSpent:
+                      type: integer
+                    lastAccessedAt:
+                      type: string
+                      format: date-time
+                lessonProgress:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      lessonId:
+                        type: string
+                      progressPercentage:
+                        type: number
+                      timeSpent:
+                        type: integer
+                      completionStatus:
+                        type: string
+                      completedAt:
+                        type: string
+                        format: date-time
+
+  responses:
+    BadRequest:
+      description: 请求参数错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Unauthorized:
+      description: 未授权访问
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Forbidden:
+      description: 权限不足
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFound:
+      description: 资源不存在
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    RateLimitExceeded:
+      description: 请求频率超限
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      headers:
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+          description: 请求限制数量
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+          description: 剩余请求数量
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+          description: 限制重置时间戳
+
+    InternalServerError:
+      description: 服务器内部错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+tags:
+  - name: Authentication
+    description: 用户认证相关接口
+  - name: Monitoring
+    description: 监控统计相关接口
+  - name: Face Recognition
+    description: 人脸识别相关接口
+  - name: SMS Verification
+    description: 短信验证相关接口
+  - name: Learning Progress
+    description: 学习进度相关接口

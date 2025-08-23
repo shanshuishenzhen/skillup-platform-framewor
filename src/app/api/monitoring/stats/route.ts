@@ -5,7 +5,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { monitoringService } from '@/services/monitoringService';
-import { StatsQuery } from '@/types/monitoring';
+import { StatsQuery, EndpointStats, UserUsageStats, ExportData } from '@/types/monitoring';
+import * as XLSX from 'xlsx';
 
 /**
  * GET /api/monitoring/stats
@@ -94,11 +95,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           case 'xlsx':
             headers.set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
             headers.set('Content-Disposition', `attachment; filename="monitoring-stats-${timestamp}.xlsx"`);
-            // 这里需要集成Excel库，如 xlsx
-            return NextResponse.json(
-              { error: 'XLSX导出功能暂未实现' },
-              { status: 501 }
-            );
+            const xlsxBuffer = convertToXLSX(exportData.data, exportData.metadata);
+            return new NextResponse(xlsxBuffer, { headers });
             
           default:
             headers.set('Content-Type', 'application/json');
@@ -424,4 +422,61 @@ function sanitizeQuery(query: Record<string, unknown>): StatsQuery {
   }
   
   return sanitized;
+}
+
+/**
+ * 将数据转换为XLSX格式
+ * @param data 数据数组
+ * @param metadata 元数据
+ * @returns XLSX文件的Buffer
+ */
+function convertToXLSX(data: Record<string, unknown>[], metadata?: Record<string, unknown>): Buffer {
+  // 创建工作簿
+  const workbook = XLSX.utils.book_new();
+
+  if (!Array.isArray(data) || data.length === 0) {
+    // 如果没有数据，创建一个空的工作表
+    const emptyWorksheet = XLSX.utils.aoa_to_sheet([['No data available']]);
+    XLSX.utils.book_append_sheet(workbook, emptyWorksheet, 'Data');
+  } else {
+    // 创建数据工作表
+    const worksheet = XLSX.utils.json_to_sheet(data);
+
+    // 设置列宽
+    const columnWidths = Object.keys(data[0]).map(key => {
+      const maxLength = Math.max(
+        key.length,
+        ...data.map(row => {
+          const value = row[key];
+          return value ? String(value).length : 0;
+        })
+      );
+      return { wch: Math.min(Math.max(maxLength, 10), 50) };
+    });
+    worksheet['!cols'] = columnWidths;
+
+    // 添加数据工作表
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Monitoring Data');
+
+    // 如果有元数据，创建元数据工作表
+    if (metadata) {
+      const metadataArray = Object.entries(metadata).map(([key, value]) => ({
+        Property: key,
+        Value: typeof value === 'object' ? JSON.stringify(value) : String(value)
+      }));
+
+      const metadataWorksheet = XLSX.utils.json_to_sheet(metadataArray);
+      metadataWorksheet['!cols'] = [{ wch: 20 }, { wch: 50 }];
+      XLSX.utils.book_append_sheet(workbook, metadataWorksheet, 'Metadata');
+    }
+  }
+
+  // 生成XLSX文件
+  const xlsxBuffer = XLSX.write(workbook, {
+    type: 'buffer',
+    bookType: 'xlsx',
+    compression: true
+  });
+
+  return xlsxBuffer;
 }

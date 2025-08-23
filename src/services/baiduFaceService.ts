@@ -14,6 +14,7 @@ import {
   createError,
   RetryConfig
 } from '../utils/errorHandler';
+import * as crypto from 'crypto';
 
 /**
  * 百度人脸识别API响应基础接口
@@ -127,6 +128,76 @@ export interface LivenessResult {
     frr_1e3: number;
     frr_1e2: number;
   };
+}
+
+/**
+ * 人脸检测响应接口
+ */
+export interface FaceDetectionResponse {
+  success: boolean;
+  message: string;
+  faceToken?: string;
+  faceCount?: number;
+  quality?: {
+    blur: number;
+    illumination: number;
+    completeness: number;
+    occlusion: {
+      left_eye: number;
+      right_eye: number;
+      nose: number;
+      mouth: number;
+    };
+  };
+}
+
+/**
+ * 人脸比对响应接口
+ */
+export interface FaceCompareResult {
+  success: boolean;
+  message: string;
+  score?: number;
+  isMatch?: boolean;
+}
+
+/**
+ * 人脸注册响应接口
+ */
+export interface FaceRegisterResult {
+  success: boolean;
+  message: string;
+  faceToken?: string;
+}
+
+/**
+ * 人脸搜索响应接口
+ */
+export interface FaceSearchResult {
+  success: boolean;
+  message: string;
+  userList?: Array<{
+    userId: string;
+    score: number;
+    groupId: string;
+  }>;
+}
+
+/**
+ * 人脸特征模板接口
+ */
+export interface FaceTemplate {
+  face_token: string;
+  landmark: Array<{ x: number; y: number }>;
+  landmark72: Array<{ x: number; y: number }>;
+  quality: {
+    blur: number;
+    illumination: number;
+    completeness: number;
+    occlusion: Record<string, number>;
+  };
+  timestamp: number;
+  version: string;
 }
 
 /**
@@ -630,6 +701,328 @@ class BaiduFaceService {
       return false;
     }
   }
+
+  /**
+   * 生成人脸特征模板
+   * @param imageBase64 图片的base64编码
+   * @returns Promise<string> 加密后的人脸特征模板
+   */
+  async generateFaceTemplate(imageBase64: string): Promise<string> {
+    try {
+      // 首先进行人脸检测
+      const requestData = {
+        image: imageBase64,
+        image_type: 'BASE64',
+        face_field: 'landmark,landmark72,quality,face_type',
+        max_face_num: 1
+      };
+
+      const response = await this.makeApiRequest('/rest/2.0/face/v3/detect', requestData);
+
+      if (!response.result || !response.result.face_list || response.result.face_list.length === 0) {
+        throw createError(
+          ErrorType.FACE_RECOGNITION_ERROR,
+          '未检测到人脸',
+          {
+            code: 'NO_FACE_DETECTED',
+            statusCode: 400,
+            severity: ErrorSeverity.MEDIUM
+          }
+        );
+      }
+
+      if (response.result.face_list.length > 1) {
+        throw createError(
+          ErrorType.FACE_RECOGNITION_ERROR,
+          '检测到多张人脸，请确保图片中只有一张人脸',
+          {
+            code: 'MULTIPLE_FACES_DETECTED',
+            statusCode: 400,
+            severity: ErrorSeverity.MEDIUM
+          }
+        );
+      }
+
+      const face = response.result.face_list[0];
+
+      // 检查人脸质量
+      if (face.face_probability < 0.8) {
+        throw createError(
+          ErrorType.FACE_RECOGNITION_ERROR,
+          '人脸置信度过低，请重新拍摄',
+          {
+            code: 'LOW_FACE_CONFIDENCE',
+            statusCode: 400,
+            severity: ErrorSeverity.MEDIUM
+          }
+        );
+      }
+
+      // 检查人脸质量指标
+      if (face.quality) {
+        if (face.quality.blur > 0.7) {
+          throw createError(
+            ErrorType.FACE_RECOGNITION_ERROR,
+            '图片模糊度过高，请重新拍摄',
+            {
+              code: 'IMAGE_TOO_BLURRY',
+              statusCode: 400,
+              severity: ErrorSeverity.MEDIUM
+            }
+          );
+        }
+
+        if (face.quality.illumination < 40) {
+          throw createError(
+            ErrorType.FACE_RECOGNITION_ERROR,
+            '光线不足，请在光线充足的环境下拍摄',
+            {
+              code: 'INSUFFICIENT_LIGHTING',
+              statusCode: 400,
+              severity: ErrorSeverity.MEDIUM
+            }
+          );
+        }
+
+        if (face.quality.completeness < 0.8) {
+          throw createError(
+            ErrorType.FACE_RECOGNITION_ERROR,
+            '人脸不完整，请确保整张脸都在画面中',
+            {
+              code: 'INCOMPLETE_FACE',
+              statusCode: 400,
+              severity: ErrorSeverity.MEDIUM
+            }
+          );
+        }
+      }
+
+      // 生成人脸特征模板
+      const template: FaceTemplate = {
+        face_token: face.face_token,
+        landmark: face.landmark || [],
+        landmark72: face.landmark72 || [],
+        quality: {
+          blur: face.quality?.blur || 0,
+          illumination: face.quality?.illumination || 0,
+          completeness: face.quality?.completeness || 0,
+          occlusion: face.quality?.occlusion || {}
+        },
+        timestamp: Date.now(),
+        version: '1.0.0'
+      };
+
+      // 使用AES加密模板
+      return this.encryptTemplate(JSON.stringify(template));
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw createError(
+        ErrorType.FACE_RECOGNITION_ERROR,
+        `生成人脸特征模板失败: ${error instanceof Error ? error.message : String(error)}`,
+        {
+          code: 'TEMPLATE_GENERATION_FAILED',
+          statusCode: 500,
+          severity: ErrorSeverity.HIGH,
+          originalError: error instanceof Error ? error : undefined
+        }
+      );
+    }
+  }
+
+  /**
+   * 加密人脸模板
+   * @param template 人脸模板字符串
+   * @returns string 加密后的模板
+   */
+  private encryptTemplate(template: string): string {
+    try {
+      const algorithm = 'aes-256-cbc';
+      const secretKey = process.env.FACE_TEMPLATE_SECRET || 'skillup-platform-face-secret-key-2024';
+      const key = crypto.scryptSync(secretKey, 'salt', 32);
+      const iv = crypto.randomBytes(16);
+
+      const cipher = crypto.createCipher(algorithm, key, iv);
+      let encrypted = cipher.update(template, 'utf8', 'hex');
+      encrypted += cipher.final('hex');
+
+      // 返回 IV + 加密数据的组合
+      return iv.toString('hex') + ':' + encrypted;
+    } catch (error) {
+      throw createError(
+        ErrorType.FACE_RECOGNITION_ERROR,
+        `人脸模板加密失败: ${error instanceof Error ? error.message : String(error)}`,
+        {
+          code: 'TEMPLATE_ENCRYPTION_FAILED',
+          statusCode: 500,
+          severity: ErrorSeverity.HIGH,
+          originalError: error instanceof Error ? error : undefined
+        }
+      );
+    }
+  }
+
+  /**
+   * 解密人脸模板
+   * @param encryptedTemplate 加密的模板
+   * @returns string 解密后的模板
+   */
+  private decryptTemplate(encryptedTemplate: string): string {
+    try {
+      const algorithm = 'aes-256-cbc';
+      const secretKey = process.env.FACE_TEMPLATE_SECRET || 'skillup-platform-face-secret-key-2024';
+      const key = crypto.scryptSync(secretKey, 'salt', 32);
+
+      const textParts = encryptedTemplate.split(':');
+      if (textParts.length !== 2) {
+        throw new Error('Invalid encrypted template format');
+      }
+
+      const iv = Buffer.from(textParts[0], 'hex');
+      const encryptedText = textParts[1];
+
+      const decipher = crypto.createDecipher(algorithm, key, iv);
+      let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+
+      return decrypted;
+    } catch (error) {
+      throw createError(
+        ErrorType.FACE_RECOGNITION_ERROR,
+        `人脸模板解密失败: ${error instanceof Error ? error.message : String(error)}`,
+        {
+          code: 'TEMPLATE_DECRYPTION_FAILED',
+          statusCode: 500,
+          severity: ErrorSeverity.HIGH,
+          originalError: error instanceof Error ? error : undefined
+        }
+      );
+    }
+  }
+
+  /**
+   * 验证人脸模板
+   * @param currentImageBase64 当前拍摄的图片
+   * @param storedTemplate 存储的人脸模板
+   * @returns Promise<{ isMatch: boolean; confidence: number; message: string }> 验证结果
+   */
+  async verifyFaceTemplate(
+    currentImageBase64: string,
+    storedTemplate: string
+  ): Promise<{ isMatch: boolean; confidence: number; message: string }> {
+    try {
+      // 解密存储的模板
+      const templateData: FaceTemplate = JSON.parse(this.decryptTemplate(storedTemplate));
+
+      // 检测当前图片中的人脸
+      const currentTemplate = await this.generateFaceTemplate(currentImageBase64);
+      const currentTemplateData: FaceTemplate = JSON.parse(this.decryptTemplate(currentTemplate));
+
+      // 计算特征相似度（简化版本，实际应该使用更复杂的算法）
+      const confidence = this.calculateTemplateSimilarity(templateData, currentTemplateData);
+
+      // 设置匹配阈值
+      const threshold = 0.8;
+      const isMatch = confidence >= threshold;
+
+      return {
+        isMatch,
+        confidence,
+        message: isMatch ? '人脸验证成功' : '人脸验证失败'
+      };
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw createError(
+        ErrorType.FACE_RECOGNITION_ERROR,
+        `人脸模板验证失败: ${error instanceof Error ? error.message : String(error)}`,
+        {
+          code: 'TEMPLATE_VERIFICATION_FAILED',
+          statusCode: 500,
+          severity: ErrorSeverity.HIGH,
+          originalError: error instanceof Error ? error : undefined
+        }
+      );
+    }
+  }
+
+  /**
+   * 计算模板相似度（简化版本）
+   * @param template1 模板1
+   * @param template2 模板2
+   * @returns number 相似度分数 (0-1)
+   */
+  private calculateTemplateSimilarity(template1: FaceTemplate, template2: FaceTemplate): number {
+    try {
+      // 检查模板版本兼容性
+      if (template1.version !== template2.version) {
+        console.warn('Face template versions do not match');
+      }
+
+      // 计算关键点相似度
+      const landmarkSimilarity = this.calculateLandmarkSimilarity(template1.landmark, template2.landmark);
+      const landmark72Similarity = this.calculateLandmarkSimilarity(template1.landmark72, template2.landmark72);
+
+      // 计算质量指标相似度
+      const qualitySimilarity = this.calculateQualitySimilarity(template1.quality, template2.quality);
+
+      // 加权平均
+      const similarity = (landmarkSimilarity * 0.5) + (landmark72Similarity * 0.3) + (qualitySimilarity * 0.2);
+
+      return Math.max(0, Math.min(1, similarity));
+    } catch (error) {
+      console.error('Error calculating template similarity:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * 计算关键点相似度
+   * @param landmarks1 关键点1
+   * @param landmarks2 关键点2
+   * @returns number 相似度分数
+   */
+  private calculateLandmarkSimilarity(
+    landmarks1: Array<{ x: number; y: number }>,
+    landmarks2: Array<{ x: number; y: number }>
+  ): number {
+    if (!landmarks1 || !landmarks2 || landmarks1.length !== landmarks2.length) {
+      return 0;
+    }
+
+    let totalDistance = 0;
+    for (let i = 0; i < landmarks1.length; i++) {
+      const dx = landmarks1[i].x - landmarks2[i].x;
+      const dy = landmarks1[i].y - landmarks2[i].y;
+      totalDistance += Math.sqrt(dx * dx + dy * dy);
+    }
+
+    // 归一化距离（假设图片尺寸为500x500）
+    const avgDistance = totalDistance / landmarks1.length;
+    const normalizedDistance = avgDistance / 500;
+
+    // 转换为相似度分数
+    return Math.max(0, 1 - normalizedDistance);
+  }
+
+  /**
+   * 计算质量指标相似度
+   * @param quality1 质量指标1
+   * @param quality2 质量指标2
+   * @returns number 相似度分数
+   */
+  private calculateQualitySimilarity(
+    quality1: FaceTemplate['quality'],
+    quality2: FaceTemplate['quality']
+  ): number {
+    const blurSimilarity = 1 - Math.abs(quality1.blur - quality2.blur);
+    const illuminationSimilarity = 1 - Math.abs(quality1.illumination - quality2.illumination) / 100;
+    const completenessSimilarity = 1 - Math.abs(quality1.completeness - quality2.completeness);
+
+    return (blurSimilarity + illuminationSimilarity + completenessSimilarity) / 3;
+  }
 }
 
 // 创建单例实例
@@ -642,5 +1035,8 @@ export type {
   FaceCompareResult,
   FaceSearchResult,
   FaceRegisterResult,
-  BaiduFaceApiResponse
+  FaceDetectionResponse,
+  FaceTemplate,
+  BaiduFaceApiResponse,
+  LivenessResult
 };

@@ -1,88 +1,29 @@
+'use client'
+
 import Link from 'next/link'
+import { useState, useEffect } from 'react'
+import { aiDataGeneratorService } from '@/services/aiDataGeneratorService'
+import type { VirtualTalent } from '@/types/virtual'
 
 export default function TalentsPage() {
-  const talents = [
-    {
-      id: 1,
-      name: "张明",
-      title: "资深UI设计师",
-      experience: "8年",
-      skills: ["UI设计", "用户体验", "产品设计", "Figma"],
-      description: "专注于移动应用和Web产品的UI设计，曾参与多个知名产品的设计工作，对用户体验设计有深入研究。",
-      projects: ["微信小程序设计", "电商平台UI设计", "企业管理系统设计"],
-      image: "/api/placeholder/200/200"
-    },
-    {
-      id: 2,
-      name: "李华",
-      title: "包装设计专家",
-      experience: "12年",
-      skills: ["包装设计", "品牌设计", "印刷工艺", "Adobe Creative Suite"],
-      description: "在包装设计领域有着丰富的经验，擅长食品、化妆品、电子产品等各类产品的包装设计。",
-      projects: ["某知名化妆品品牌包装", "食品包装设计", "礼品包装设计"],
-      image: "/api/placeholder/200/200"
-    },
-    {
-      id: 3,
-      name: "王芳",
-      title: "室内设计师",
-      experience: "10年",
-      skills: ["室内设计", "空间规划", "材料应用", "AutoCAD"],
-      description: "专注于商业空间和住宅设计，对空间布局和材料应用有独到见解，作品多次获得行业奖项。",
-      projects: ["商业空间设计", "住宅装修设计", "办公空间设计"],
-      image: "/api/placeholder/200/200"
-    },
-    {
-      id: 4,
-      name: "陈强",
-      title: "广告创意总监",
-      experience: "15年",
-      skills: ["广告创意", "品牌策划", "营销策略", "创意设计"],
-      description: "在广告创意领域有着丰富的经验，曾为多个知名品牌提供创意服务，作品多次获得国际奖项。",
-      projects: ["品牌广告策划", "营销活动设计", "创意视频制作"],
-      image: "/api/placeholder/200/200"
-    },
-    {
-      id: 5,
-      name: "刘敏",
-      title: "工业设计师",
-      experience: "9年",
-      skills: ["产品设计", "3D建模", "原型制作", "Rhino"],
-      description: "专注于消费电子和家居产品的工业设计，注重产品的功能性和美观性的平衡。",
-      projects: ["智能家居产品设计", "消费电子产品设计", "家具设计"],
-      image: "/api/placeholder/200/200"
-    },
-    {
-      id: 6,
-      name: "赵伟",
-      title: "平面设计师",
-      experience: "7年",
-      skills: ["平面设计", "品牌设计", "插画设计", "Photoshop"],
-      description: "擅长品牌视觉设计和插画创作，作品风格独特，深受客户喜爱。",
-      projects: ["企业品牌设计", "插画创作", "海报设计"],
-      image: "/api/placeholder/200/200"
-    },
-    {
-      id: 7,
-      name: "孙丽",
-      title: "形象设计师",
-      experience: "6年",
-      skills: ["形象设计", "色彩搭配", "造型设计", "时尚搭配"],
-      description: "专注于个人和企业形象设计，帮助客户打造独特的个人魅力和品牌形象。",
-      projects: ["个人形象设计", "企业形象策划", "时尚造型设计"],
-      image: "/api/placeholder/200/200"
-    },
-    {
-      id: 8,
-      name: "周杰",
-      title: "摄影总监",
-      experience: "11年",
-      skills: ["商业摄影", "产品摄影", "人像摄影", "后期处理"],
-      description: "在商业摄影领域有着丰富的经验，擅长产品摄影和人像摄影，作品多次在专业杂志发表。",
-      projects: ["产品摄影", "商业人像摄影", "广告摄影"],
-      image: "/api/placeholder/200/200"
+  const [talents, setTalents] = useState<VirtualTalent[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const loadTalents = async () => {
+    setLoading(true)
+    try {
+      const virtualTalents = await aiDataGeneratorService.generateTalents(8)
+      setTalents(virtualTalents)
+    } catch (error) {
+      console.error('生成虚拟人才数据失败:', error)
+    } finally {
+      setLoading(false)
     }
-  ]
+  }
+
+  useEffect(() => {
+    loadTalents()
+  }, [])
 
   const categories = ["全部", "UI设计", "包装设计", "室内设计", "广告创意", "工业设计", "平面设计", "形象设计", "摄影"]
 
@@ -104,11 +45,32 @@ export default function TalentsPage() {
       {/* 人才库介绍 */}
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-12">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-2xl font-bold mb-4">设计人才库</h2>
-          <p className="text-blue-100 max-w-3xl mx-auto">
-            深圳市商业美术设计促进会设计人才库汇聚了来自各个设计领域的优秀人才，
-            包括UI设计师、包装设计师、室内设计师、广告创意总监等。我们致力于为企业和项目提供最专业的设计服务。
+          <h2 className="text-2xl font-bold mb-4">虚拟人才展示</h2>
+          <p className="text-blue-100 max-w-3xl mx-auto mb-6">
+            AI生成的虚拟人才信息，展示多样化的专业技能和项目经验
           </p>
+          <button
+            onClick={loadTalents}
+            disabled={loading}
+            className="bg-white text-blue-600 px-6 py-2 rounded-lg font-semibold hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mx-auto"
+          >
+            {loading ? (
+              <>
+                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                生成中...
+              </>
+            ) : (
+              <>
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                刷新虚拟数据
+              </>
+            )}
+          </button>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-8">
             <div>
               <div className="text-3xl mb-2">👥</div>
@@ -145,65 +107,78 @@ export default function TalentsPage() {
         </div>
 
         {/* 人才列表 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {talents.map((talent) => (
-            <div key={talent.id} className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-lg transition-shadow">
-              <div className="h-48 bg-gray-200 relative">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-24 h-24 bg-gray-300 rounded-full"></div>
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+            <p className="text-gray-600">正在生成虚拟人才数据...</p>
+          </div>
+        ) : talents.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-600 mb-4">暂无人才信息</p>
+            <button
+              onClick={loadTalents}
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              重新加载
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {talents.map((talent) => (
+              <div key={talent.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+                <div className="h-48 bg-gray-200 flex items-center justify-center overflow-hidden">
+                  <img
+                    src={talent.avatar}
+                    alt={talent.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement
+                      target.style.display = 'none'
+                      target.parentElement!.innerHTML = `
+                        <svg className="w-16 h-16 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                        </svg>
+                      `
+                    }}
+                  />
                 </div>
-                <div className="absolute top-4 right-4">
-                  <span className="px-3 py-1 text-xs font-semibold text-white bg-green-600 rounded-full">
-                    {talent.experience}经验
-                  </span>
-                </div>
-              </div>
-              <div className="p-6">
-                <h3 className="font-semibold text-lg mb-2">{talent.name}</h3>
-                <p className="text-blue-600 text-sm mb-3">{talent.title}</p>
-                <p className="text-gray-600 text-sm mb-4 line-clamp-3">{talent.description}</p>
-                
-                <div className="mb-4">
-                  <h4 className="font-semibold text-sm mb-2">专业技能：</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {talent.skills.map((skill, index) => (
-                      <span 
-                        key={index}
-                        className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded"
-                      >
-                        {skill}
-                      </span>
-                    ))}
+                <div className="p-6">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">{talent.name}</h3>
+                  <p className="text-blue-600 font-medium mb-2">{talent.title}</p>
+                  <p className="text-gray-600 text-sm mb-3">经验：{talent.experience}</p>
+                  <p className="text-gray-700 text-sm mb-4 line-clamp-3">{talent.bio}</p>
+                  
+                  <div className="mb-4">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-2">核心技能</h4>
+                    <div className="flex flex-wrap gap-1">
+                      {talent.skills.map((skill, index) => (
+                        <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </div>
-
-                <div className="mb-6">
-                  <h4 className="font-semibold text-sm mb-2">代表项目：</h4>
-                  <div className="space-y-1">
-                    {talent.projects.map((project, index) => (
-                      <div key={index} className="text-xs text-gray-500 flex items-center">
-                        <span className="w-1 h-1 bg-blue-600 rounded-full mr-2"></span>
-                        {project}
-                      </div>
-                    ))}
+                  
+                  <div className="mb-4">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-2">代表项目</h4>
+                    <ul className="text-xs text-gray-600 space-y-1">
+                      {talent.projects.map((project, index) => (
+                        <li key={index} className="flex items-start">
+                          <span className="w-1 h-1 bg-gray-400 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+                          {project}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                </div>
-
-                <div className="flex space-x-3">
-                  <button className="flex-1 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition-colors">
-                    联系合作
-                  </button>
-                  <Link 
-                    href={`/talents/${talent.id}`}
-                    className="flex-1 border border-blue-600 text-blue-600 py-2 px-4 rounded hover:bg-blue-50 transition-colors text-center"
-                  >
+                  
+                  <button className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium">
                     查看详情
-                  </Link>
+                  </button>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         {/* 分页 */}
         <div className="mt-12 flex justify-center">
@@ -216,29 +191,29 @@ export default function TalentsPage() {
           </div>
         </div>
 
-        {/* 人才服务 */}
+        {/* 虚拟数据说明 */}
         <div className="mt-16 bg-white rounded-lg p-8 shadow-sm">
-          <h2 className="text-2xl font-bold mb-8 text-center">人才服务</h2>
+          <h2 className="text-2xl font-bold mb-8 text-center">虚拟数据说明</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="text-center">
-              <div className="text-4xl mb-4">🔍</div>
-              <h3 className="font-semibold mb-2">人才筛选</h3>
-              <p className="text-gray-600 text-sm">严格筛选，确保人才质量</p>
+              <div className="text-4xl mb-4">🤖</div>
+              <h3 className="font-semibold mb-2">AI生成</h3>
+              <p className="text-gray-600 text-sm">所有数据均由AI算法生成</p>
             </div>
             <div className="text-center">
-              <div className="text-4xl mb-4">🤝</div>
-              <h3 className="font-semibold mb-2">项目对接</h3>
-              <p className="text-gray-600 text-sm">精准匹配项目需求</p>
+              <div className="text-4xl mb-4">🔄</div>
+              <h3 className="font-semibold mb-2">实时更新</h3>
+              <p className="text-gray-600 text-sm">每次刷新生成新的虚拟数据</p>
             </div>
             <div className="text-center">
-              <div className="text-4xl mb-4">📋</div>
-              <h3 className="font-semibold mb-2">合同管理</h3>
-              <p className="text-gray-600 text-sm">规范合同，保障双方权益</p>
+              <div className="text-4xl mb-4">📊</div>
+              <h3 className="font-semibold mb-2">展示功能</h3>
+              <p className="text-gray-600 text-sm">仅用于演示页面效果</p>
             </div>
             <div className="text-center">
-              <div className="text-4xl mb-4">⭐</div>
-              <h3 className="font-semibold mb-2">质量监督</h3>
-              <p className="text-gray-600 text-sm">全程监督，确保项目质量</p>
+              <div className="text-4xl mb-4">⚠️</div>
+              <h3 className="font-semibold mb-2">非真实数据</h3>
+              <p className="text-gray-600 text-sm">不代表真实的人才信息</p>
             </div>
           </div>
         </div>
@@ -264,4 +239,4 @@ export default function TalentsPage() {
       </div>
     </div>
   )
-} 
+}

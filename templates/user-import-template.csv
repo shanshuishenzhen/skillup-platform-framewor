@@ -1,0 +1,11 @@
+name,email,phone,department,position,employee_id,role,password,status
+张三,zhangsan@example.com,+8613800138001,技术部,软件工程师,EMP001,student,,active
+李四,lisi@example.com,+8613800138002,市场部,市场专员,EMP002,student,,active
+王五,wangwu@example.com,+8613800138003,人事部,HR经理,EMP003,teacher,,active
+赵六,zhaoliu@example.com,+8613800138004,财务部,会计师,EMP004,student,,active
+孙七,sunqi@example.com,+8613800138005,技术部,前端工程师,EMP005,student,,active
+周八,zhouba@example.com,+8613800138006,运营部,运营专员,EMP006,student,,active
+吴九,wujiu@example.com,+8613800138007,设计部,UI设计师,EMP007,student,,active
+郑十,zhengshi@example.com,+8613800138008,技术部,后端工程师,EMP008,student,,active
+钱一,qianyi@example.com,+8613800138009,产品部,产品经理,EMP009,teacher,,active
+刘二,liuer@example.com,+8613800138010,客服部,客服主管,EMP010,student,,active

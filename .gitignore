@@ -32,6 +32,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+!.env.monitoring.example
 
 # vercel
 .vercel
@@ -39,3 +41,22 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# security and sensitive files
+security-key-inventory.json
+monitoring-setup-report.json
+*.key
+*.pem
+*.p12
+*.pfx
+/keys/
+/secrets/
+/certs/
+
+# logs
+logs/
+*.log
+
+# temporary files
+/tmp/
+/temp/

@@ -59,6 +59,40 @@ export interface ErrorContext {
 }
 
 /**
+ * 监控系统配置接口
+ */
+export interface MonitoringConfig {
+  enabled: boolean;
+  endpoint?: string;
+  apiKey?: string;
+  environment: string;
+  service: string;
+  version: string;
+  batchSize: number;
+  flushInterval: number; // 毫秒
+  retryAttempts: number;
+  timeout: number; // 毫秒
+}
+
+/**
+ * 监控事件接口
+ */
+export interface MonitoringEvent {
+  id: string;
+  timestamp: string;
+  level: 'error' | 'warning' | 'info';
+  message: string;
+  error?: {
+    type: string;
+    code?: string;
+    stack?: string;
+  };
+  context?: ErrorContext;
+  tags?: Record<string, string>;
+  extra?: Record<string, unknown>;
+}
+
+/**
  * 标准化错误接口
  */
 export interface StandardError {
@@ -188,24 +222,56 @@ const DEFAULT_RETRY_CONFIG: RetryConfig = {
 };
 
 /**
+ * 默认监控配置
+ */
+const DEFAULT_MONITORING_CONFIG: MonitoringConfig = {
+  enabled: process.env.NODE_ENV === 'production',
+  endpoint: process.env.MONITORING_ENDPOINT,
+  apiKey: process.env.MONITORING_API_KEY,
+  environment: process.env.NODE_ENV || 'development',
+  service: 'skillup-platform',
+  version: process.env.APP_VERSION || '1.0.0',
+  batchSize: 10,
+  flushInterval: 5000,
+  retryAttempts: 3,
+  timeout: 10000
+};
+
+/**
  * 错误处理器类
  */
 export class ErrorHandler {
   private static instance: ErrorHandler;
   private retryConfig: RetryConfig;
+  private monitoringConfig: MonitoringConfig;
+  private eventQueue: MonitoringEvent[] = [];
+  private flushTimer?: NodeJS.Timeout;
 
-  constructor(retryConfig: Partial<RetryConfig> = {}) {
+  constructor(
+    retryConfig: Partial<RetryConfig> = {},
+    monitoringConfig: Partial<MonitoringConfig> = {}
+  ) {
     this.retryConfig = { ...DEFAULT_RETRY_CONFIG, ...retryConfig };
+    this.monitoringConfig = { ...DEFAULT_MONITORING_CONFIG, ...monitoringConfig };
+
+    // 启动定时刷新
+    if (this.monitoringConfig.enabled) {
+      this.startFlushTimer();
+    }
   }
 
   /**
    * 获取错误处理器单例
-   * @param config 重试配置
+   * @param retryConfig 重试配置
+   * @param monitoringConfig 监控配置
    * @returns 错误处理器实例
    */
-  static getInstance(config?: Partial<RetryConfig>): ErrorHandler {
+  static getInstance(
+    retryConfig?: Partial<RetryConfig>,
+    monitoringConfig?: Partial<MonitoringConfig>
+  ): ErrorHandler {
     if (!ErrorHandler.instance) {
-      ErrorHandler.instance = new ErrorHandler(config);
+      ErrorHandler.instance = new ErrorHandler(retryConfig, monitoringConfig);
     }
     return ErrorHandler.instance;
   }
@@ -385,9 +451,10 @@ export class ErrorHandler {
         break;
     }
 
-    // TODO: 在生产环境中，可以将错误发送到监控系统
-    // 例如：Sentry、DataDog、CloudWatch等
-    // this.sendToMonitoring(logData);
+    // 发送到监控系统
+    if (this.monitoringConfig.enabled) {
+      this.sendToMonitoring(error, context);
+    }
   }
 
   /**
@@ -418,6 +485,160 @@ export class ErrorHandler {
       ...options,
       context
     });
+  }
+
+  /**
+   * 发送错误到监控系统
+   * @param error 错误对象
+   * @param context 额外上下文
+   */
+  private sendToMonitoring(error: AppError, context?: Record<string, unknown>): void {
+    try {
+      const event: MonitoringEvent = {
+        id: this.generateEventId(),
+        timestamp: new Date().toISOString(),
+        level: this.mapSeverityToLevel(error.severity),
+        message: error.message,
+        error: {
+          type: error.type,
+          code: error.code,
+          stack: error.stack
+        },
+        context: error.context,
+        tags: {
+          environment: this.monitoringConfig.environment,
+          service: this.monitoringConfig.service,
+          version: this.monitoringConfig.version,
+          errorType: error.type,
+          severity: error.severity
+        },
+        extra: context
+      };
+
+      // 添加到队列
+      this.eventQueue.push(event);
+
+      // 如果队列满了，立即刷新
+      if (this.eventQueue.length >= this.monitoringConfig.batchSize) {
+        this.flushEvents();
+      }
+    } catch (monitoringError) {
+      console.error('Failed to send error to monitoring system:', monitoringError);
+    }
+  }
+
+  /**
+   * 启动定时刷新器
+   */
+  private startFlushTimer(): void {
+    this.flushTimer = setInterval(() => {
+      if (this.eventQueue.length > 0) {
+        this.flushEvents();
+      }
+    }, this.monitoringConfig.flushInterval);
+  }
+
+  /**
+   * 刷新事件队列到监控系统
+   */
+  private async flushEvents(): Promise<void> {
+    if (this.eventQueue.length === 0) return;
+
+    const events = [...this.eventQueue];
+    this.eventQueue = [];
+
+    try {
+      await this.sendEventsToMonitoring(events);
+    } catch (error) {
+      console.error('Failed to flush events to monitoring system:', error);
+
+      // 重新加入队列（最多重试一次）
+      if (events.length < this.monitoringConfig.batchSize * 2) {
+        this.eventQueue.unshift(...events);
+      }
+    }
+  }
+
+  /**
+   * 发送事件到监控系统
+   * @param events 事件数组
+   */
+  private async sendEventsToMonitoring(events: MonitoringEvent[]): Promise<void> {
+    if (!this.monitoringConfig.endpoint || !this.monitoringConfig.apiKey) {
+      console.warn('Monitoring endpoint or API key not configured');
+      return;
+    }
+
+    const payload = {
+      service: this.monitoringConfig.service,
+      version: this.monitoringConfig.version,
+      environment: this.monitoringConfig.environment,
+      events
+    };
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.monitoringConfig.timeout);
+
+    try {
+      const response = await fetch(this.monitoringConfig.endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.monitoringConfig.apiKey}`,
+          'User-Agent': `${this.monitoringConfig.service}/${this.monitoringConfig.version}`
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+
+      if (!response.ok) {
+        throw new Error(`Monitoring API responded with status ${response.status}`);
+      }
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  /**
+   * 生成事件ID
+   * @returns 唯一事件ID
+   */
+  private generateEventId(): string {
+    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  /**
+   * 将错误严重程度映射到监控级别
+   * @param severity 错误严重程度
+   * @returns 监控级别
+   */
+  private mapSeverityToLevel(severity: ErrorSeverity): 'error' | 'warning' | 'info' {
+    switch (severity) {
+      case ErrorSeverity.CRITICAL:
+      case ErrorSeverity.HIGH:
+        return 'error';
+      case ErrorSeverity.MEDIUM:
+        return 'warning';
+      case ErrorSeverity.LOW:
+        return 'info';
+      default:
+        return 'error';
+    }
+  }
+
+  /**
+   * 清理资源
+   */
+  public cleanup(): void {
+    if (this.flushTimer) {
+      clearInterval(this.flushTimer);
+      this.flushTimer = undefined;
+    }
+
+    // 最后一次刷新
+    if (this.eventQueue.length > 0) {
+      this.flushEvents();
+    }
   }
 }
 

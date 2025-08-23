@@ -1,0 +1,10 @@
+{
+  "provider": "custom",
+  "enabled": true,
+  "endpoint": "http://localhost:8080/api/monitoring",
+  "apiKey": "***",
+  "environment": "development",
+  "service": "skillup-platform",
+  "version": "1.0.0-dev",
+  "createdAt": "2025-08-22T03:02:30.867Z"
+}

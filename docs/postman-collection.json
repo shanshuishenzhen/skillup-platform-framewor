@@ -1,0 +1,353 @@
+{
+  "info": {
+    "name": "SkillUp Platform API",
+    "description": "SkillUp Platform API 接口集合，包含所有主要功能的 API 测试用例",
+    "version": "1.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://api.skillup.com/v1",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "course_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "lesson_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "用户登录",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.success && response.data.token) {",
+                  "        pm.collectionVariables.set('jwt_token', response.data.token);",
+                  "        pm.collectionVariables.set('user_id', response.data.user.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Monitoring",
+      "item": [
+        {
+          "name": "获取监控统计数据",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/monitoring/stats?startDate=2025-08-01&endDate=2025-08-31&format=json",
+              "host": ["{{base_url}}"],
+              "path": ["api", "monitoring", "stats"],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2025-08-01"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2025-08-31"
+                },
+                {
+                  "key": "format",
+                  "value": "json"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "导出监控数据为Excel",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/monitoring/stats?format=xlsx",
+              "host": ["{{base_url}}"],
+              "path": ["api", "monitoring", "stats"],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "xlsx"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Face Recognition",
+      "item": [
+        {
+          "name": "人脸检测",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"image\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQ...\",\n  \"options\": {\n    \"returnLandmarks\": true,\n    \"returnQuality\": true\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/face/detect",
+              "host": ["{{base_url}}"],
+              "path": ["api", "face", "detect"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "生成人脸模板",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"image\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQ...\",\n  \"userId\": \"{{user_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/face/template/generate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "face", "template", "generate"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "人脸验证",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"image\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQ...\",\n  \"userId\": \"{{user_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/face/verify",
+              "host": ["{{base_url}}"],
+              "path": ["api", "face", "verify"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "SMS Verification",
+      "item": [
+        {
+          "name": "发送验证码",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+8613800138000\",\n  \"purpose\": \"register\",\n  \"template\": \"default\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/sms/send",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sms", "send"]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "验证验证码",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+8613800138000\",\n  \"code\": \"123456\",\n  \"purpose\": \"register\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/sms/verify",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sms", "verify"]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Learning Progress",
+      "item": [
+        {
+          "name": "更新学习进度",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{user_id}}\",\n  \"courseId\": \"{{course_id}}\",\n  \"lessonId\": \"{{lesson_id}}\",\n  \"progress\": 75.5,\n  \"timeSpent\": 1800,\n  \"lastPosition\": 1650,\n  \"completed\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/learning/progress",
+              "host": ["{{base_url}}"],
+              "path": ["api", "learning", "progress"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "获取学习进度",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/learning/progress/{{user_id}}/{{course_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "learning", "progress", "{{user_id}}", "{{course_id}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// 设置默认变量",
+          "if (!pm.collectionVariables.get('user_id')) {",
+          "    pm.collectionVariables.set('user_id', '550e8400-e29b-41d4-a716-446655440000');",
+          "}",
+          "if (!pm.collectionVariables.get('course_id')) {",
+          "    pm.collectionVariables.set('course_id', 'course_12345');",
+          "}",
+          "if (!pm.collectionVariables.get('lesson_id')) {",
+          "    pm.collectionVariables.set('lesson_id', 'lesson_12345');",
+          "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// 全局测试脚本",
+          "pm.test('Response time is less than 5000ms', function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(5000);",
+          "});",
+          "",
+          "pm.test('Response has correct content type', function () {",
+          "    pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+          "});",
+          "",
+          "if (pm.response.code !== 200) {",
+          "    pm.test('Error response has correct structure', function () {",
+          "        const response = pm.response.json();",
+          "        pm.expect(response).to.have.property('success', false);",
+          "        pm.expect(response).to.have.property('error');",
+          "        pm.expect(response.error).to.have.property('code');",
+          "        pm.expect(response.error).to.have.property('message');",
+          "    });",
+          "}"
+        ]
+      }
+    }
+  ]
+}

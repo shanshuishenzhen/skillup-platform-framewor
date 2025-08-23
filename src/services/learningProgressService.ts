@@ -68,14 +68,15 @@ export interface LearningStats {
 function getRetryConfig(): RetryConfig {
   return {
     maxAttempts: 3,
-    delay: 1000,
-    exponentialBackoff: true,
+    baseDelay: 1000,
+    maxDelay: 10000,
+    backoffMultiplier: 2,
     jitter: true,
     retryableErrors: [
       ErrorType.NETWORK_ERROR,
       ErrorType.TIMEOUT_ERROR,
       ErrorType.DATABASE_ERROR,
-      ErrorType.SERVICE_UNAVAILABLE_ERROR
+      ErrorType.SERVICE_UNAVAILABLE
     ]
   };
 }
@@ -161,10 +162,12 @@ export async function saveLearningProgress(
         throw createError(
           ErrorType.DATABASE_ERROR,
           '保存学习进度失败',
-          'SAVE_PROGRESS_FAILED',
-          500,
-          ErrorSeverity.HIGH,
-          { userId, courseId, lessonId, error: dbResult.error }
+          {
+            code: 'SAVE_PROGRESS_FAILED',
+            statusCode: 500,
+            severity: ErrorSeverity.HIGH,
+            context: { userId, courseId, lessonId, additionalData: { error: dbResult.error } }
+          }
         );
       }
 
@@ -196,10 +199,13 @@ export async function saveLearningProgress(
     throw createError(
       ErrorType.DATABASE_ERROR,
       '保存学习进度失败，请稍后重试',
-      'SAVE_PROGRESS_ERROR',
-      500,
-      ErrorSeverity.HIGH,
-      { userId, courseId, lessonId, originalError: error }
+      {
+        code: 'SAVE_PROGRESS_ERROR',
+        statusCode: 500,
+        severity: ErrorSeverity.HIGH,
+        context: { userId, courseId, lessonId },
+        originalError: error instanceof Error ? error : undefined
+      }
     );
   }
 }
@@ -241,10 +247,12 @@ export async function getLearningProgress(
           throw createError(
             ErrorType.DATABASE_ERROR,
             '获取学习进度失败',
-            'GET_PROGRESS_FAILED',
-            500,
-            ErrorSeverity.MEDIUM,
-            { userId, courseId, lessonId, error }
+            {
+              code: 'GET_PROGRESS_FAILED',
+              statusCode: 500,
+              severity: ErrorSeverity.MEDIUM,
+              context: { userId, courseId, lessonId, additionalData: { error } }
+            }
           );
         }
 
@@ -256,10 +264,12 @@ export async function getLearningProgress(
           throw createError(
             ErrorType.DATABASE_ERROR,
             '获取课程学习进度失败',
-            'GET_COURSE_PROGRESS_FAILED',
-            500,
-            ErrorSeverity.MEDIUM,
-            { userId, courseId, error }
+            {
+              code: 'GET_COURSE_PROGRESS_FAILED',
+              statusCode: 500,
+              severity: ErrorSeverity.MEDIUM,
+              context: { userId, courseId, additionalData: { error } }
+            }
           );
         }
 
@@ -321,10 +331,13 @@ export async function getLearningProgress(
     throw createError(
       ErrorType.DATABASE_ERROR,
       '获取学习进度失败，请稍后重试',
-      'GET_PROGRESS_ERROR',
-      500,
-      ErrorSeverity.MEDIUM,
-      { userId, courseId, lessonId, originalError: error }
+      {
+        code: 'GET_PROGRESS_ERROR',
+        statusCode: 500,
+        severity: ErrorSeverity.MEDIUM,
+        context: { userId, courseId, lessonId },
+        originalError: error instanceof Error ? error : undefined
+      }
     );
   }
 }
@@ -358,10 +371,12 @@ export async function getCourseProgress(
         throw createError(
           ErrorType.DATABASE_ERROR,
           '获取课程进度失败',
-          'GET_COURSE_PROGRESS_FAILED',
-          500,
-          ErrorSeverity.MEDIUM,
-          { userId, courseId, error: progressError }
+          {
+            code: 'GET_COURSE_PROGRESS_FAILED',
+            statusCode: 500,
+            severity: ErrorSeverity.MEDIUM,
+            context: { userId, courseId, additionalData: { error: progressError } }
+          }
         );
       }
 
@@ -376,10 +391,12 @@ export async function getCourseProgress(
         throw createError(
           ErrorType.DATABASE_ERROR,
           '获取课程信息失败',
-          'GET_COURSE_INFO_FAILED',
-          500,
-          ErrorSeverity.MEDIUM,
-          { courseId, error: courseError }
+          {
+            code: 'GET_COURSE_INFO_FAILED',
+            statusCode: 500,
+            severity: ErrorSeverity.MEDIUM,
+            context: { courseId, additionalData: { error: courseError } }
+          }
         );
       }
 
@@ -415,10 +432,13 @@ export async function getCourseProgress(
     throw createError(
       ErrorType.DATABASE_ERROR,
       '获取课程进度失败，请稍后重试',
-      'GET_COURSE_PROGRESS_ERROR',
-      500,
-      ErrorSeverity.MEDIUM,
-      { userId, courseId, originalError: error }
+      {
+        code: 'GET_COURSE_PROGRESS_ERROR',
+        statusCode: 500,
+        severity: ErrorSeverity.MEDIUM,
+        context: { userId, courseId },
+        originalError: error instanceof Error ? error : undefined
+      }
     );
   }
 }
@@ -449,10 +469,12 @@ export async function getLearningStats(
         throw createError(
           ErrorType.DATABASE_ERROR,
           '获取学习统计失败',
-          'GET_LEARNING_STATS_FAILED',
-          500,
-          ErrorSeverity.MEDIUM,
-          { userId, error: progressError }
+          {
+            code: 'GET_LEARNING_STATS_FAILED',
+            statusCode: 500,
+            severity: ErrorSeverity.MEDIUM,
+            context: { userId, additionalData: { error: progressError } }
+          }
         );
       }
 
@@ -523,10 +545,13 @@ export async function getLearningStats(
     throw createError(
       ErrorType.DATABASE_ERROR,
       '获取学习统计失败，请稍后重试',
-      'GET_LEARNING_STATS_ERROR',
-      500,
-      ErrorSeverity.MEDIUM,
-      { userId, originalError: error }
+      {
+        code: 'GET_LEARNING_STATS_ERROR',
+        statusCode: 500,
+        severity: ErrorSeverity.MEDIUM,
+        context: { userId },
+        originalError: error instanceof Error ? error : undefined
+      }
     );
   }
 }
@@ -568,10 +593,12 @@ export async function markLessonCompleted(
         throw createError(
           ErrorType.DATABASE_ERROR,
           '标记课时完成失败',
-          'MARK_LESSON_COMPLETED_FAILED',
-          500,
-          ErrorSeverity.MEDIUM,
-          { userId, courseId, lessonId, error }
+          {
+            code: 'MARK_LESSON_COMPLETED_FAILED',
+            statusCode: 500,
+            severity: ErrorSeverity.MEDIUM,
+            context: { userId, courseId, lessonId, additionalData: { error } }
+          }
         );
       }
     }, getRetryConfig());
@@ -587,10 +614,13 @@ export async function markLessonCompleted(
     throw createError(
       ErrorType.DATABASE_ERROR,
       '标记课时完成失败，请稍后重试',
-      'MARK_LESSON_COMPLETED_ERROR',
-      500,
-      ErrorSeverity.MEDIUM,
-      { userId, courseId, lessonId, originalError: error }
+      {
+        code: 'MARK_LESSON_COMPLETED_ERROR',
+        statusCode: 500,
+        severity: ErrorSeverity.MEDIUM,
+        context: { userId, courseId, lessonId },
+        originalError: error instanceof Error ? error : undefined
+      }
     );
   }
 }
@@ -633,10 +663,12 @@ export async function resetLessonProgress(
         throw createError(
           ErrorType.DATABASE_ERROR,
           '重置课时进度失败',
-          'RESET_LESSON_PROGRESS_FAILED',
-          500,
-          ErrorSeverity.MEDIUM,
-          { userId, courseId, lessonId, error }
+          {
+            code: 'RESET_LESSON_PROGRESS_FAILED',
+            statusCode: 500,
+            severity: ErrorSeverity.MEDIUM,
+            context: { userId, courseId, lessonId, additionalData: { error } }
+          }
         );
       }
     }, getRetryConfig());
@@ -652,10 +684,13 @@ export async function resetLessonProgress(
     throw createError(
       ErrorType.DATABASE_ERROR,
       '重置课时进度失败，请稍后重试',
-      'RESET_LESSON_PROGRESS_ERROR',
-      500,
-      ErrorSeverity.MEDIUM,
-      { userId, courseId, lessonId, originalError: error }
+      {
+        code: 'RESET_LESSON_PROGRESS_ERROR',
+        statusCode: 500,
+        severity: ErrorSeverity.MEDIUM,
+        context: { userId, courseId, lessonId },
+        originalError: error instanceof Error ? error : undefined
+      }
     );
   }
 }

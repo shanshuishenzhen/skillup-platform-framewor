@@ -1,877 +1,1447 @@
 /**
  * 云存储服务单元测试
- * 测试文件上传、下载、删除等云存储功能
+ * 
+ * 测试覆盖范围：
+ * 1. 文件上传和下载
+ * 2. 多云存储提供商支持(阿里云OSS、AWS S3、腾讯云COS)
+ * 3. 文件管理和组织
+ * 4. 文件安全和权限控制
+ * 5. 文件压缩和优化
+ * 6. 文件版本控制
+ * 7. 文件分享和链接生成
+ * 8. 文件统计和分析
+ * 9. 文件备份和恢复
+ * 10. 错误处理和重试机制
  */
 
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { testUtils } from '../setup';
+
+// 模拟依赖
+jest.mock('@/utils/envConfig');
+jest.mock('@/utils/errorHandler');
+jest.mock('@/services/monitoringService');
+jest.mock('@/services/userService');
+jest.mock('@supabase/supabase-js');
+jest.mock('@alicloud/oss');
+jest.mock('@aws-sdk/client-s3');
+jest.mock('cos-nodejs-sdk-v5');
+jest.mock('node:crypto');
+jest.mock('uuid');
+jest.mock('moment');
+jest.mock('redis');
+jest.mock('lodash');
+jest.mock('sharp');
+jest.mock('ffmpeg-static');
+jest.mock('fluent-ffmpeg');
+jest.mock('archiver');
+jest.mock('unzipper');
+jest.mock('mime-types');
+jest.mock('file-type');
+jest.mock('node:fs/promises');
+jest.mock('node:path');
+jest.mock('node:stream');
+
+const mockEnvConfig = {
+  NODE_ENV: 'test',
+  CLOUD_STORAGE: {
+    provider: 'alicloud', // alicloud, aws, tencent
+    defaultBucket: 'skillup-storage',
+    region: 'oss-cn-hangzhou',
+    alicloud: {
+      accessKeyId: 'alicloud-access-key',
+      accessKeySecret: 'alicloud-secret-key',
+      bucket: 'skillup-oss',
+      region: 'oss-cn-hangzhou',
+      endpoint: 'https://oss-cn-hangzhou.aliyuncs.com',
+      customDomain: 'https://cdn.skillup.com'
+    },
+    aws: {
+      accessKeyId: 'aws-access-key',
+      secretAccessKey: 'aws-secret-key',
+      bucket: 'skillup-s3',
+      region: 'us-east-1'
+    },
+    tencent: {
+      secretId: 'tencent-secret-id',
+      secretKey: 'tencent-secret-key',
+      bucket: 'skillup-cos',
+      region: 'ap-guangzhou'
+    },
+    upload: {
+      maxFileSize: 100 * 1024 * 1024, // 100MB
+      allowedTypes: ['image/*', 'video/*', 'application/pdf', 'text/*'],
+      imageOptimization: {
+        enabled: true,
+        quality: 80,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        formats: ['webp', 'jpeg']
+      },
+      videoOptimization: {
+        enabled: true,
+        maxBitrate: '2M',
+        maxResolution: '1080p',
+        formats: ['mp4', 'webm']
+      }
+    },
+    security: {
+      virusScanning: true,
+      contentValidation: true,
+      encryptionAtRest: true,
+      signedUrls: true,
+      urlExpiration: 3600 // 1小时
+    },
+    backup: {
+      enabled: true,
+      retention: 30, // 30天
+      crossRegion: true
+    }
+  },
+  REDIS: {
+    host: 'localhost',
+    port: 6379,
+    password: 'redis-password',
+    db: 5
+  },
+  SUPABASE: {
+    url: 'https://project.supabase.co',
+    anonKey: 'supabase-anon-key',
+    serviceRoleKey: 'supabase-service-role-key'
+  }
+};
+
+const mockErrorHandler = {
+  createError: jest.fn(),
+  logError: jest.fn(),
+  handleError: jest.fn()
+};
+
+const mockMonitoringService = {
+  recordMetric: jest.fn(),
+  recordEvent: jest.fn(),
+  incrementCounter: jest.fn()
+};
+
+const mockUserService = {
+  getUserById: jest.fn(),
+  updateUserStorage: jest.fn()
+};
+
+// Supabase模拟
+const mockSupabase = {
+  from: jest.fn(() => ({
+    select: jest.fn().mockReturnThis(),
+    insert: jest.fn().mockReturnThis(),
+    update: jest.fn().mockReturnThis(),
+    delete: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    gte: jest.fn().mockReturnThis(),
+    lte: jest.fn().mockReturnThis(),
+    order: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockReturnThis(),
+    single: jest.fn(),
+    then: jest.fn()
+  })),
+  storage: {
+    from: jest.fn(() => ({
+      upload: jest.fn(),
+      download: jest.fn(),
+      remove: jest.fn(),
+      list: jest.fn(),
+      createSignedUrl: jest.fn(),
+      getPublicUrl: jest.fn()
+    }))
+  }
+};
+
+// 阿里云OSS模拟
+const mockAlicloudOss = {
+  put: jest.fn(),
+  get: jest.fn(),
+  delete: jest.fn(),
+  list: jest.fn(),
+  signatureUrl: jest.fn(),
+  copy: jest.fn(),
+  head: jest.fn()
+};
+
+// AWS S3模拟
+const mockAwsS3 = {
+  send: jest.fn()
+};
+
+// 腾讯云COS模拟
+const mockTencentCos = {
+  putObject: jest.fn(),
+  getObject: jest.fn(),
+  deleteObject: jest.fn(),
+  getBucket: jest.fn(),
+  getObjectUrl: jest.fn()
+};
+
+// 其他依赖模拟
+const mockCrypto = {
+  randomBytes: jest.fn(),
+  createHash: jest.fn(() => ({
+    update: jest.fn().mockReturnThis(),
+    digest: jest.fn()
+  })),
+  createCipher: jest.fn(),
+  createDecipher: jest.fn()
+};
+
+const mockUuid = {
+  v4: jest.fn()
+};
+
+const mockMoment = jest.fn(() => ({
+  format: jest.fn(),
+  toISOString: jest.fn(),
+  valueOf: jest.fn(),
+  add: jest.fn().mockReturnThis(),
+  subtract: jest.fn().mockReturnThis(),
+  isAfter: jest.fn(),
+  isBefore: jest.fn()
+}));
+
+const mockRedis = {
+  get: jest.fn(),
+  set: jest.fn(),
+  del: jest.fn(),
+  exists: jest.fn(),
+  incr: jest.fn(),
+  expire: jest.fn(),
+  ttl: jest.fn(),
+  hget: jest.fn(),
+  hset: jest.fn(),
+  hdel: jest.fn(),
+  hgetall: jest.fn()
+};
+
+const mockLodash = {
+  pick: jest.fn(),
+  omit: jest.fn(),
+  merge: jest.fn(),
+  cloneDeep: jest.fn(),
+  isString: jest.fn(),
+  isObject: jest.fn(),
+  isEmpty: jest.fn(),
+  get: jest.fn(),
+  set: jest.fn()
+};
+
+const mockSharp = jest.fn(() => ({
+  resize: jest.fn().mockReturnThis(),
+  jpeg: jest.fn().mockReturnThis(),
+  webp: jest.fn().mockReturnThis(),
+  png: jest.fn().mockReturnThis(),
+  toBuffer: jest.fn(),
+  toFile: jest.fn(),
+  metadata: jest.fn()
+}));
+
+const mockFfmpeg = jest.fn(() => ({
+  input: jest.fn().mockReturnThis(),
+  output: jest.fn().mockReturnThis(),
+  videoBitrate: jest.fn().mockReturnThis(),
+  size: jest.fn().mockReturnThis(),
+  format: jest.fn().mockReturnThis(),
+  on: jest.fn().mockReturnThis(),
+  run: jest.fn()
+}));
+
+const mockArchiver = {
+  create: jest.fn(() => ({
+    append: jest.fn(),
+    directory: jest.fn(),
+    finalize: jest.fn(),
+    pipe: jest.fn(),
+    on: jest.fn()
+  }))
+};
+
+const mockUnzipper = {
+  Extract: jest.fn(),
+  Parse: jest.fn()
+};
+
+const mockMimeTypes = {
+  lookup: jest.fn(),
+  extension: jest.fn()
+};
+
+const mockFileType = {
+  fromBuffer: jest.fn(),
+  fromFile: jest.fn()
+};
+
+const mockFs = {
+  readFile: jest.fn(),
+  writeFile: jest.fn(),
+  unlink: jest.fn(),
+  mkdir: jest.fn(),
+  stat: jest.fn(),
+  access: jest.fn()
+};
+
+const mockPath = {
+  join: jest.fn(),
+  extname: jest.fn(),
+  basename: jest.fn(),
+  dirname: jest.fn()
+};
+
+const mockStream = {
+  Readable: jest.fn(),
+  Writable: jest.fn(),
+  Transform: jest.fn(),
+  pipeline: jest.fn()
+};
+
+// 导入被测试的模块
 import {
   CloudStorageService,
   uploadFile,
   downloadFile,
   deleteFile,
-  getFileUrl,
-  CloudStorageConfig
+  generateSignedUrl,
+  optimizeImage,
+  optimizeVideo
 } from '@/services/cloudStorageService';
-import { testUtils } from '../setup';
 
-// 模拟云存储客户端
-const mockStorageClient = {
-  upload: jest.fn(),
-  download: jest.fn(),
-  delete: jest.fn(),
-  getSignedUrl: jest.fn(),
-  listFiles: jest.fn(),
-  copyFile: jest.fn(),
-  moveFile: jest.fn(),
-  getFileInfo: jest.fn()
-};
-
-// 模拟环境配置
-const mockEnvConfig = {
-  getCloudStorage: jest.fn(() => ({
-    client: mockStorageClient,
-    bucket: 'test-bucket',
-    region: 'us-east-1',
-    accessKey: 'test-access-key',
-    secretKey: 'test-secret-key'
-  }))
-};
-
-jest.mock('@/utils/envConfig', () => ({
-  getEnvConfig: () => mockEnvConfig
-}));
-
-// 模拟错误处理器
-const mockErrorHandler = {
-  withRetry: jest.fn(),
-  createError: jest.fn(),
-  logError: jest.fn()
-};
-
-jest.mock('@/utils/errorHandler', () => ({
-  errorHandler: mockErrorHandler
-}));
-
-// 模拟文件处理
-const mockFileUtils = {
-  validateFileType: jest.fn(),
-  validateFileSize: jest.fn(),
-  generateFileName: jest.fn(),
-  getFileExtension: jest.fn(),
-  getMimeType: jest.fn(),
-  compressImage: jest.fn()
-};
-
-jest.mock('@/utils/fileUtils', () => mockFileUtils);
-
-// 模拟安全模块
-const mockSecurity = {
-  generateUploadToken: jest.fn(),
-  validateUploadToken: jest.fn(),
-  sanitizeFileName: jest.fn()
-};
-
-jest.mock('@/middleware/security', () => ({
-  security: mockSecurity
-}));
-
-describe('CloudStorageService', () => {
-  let storageService: CloudStorageService;
+describe('云存储服务', () => {
+  let cloudStorageService: CloudStorageService;
 
   beforeEach(() => {
+    // 重置所有模拟
     jest.clearAllMocks();
-    storageService = new CloudStorageService();
     
-    // 设置默认的成功响应
-    mockErrorHandler.withRetry.mockImplementation(async (fn) => await fn());
-    mockFileUtils.validateFileType.mockReturnValue(true);
-    mockFileUtils.validateFileSize.mockReturnValue(true);
-    mockFileUtils.generateFileName.mockReturnValue('generated-file-name.jpg');
-    mockFileUtils.getFileExtension.mockReturnValue('jpg');
-    mockFileUtils.getMimeType.mockReturnValue('image/jpeg');
-    mockSecurity.sanitizeFileName.mockImplementation((name) => name);
+    // 设置模拟返回值
+    require('@/utils/envConfig').envConfig = mockEnvConfig;
+    require('@/utils/errorHandler').errorHandler = mockErrorHandler;
+    require('@/services/monitoringService').monitoringService = mockMonitoringService;
+    require('@/services/userService').userService = mockUserService;
+    
+    // 设置Supabase模拟
+    require('@supabase/supabase-js').createClient = jest.fn(() => mockSupabase);
+    
+    // 设置云存储提供商模拟
+    require('@alicloud/oss').default = jest.fn(() => mockAlicloudOss);
+    require('@aws-sdk/client-s3').S3Client = jest.fn(() => mockAwsS3);
+    require('cos-nodejs-sdk-v5').default = jest.fn(() => mockTencentCos);
+    
+    // 设置其他依赖模拟
+    require('node:crypto').default = mockCrypto;
+    require('uuid').default = mockUuid;
+    require('moment').default = mockMoment;
+    require('redis').createClient = jest.fn(() => mockRedis);
+    require('lodash').default = mockLodash;
+    require('sharp').default = mockSharp;
+    require('fluent-ffmpeg').default = mockFfmpeg;
+    require('archiver').default = mockArchiver;
+    require('unzipper').default = mockUnzipper;
+    require('mime-types').default = mockMimeTypes;
+    require('file-type').default = mockFileType;
+    require('node:fs/promises').default = mockFs;
+    require('node:path').default = mockPath;
+    require('node:stream').default = mockStream;
+    
+    // 创建云存储服务实例
+    cloudStorageService = new CloudStorageService();
+    
+    // 设置默认模拟返回值
+    mockUuid.v4.mockReturnValue('file-123');
+    
+    mockMoment().format.mockReturnValue('2023-01-01T12:00:00Z');
+    mockMoment().toISOString.mockReturnValue('2023-01-01T12:00:00.000Z');
+    mockMoment().valueOf.mockReturnValue(1672574400000);
+    
+    mockCrypto.randomBytes.mockReturnValue(Buffer.from('random-bytes'));
+    mockCrypto.createHash().digest.mockReturnValue('file-hash');
+    
+    // Redis默认响应
+    mockRedis.get.mockResolvedValue(null);
+    mockRedis.set.mockResolvedValue('OK');
+    mockRedis.exists.mockResolvedValue(0);
+    mockRedis.hgetall.mockResolvedValue({});
+    
+    // Path默认响应
+    mockPath.join.mockImplementation((...args) => args.join('/'));
+    mockPath.extname.mockReturnValue('.jpg');
+    mockPath.basename.mockReturnValue('image.jpg');
+    mockPath.dirname.mockReturnValue('/uploads');
+    
+    // MIME类型默认响应
+    mockMimeTypes.lookup.mockReturnValue('image/jpeg');
+    mockMimeTypes.extension.mockReturnValue('jpg');
+    
+    // 文件类型检测默认响应
+    mockFileType.fromBuffer.mockResolvedValue({
+      ext: 'jpg',
+      mime: 'image/jpeg'
+    });
+    
+    // Sharp图片处理默认响应
+    const mockSharpInstance = mockSharp();
+    mockSharpInstance.metadata.mockResolvedValue({
+      width: 1920,
+      height: 1080,
+      format: 'jpeg',
+      size: 1024000
+    });
+    mockSharpInstance.toBuffer.mockResolvedValue(Buffer.from('optimized-image'));
+    
+    // FFmpeg视频处理默认响应
+    const mockFfmpegInstance = mockFfmpeg();
+    mockFfmpegInstance.on.mockImplementation((event, callback) => {
+      if (event === 'end') {
+        setTimeout(callback, 100);
+      }
+      return mockFfmpegInstance;
+    });
+    
+    // 阿里云OSS默认响应
+    mockAlicloudOss.put.mockResolvedValue({
+      name: 'uploads/image.jpg',
+      url: 'https://skillup-oss.oss-cn-hangzhou.aliyuncs.com/uploads/image.jpg',
+      res: { status: 200 }
+    });
+    
+    mockAlicloudOss.get.mockResolvedValue({
+      content: Buffer.from('file-content'),
+      res: { status: 200 }
+    });
+    
+    mockAlicloudOss.delete.mockResolvedValue({
+      res: { status: 204 }
+    });
+    
+    mockAlicloudOss.signatureUrl.mockReturnValue(
+      'https://skillup-oss.oss-cn-hangzhou.aliyuncs.com/uploads/image.jpg?signature=abc123'
+    );
+    
+    mockAlicloudOss.head.mockResolvedValue({
+      meta: {
+        size: 1024000,
+        lastModified: '2023-01-01T12:00:00.000Z'
+      },
+      res: { status: 200 }
+    });
+    
+    // AWS S3默认响应
+    mockAwsS3.send.mockResolvedValue({
+      ETag: '"abc123"',
+      Location: 'https://skillup-s3.s3.amazonaws.com/uploads/image.jpg'
+    });
+    
+    // 腾讯云COS默认响应
+    mockTencentCos.putObject.mockImplementation((params, callback) => {
+      callback(null, {
+        statusCode: 200,
+        headers: {
+          etag: '"abc123"'
+        }
+      });
+    });
+    
+    mockTencentCos.getObject.mockImplementation((params, callback) => {
+      callback(null, {
+        statusCode: 200,
+        Body: Buffer.from('file-content')
+      });
+    });
+    
+    // Supabase默认响应
+    mockSupabase.from().insert().mockResolvedValue({
+      data: [{ id: 'record-123' }],
+      error: null
+    });
+    
+    mockSupabase.from().select().mockResolvedValue({
+      data: [],
+      error: null
+    });
+    
+    mockSupabase.from().update().mockResolvedValue({
+      data: [{ id: 'record-123' }],
+      error: null
+    });
+    
+    mockSupabase.storage.from().upload.mockResolvedValue({
+      data: {
+        path: 'uploads/image.jpg',
+        id: 'file-123',
+        fullPath: 'skillup-storage/uploads/image.jpg'
+      },
+      error: null
+    });
+    
+    // User service默认响应
+    mockUserService.getUserById.mockResolvedValue({
+      id: 'user-123',
+      storageUsed: 1024000,
+      storageLimit: 1073741824 // 1GB
+    });
   });
 
-  describe('uploadFile', () => {
-    it('应该成功上传文件', async () => {
-      const mockUploadResult = {
-        success: true,
-        fileId: 'file-123',
-        fileName: 'test-image.jpg',
-        fileUrl: 'https://storage.example.com/test-bucket/test-image.jpg',
-        fileSize: 1024000,
-        mimeType: 'image/jpeg',
-        uploadedAt: new Date().toISOString(),
-        etag: 'abc123def456',
-        metadata: {
-          originalName: 'original-image.jpg',
-          uploadedBy: 'user-123'
-        }
-      };
+  afterEach(() => {
+    if (cloudStorageService) {
+      cloudStorageService.destroy();
+    }
+  });
+
+  describe('云存储服务初始化', () => {
+    it('应该正确初始化云存储服务', async () => {
+      await cloudStorageService.initialize();
       
-      mockStorageClient.upload.mockResolvedValue(mockUploadResult);
+      expect(cloudStorageService).toBeDefined();
+      expect(cloudStorageService.provider).toBe('alicloud');
+      expect(cloudStorageService.client).toBeDefined();
+    });
+
+    it('应该验证配置参数', () => {
+      expect(cloudStorageService.config).toBeDefined();
+      expect(cloudStorageService.config.CLOUD_STORAGE.provider).toBe('alicloud');
+      expect(cloudStorageService.config.CLOUD_STORAGE.defaultBucket).toBe('skillup-storage');
+    });
+
+    it('应该初始化阿里云OSS客户端', async () => {
+      await cloudStorageService.initialize();
       
-      const file = testUtils.createMockFile('test-image.jpg', 'image/jpeg', 1024000);
-      const result = await storageService.uploadFile(file, {
-        folder: 'images',
-        userId: 'user-123',
-        isPublic: true
-      });
-      
-      expect(result.success).toBe(true);
-      expect(result.fileId).toBe('file-123');
-      expect(result.fileName).toBe('test-image.jpg');
-      expect(result.fileUrl).toBe('https://storage.example.com/test-bucket/test-image.jpg');
-      expect(result.fileSize).toBe(1024000);
-      expect(result.mimeType).toBe('image/jpeg');
-      expect(mockStorageClient.upload).toHaveBeenCalledWith(
+      expect(require('@alicloud/oss').default).toHaveBeenCalledWith(
         expect.objectContaining({
-          file,
-          folder: 'images',
-          isPublic: true
+          accessKeyId: 'alicloud-access-key',
+          accessKeySecret: 'alicloud-secret-key',
+          bucket: 'skillup-oss',
+          region: 'oss-cn-hangzhou'
         })
       );
     });
 
-    it('应该处理不同文件类型', async () => {
-      const testCases = [
-        { name: 'document.pdf', type: 'application/pdf', folder: 'documents' },
-        { name: 'video.mp4', type: 'video/mp4', folder: 'videos' },
-        { name: 'audio.mp3', type: 'audio/mpeg', folder: 'audio' },
-        { name: 'archive.zip', type: 'application/zip', folder: 'archives' }
-      ];
+    it('应该初始化AWS S3客户端', async () => {
+      // 切换到AWS提供商
+      mockEnvConfig.CLOUD_STORAGE.provider = 'aws';
+      cloudStorageService = new CloudStorageService();
       
-      for (const testCase of testCases) {
-        const mockResult = {
-          success: true,
-          fileId: `file-${Date.now()}`,
-          fileName: testCase.name,
-          fileUrl: `https://storage.example.com/test-bucket/${testCase.folder}/${testCase.name}`,
-          mimeType: testCase.type
-        };
-        
-        mockStorageClient.upload.mockResolvedValue(mockResult);
-        mockFileUtils.getMimeType.mockReturnValue(testCase.type);
-        
-        const file = testUtils.createMockFile(testCase.name, testCase.type);
-        const result = await storageService.uploadFile(file, {
-          folder: testCase.folder
-        });
-        
-        expect(result.success).toBe(true);
-        expect(result.mimeType).toBe(testCase.type);
-      }
+      await cloudStorageService.initialize();
+      
+      expect(require('@aws-sdk/client-s3').S3Client).toHaveBeenCalledWith(
+        expect.objectContaining({
+          region: 'us-east-1',
+          credentials: {
+            accessKeyId: 'aws-access-key',
+            secretAccessKey: 'aws-secret-key'
+          }
+        })
+      );
+    });
+
+    it('应该初始化腾讯云COS客户端', async () => {
+      // 切换到腾讯云提供商
+      mockEnvConfig.CLOUD_STORAGE.provider = 'tencent';
+      cloudStorageService = new CloudStorageService();
+      
+      await cloudStorageService.initialize();
+      
+      expect(require('cos-nodejs-sdk-v5').default).toHaveBeenCalledWith(
+        expect.objectContaining({
+          SecretId: 'tencent-secret-id',
+          SecretKey: 'tencent-secret-key'
+        })
+      );
+    });
+  });
+
+  describe('文件上传', () => {
+    beforeEach(async () => {
+      await cloudStorageService.initialize();
+    });
+
+    it('应该成功上传文件', async () => {
+      const fileData = {
+        buffer: Buffer.from('test-file-content'),
+        originalName: 'test.jpg',
+        mimeType: 'image/jpeg',
+        size: 1024000,
+        userId: 'user-123'
+      };
+      
+      const result = await uploadFile(fileData);
+      
+      expect(result.success).toBe(true);
+      expect(result.url).toBeDefined();
+      expect(result.key).toBeDefined();
+      
+      expect(mockAlicloudOss.put).toHaveBeenCalledWith(
+        expect.stringContaining('uploads/'),
+        fileData.buffer,
+        expect.objectContaining({
+          headers: {
+            'Content-Type': 'image/jpeg'
+          }
+        })
+      );
     });
 
     it('应该验证文件类型', async () => {
-      mockFileUtils.validateFileType.mockReturnValue(false);
+      const fileData = {
+        buffer: Buffer.from('test-file-content'),
+        originalName: 'test.exe',
+        mimeType: 'application/x-msdownload',
+        size: 1024000,
+        userId: 'user-123'
+      };
       
-      const invalidFile = testUtils.createMockFile('malicious.exe', 'application/x-executable');
+      const result = await uploadFile(fileData);
       
-      await expect(storageService.uploadFile(invalidFile)).rejects.toThrow('Invalid file type');
+      expect(result.success).toBe(false);
+      expect(result.error).toEqual(
+        expect.objectContaining({
+          type: 'INVALID_FILE_TYPE',
+          message: 'File type not allowed'
+        })
+      );
     });
 
     it('应该验证文件大小', async () => {
-      mockFileUtils.validateFileSize.mockReturnValue(false);
-      
-      const largeFile = testUtils.createMockFile('large-file.jpg', 'image/jpeg', 100 * 1024 * 1024); // 100MB
-      
-      await expect(storageService.uploadFile(largeFile)).rejects.toThrow('File size exceeds limit');
-    });
-
-    it('应该处理上传错误', async () => {
-      const uploadError = new Error('Upload failed: Network timeout');
-      mockStorageClient.upload.mockRejectedValue(uploadError);
-      mockErrorHandler.withRetry.mockRejectedValue(uploadError);
-      
-      const file = testUtils.createMockFile('test-image.jpg', 'image/jpeg');
-      
-      await expect(storageService.uploadFile(file)).rejects.toThrow('Upload failed: Network timeout');
-      expect(mockErrorHandler.withRetry).toHaveBeenCalled();
-    });
-
-    it('应该支持自定义文件名', async () => {
-      const mockResult = {
-        success: true,
-        fileId: 'custom-file-123',
-        fileName: 'custom-name.jpg',
-        fileUrl: 'https://storage.example.com/test-bucket/custom-name.jpg'
-      };
-      
-      mockStorageClient.upload.mockResolvedValue(mockResult);
-      
-      const file = testUtils.createMockFile('original.jpg', 'image/jpeg');
-      const result = await storageService.uploadFile(file, {
-        customFileName: 'custom-name.jpg'
-      });
-      
-      expect(result.fileName).toBe('custom-name.jpg');
-    });
-
-    it('应该支持文件压缩', async () => {
-      const compressedBuffer = Buffer.from('compressed-image-data');
-      mockFileUtils.compressImage.mockResolvedValue(compressedBuffer);
-      
-      const mockResult = {
-        success: true,
-        fileId: 'compressed-file-123',
-        fileName: 'compressed-image.jpg',
-        fileSize: compressedBuffer.length
-      };
-      
-      mockStorageClient.upload.mockResolvedValue(mockResult);
-      
-      const file = testUtils.createMockFile('large-image.jpg', 'image/jpeg', 5 * 1024 * 1024);
-      const result = await storageService.uploadFile(file, {
-        compress: true,
-        quality: 80
-      });
-      
-      expect(mockFileUtils.compressImage).toHaveBeenCalledWith(file, { quality: 80 });
-      expect(result.success).toBe(true);
-    });
-
-    it('应该处理元数据', async () => {
-      const metadata = {
-        description: 'Test image',
-        tags: ['test', 'image'],
-        category: 'profile'
-      };
-      
-      const mockResult = {
-        success: true,
-        fileId: 'metadata-file-123',
-        fileName: 'test-image.jpg',
-        metadata
-      };
-      
-      mockStorageClient.upload.mockResolvedValue(mockResult);
-      
-      const file = testUtils.createMockFile('test-image.jpg', 'image/jpeg');
-      const result = await storageService.uploadFile(file, {
-        metadata
-      });
-      
-      expect(result.metadata).toEqual(metadata);
-    });
-  });
-
-  describe('downloadFile', () => {
-    it('应该成功下载文件', async () => {
-      const mockFileData = Buffer.from('file-content-data');
-      const mockDownloadResult = {
-        success: true,
-        fileData: mockFileData,
-        fileName: 'downloaded-file.jpg',
-        fileSize: mockFileData.length,
+      const fileData = {
+        buffer: Buffer.from('test-file-content'),
+        originalName: 'large-file.jpg',
         mimeType: 'image/jpeg',
-        lastModified: new Date().toISOString(),
-        etag: 'download-etag-123'
+        size: 200 * 1024 * 1024, // 200MB，超过限制
+        userId: 'user-123'
       };
       
-      mockStorageClient.download.mockResolvedValue(mockDownloadResult);
-      
-      const result = await storageService.downloadFile('file-123');
-      
-      expect(result.success).toBe(true);
-      expect(result.fileData).toEqual(mockFileData);
-      expect(result.fileName).toBe('downloaded-file.jpg');
-      expect(result.mimeType).toBe('image/jpeg');
-      expect(mockStorageClient.download).toHaveBeenCalledWith('file-123');
-    });
-
-    it('应该处理文件不存在', async () => {
-      const notFoundError = new Error('File not found');
-      notFoundError.name = 'NotFoundError';
-      mockStorageClient.download.mockRejectedValue(notFoundError);
-      
-      const result = await storageService.downloadFile('non-existent-file');
+      const result = await uploadFile(fileData);
       
       expect(result.success).toBe(false);
-      expect(result.error).toBe('File not found');
-    });
-
-    it('应该支持范围下载', async () => {
-      const partialData = Buffer.from('partial-content');
-      const mockResult = {
-        success: true,
-        fileData: partialData,
-        fileName: 'partial-file.jpg',
-        contentRange: 'bytes 0-1023/2048',
-        isPartial: true
-      };
-      
-      mockStorageClient.download.mockResolvedValue(mockResult);
-      
-      const result = await storageService.downloadFile('file-123', {
-        range: { start: 0, end: 1023 }
-      });
-      
-      expect(result.success).toBe(true);
-      expect(result.isPartial).toBe(true);
-      expect(result.contentRange).toBe('bytes 0-1023/2048');
-    });
-
-    it('应该处理下载错误', async () => {
-      const downloadError = new Error('Download failed: Network error');
-      mockStorageClient.download.mockRejectedValue(downloadError);
-      mockErrorHandler.withRetry.mockRejectedValue(downloadError);
-      
-      await expect(storageService.downloadFile('file-123')).rejects.toThrow('Download failed: Network error');
-      expect(mockErrorHandler.withRetry).toHaveBeenCalled();
-    });
-  });
-
-  describe('deleteFile', () => {
-    it('应该成功删除文件', async () => {
-      const mockDeleteResult = {
-        success: true,
-        fileId: 'deleted-file-123',
-        deletedAt: new Date().toISOString()
-      };
-      
-      mockStorageClient.delete.mockResolvedValue(mockDeleteResult);
-      
-      const result = await storageService.deleteFile('file-123');
-      
-      expect(result.success).toBe(true);
-      expect(result.fileId).toBe('deleted-file-123');
-      expect(mockStorageClient.delete).toHaveBeenCalledWith('file-123');
-    });
-
-    it('应该批量删除文件', async () => {
-      const fileIds = ['file-1', 'file-2', 'file-3'];
-      const mockBatchResult = {
-        success: true,
-        deletedFiles: fileIds,
-        deletedCount: 3,
-        failedFiles: []
-      };
-      
-      mockStorageClient.delete.mockResolvedValue(mockBatchResult);
-      
-      const result = await storageService.deleteFiles(fileIds);
-      
-      expect(result.success).toBe(true);
-      expect(result.deletedCount).toBe(3);
-      expect(result.failedFiles).toHaveLength(0);
-    });
-
-    it('应该处理部分删除失败', async () => {
-      const fileIds = ['file-1', 'file-2', 'file-3'];
-      const mockBatchResult = {
-        success: false,
-        deletedFiles: ['file-1', 'file-3'],
-        deletedCount: 2,
-        failedFiles: [{
-          fileId: 'file-2',
-          error: 'File not found'
-        }]
-      };
-      
-      mockStorageClient.delete.mockResolvedValue(mockBatchResult);
-      
-      const result = await storageService.deleteFiles(fileIds);
-      
-      expect(result.success).toBe(false);
-      expect(result.deletedCount).toBe(2);
-      expect(result.failedFiles).toHaveLength(1);
-      expect(result.failedFiles[0].fileId).toBe('file-2');
-    });
-
-    it('应该处理删除错误', async () => {
-      const deleteError = new Error('Delete failed: Permission denied');
-      mockStorageClient.delete.mockRejectedValue(deleteError);
-      
-      await expect(storageService.deleteFile('file-123')).rejects.toThrow('Delete failed: Permission denied');
-    });
-  });
-
-  describe('getFileUrl', () => {
-    it('应该生成公共文件URL', async () => {
-      const mockUrl = 'https://storage.example.com/test-bucket/public/file-123.jpg';
-      mockStorageClient.getSignedUrl.mockResolvedValue(mockUrl);
-      
-      const result = await storageService.getFileUrl('file-123', {
-        isPublic: true
-      });
-      
-      expect(result.success).toBe(true);
-      expect(result.url).toBe(mockUrl);
-      expect(result.isPublic).toBe(true);
-    });
-
-    it('应该生成带过期时间的签名URL', async () => {
-      const mockSignedUrl = 'https://storage.example.com/test-bucket/file-123.jpg?signature=abc123&expires=1234567890';
-      mockStorageClient.getSignedUrl.mockResolvedValue(mockSignedUrl);
-      
-      const expiresIn = 3600; // 1小时
-      const result = await storageService.getFileUrl('file-123', {
-        expiresIn,
-        isPublic: false
-      });
-      
-      expect(result.success).toBe(true);
-      expect(result.url).toBe(mockSignedUrl);
-      expect(result.isPublic).toBe(false);
-      expect(result.expiresIn).toBe(expiresIn);
-      expect(mockStorageClient.getSignedUrl).toHaveBeenCalledWith(
-        'file-123',
-        expect.objectContaining({ expiresIn })
+      expect(result.error).toEqual(
+        expect.objectContaining({
+          type: 'FILE_TOO_LARGE',
+          message: 'File size exceeds limit'
+        })
       );
     });
 
-    it('应该处理URL生成错误', async () => {
-      const urlError = new Error('URL generation failed');
-      mockStorageClient.getSignedUrl.mockRejectedValue(urlError);
+    it('应该检查用户存储配额', async () => {
+      mockUserService.getUserById.mockResolvedValue({
+        id: 'user-123',
+        storageUsed: 1073741824, // 1GB已使用
+        storageLimit: 1073741824 // 1GB限制
+      });
       
-      const result = await storageService.getFileUrl('file-123');
+      const fileData = {
+        buffer: Buffer.from('test-file-content'),
+        originalName: 'test.jpg',
+        mimeType: 'image/jpeg',
+        size: 1024000,
+        userId: 'user-123'
+      };
+      
+      const result = await uploadFile(fileData);
       
       expect(result.success).toBe(false);
-      expect(result.error).toBe('URL generation failed');
+      expect(result.error).toEqual(
+        expect.objectContaining({
+          type: 'STORAGE_QUOTA_EXCEEDED',
+          message: 'Storage quota exceeded'
+        })
+      );
+    });
+
+    it('应该生成唯一文件名', async () => {
+      const fileData = {
+        buffer: Buffer.from('test-file-content'),
+        originalName: 'test.jpg',
+        mimeType: 'image/jpeg',
+        size: 1024000,
+        userId: 'user-123'
+      };
+      
+      await uploadFile(fileData);
+      
+      expect(mockUuid.v4).toHaveBeenCalled();
+      expect(mockAlicloudOss.put).toHaveBeenCalledWith(
+        expect.stringMatching(/uploads\/\d{4}\/\d{2}\/\d{2}\/file-123_test\.jpg/),
+        expect.any(Buffer),
+        expect.any(Object)
+      );
+    });
+
+    it('应该优化图片文件', async () => {
+      const fileData = {
+        buffer: Buffer.from('test-image-content'),
+        originalName: 'large-image.jpg',
+        mimeType: 'image/jpeg',
+        size: 5 * 1024 * 1024, // 5MB
+        userId: 'user-123',
+        optimize: true
+      };
+      
+      await uploadFile(fileData);
+      
+      expect(mockSharp).toHaveBeenCalledWith(fileData.buffer);
+      expect(mockSharp().resize).toHaveBeenCalledWith(1920, 1080, {
+        fit: 'inside',
+        withoutEnlargement: true
+      });
+      expect(mockSharp().jpeg).toHaveBeenCalledWith({ quality: 80 });
+    });
+
+    it('应该记录文件上传日志', async () => {
+      const fileData = {
+        buffer: Buffer.from('test-file-content'),
+        originalName: 'test.jpg',
+        mimeType: 'image/jpeg',
+        size: 1024000,
+        userId: 'user-123'
+      };
+      
+      await uploadFile(fileData);
+      
+      expect(mockSupabase.from).toHaveBeenCalledWith('file_uploads');
+      expect(mockSupabase.from().insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'user-123',
+          originalName: 'test.jpg',
+          mimeType: 'image/jpeg',
+          size: 1024000,
+          key: expect.any(String),
+          url: expect.any(String)
+        })
+      );
+    });
+
+    it('应该支持文件夹组织', async () => {
+      const fileData = {
+        buffer: Buffer.from('test-file-content'),
+        originalName: 'document.pdf',
+        mimeType: 'application/pdf',
+        size: 1024000,
+        userId: 'user-123',
+        folder: 'documents/contracts'
+      };
+      
+      await uploadFile(fileData);
+      
+      expect(mockAlicloudOss.put).toHaveBeenCalledWith(
+        expect.stringContaining('documents/contracts/'),
+        expect.any(Buffer),
+        expect.any(Object)
+      );
     });
   });
 
-  describe('listFiles', () => {
-    it('应该列出文件夹中的文件', async () => {
-      const mockFileList = {
-        success: true,
-        files: [
-          {
-            fileId: 'file-1',
-            fileName: 'image1.jpg',
-            fileSize: 1024000,
-            mimeType: 'image/jpeg',
-            uploadedAt: '2024-01-01T00:00:00Z',
-            isPublic: true
-          },
-          {
-            fileId: 'file-2',
-            fileName: 'document.pdf',
-            fileSize: 2048000,
-            mimeType: 'application/pdf',
-            uploadedAt: '2024-01-02T00:00:00Z',
-            isPublic: false
-          }
-        ],
-        totalCount: 2,
-        hasMore: false,
-        nextToken: null
+  describe('文件下载', () => {
+    beforeEach(async () => {
+      await cloudStorageService.initialize();
+    });
+
+    it('应该成功下载文件', async () => {
+      const fileKey = 'uploads/2023/01/01/file-123_test.jpg';
+      
+      const result = await downloadFile(fileKey);
+      
+      expect(result.success).toBe(true);
+      expect(result.buffer).toEqual(Buffer.from('file-content'));
+      
+      expect(mockAlicloudOss.get).toHaveBeenCalledWith(fileKey);
+    });
+
+    it('应该处理文件不存在的情况', async () => {
+      const fileKey = 'uploads/non-existent.jpg';
+      
+      mockAlicloudOss.get.mockRejectedValue({
+        code: 'NoSuchKey',
+        message: 'The specified key does not exist.'
+      });
+      
+      const result = await downloadFile(fileKey);
+      
+      expect(result.success).toBe(false);
+      expect(result.error).toEqual(
+        expect.objectContaining({
+          type: 'FILE_NOT_FOUND',
+          message: 'File not found'
+        })
+      );
+    });
+
+    it('应该验证文件访问权限', async () => {
+      const fileKey = 'private/user-456/document.pdf';
+      const userId = 'user-123'; // 不同用户
+      
+      const result = await cloudStorageService.downloadFileWithPermission(fileKey, userId);
+      
+      expect(result.success).toBe(false);
+      expect(result.error).toEqual(
+        expect.objectContaining({
+          type: 'ACCESS_DENIED',
+          message: 'Access denied'
+        })
+      );
+    });
+
+    it('应该支持流式下载', async () => {
+      const fileKey = 'uploads/large-file.mp4';
+      
+      const stream = await cloudStorageService.downloadFileStream(fileKey);
+      
+      expect(stream).toBeDefined();
+      expect(mockAlicloudOss.getStream).toHaveBeenCalledWith(fileKey);
+    });
+
+    it('应该记录文件下载日志', async () => {
+      const fileKey = 'uploads/2023/01/01/file-123_test.jpg';
+      const userId = 'user-123';
+      
+      await cloudStorageService.downloadFileWithPermission(fileKey, userId);
+      
+      expect(mockSupabase.from).toHaveBeenCalledWith('file_downloads');
+      expect(mockSupabase.from().insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'user-123',
+          fileKey: fileKey,
+          downloadedAt: expect.any(String)
+        })
+      );
+    });
+  });
+
+  describe('文件删除', () => {
+    beforeEach(async () => {
+      await cloudStorageService.initialize();
+    });
+
+    it('应该成功删除文件', async () => {
+      const fileKey = 'uploads/2023/01/01/file-123_test.jpg';
+      
+      const result = await deleteFile(fileKey);
+      
+      expect(result.success).toBe(true);
+      
+      expect(mockAlicloudOss.delete).toHaveBeenCalledWith(fileKey);
+    });
+
+    it('应该验证删除权限', async () => {
+      const fileKey = 'private/user-456/document.pdf';
+      const userId = 'user-123'; // 不同用户
+      
+      const result = await cloudStorageService.deleteFileWithPermission(fileKey, userId);
+      
+      expect(result.success).toBe(false);
+      expect(result.error).toEqual(
+        expect.objectContaining({
+          type: 'ACCESS_DENIED',
+          message: 'Access denied'
+        })
+      );
+    });
+
+    it('应该支持批量删除', async () => {
+      const fileKeys = [
+        'uploads/file1.jpg',
+        'uploads/file2.jpg',
+        'uploads/file3.jpg'
+      ];
+      
+      const result = await cloudStorageService.deleteMultipleFiles(fileKeys);
+      
+      expect(result.success).toBe(true);
+      expect(result.deleted).toBe(3);
+      expect(result.failed).toBe(0);
+      
+      expect(mockAlicloudOss.delete).toHaveBeenCalledTimes(3);
+    });
+
+    it('应该更新用户存储使用量', async () => {
+      const fileKey = 'uploads/2023/01/01/file-123_test.jpg';
+      const userId = 'user-123';
+      const fileSize = 1024000;
+      
+      mockSupabase.from().select().mockResolvedValue({
+        data: [{
+          id: 'file-123',
+          size: fileSize,
+          userId: userId
+        }],
+        error: null
+      });
+      
+      await cloudStorageService.deleteFileWithPermission(fileKey, userId);
+      
+      expect(mockUserService.updateUserStorage).toHaveBeenCalledWith(
+        userId,
+        -fileSize
+      );
+    });
+
+    it('应该记录文件删除日志', async () => {
+      const fileKey = 'uploads/2023/01/01/file-123_test.jpg';
+      const userId = 'user-123';
+      
+      await cloudStorageService.deleteFileWithPermission(fileKey, userId);
+      
+      expect(mockSupabase.from).toHaveBeenCalledWith('file_deletions');
+      expect(mockSupabase.from().insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'user-123',
+          fileKey: fileKey,
+          deletedAt: expect.any(String)
+        })
+      );
+    });
+  });
+
+  describe('签名URL生成', () => {
+    beforeEach(async () => {
+      await cloudStorageService.initialize();
+    });
+
+    it('应该生成签名下载URL', async () => {
+      const fileKey = 'uploads/2023/01/01/file-123_test.jpg';
+      const expiration = 3600; // 1小时
+      
+      const result = await generateSignedUrl(fileKey, 'download', expiration);
+      
+      expect(result.success).toBe(true);
+      expect(result.url).toBeDefined();
+      expect(result.expiresAt).toBeDefined();
+      
+      expect(mockAlicloudOss.signatureUrl).toHaveBeenCalledWith(
+        fileKey,
+        expect.objectContaining({
+          expires: expiration,
+          method: 'GET'
+        })
+      );
+    });
+
+    it('应该生成签名上传URL', async () => {
+      const fileKey = 'uploads/2023/01/01/new-file.jpg';
+      const expiration = 1800; // 30分钟
+      
+      const result = await generateSignedUrl(fileKey, 'upload', expiration);
+      
+      expect(result.success).toBe(true);
+      expect(result.url).toBeDefined();
+      
+      expect(mockAlicloudOss.signatureUrl).toHaveBeenCalledWith(
+        fileKey,
+        expect.objectContaining({
+          expires: expiration,
+          method: 'PUT'
+        })
+      );
+    });
+
+    it('应该缓存签名URL', async () => {
+      const fileKey = 'uploads/2023/01/01/file-123_test.jpg';
+      
+      // 第一次生成
+      await generateSignedUrl(fileKey, 'download', 3600);
+      
+      // 第二次生成（应该从缓存获取）
+      await generateSignedUrl(fileKey, 'download', 3600);
+      
+      // 验证只调用了一次OSS API
+      expect(mockAlicloudOss.signatureUrl).toHaveBeenCalledTimes(1);
+      
+      // 验证缓存操作
+      expect(mockRedis.set).toHaveBeenCalledWith(
+        expect.stringContaining('signed_url:'),
+        expect.any(String),
+        'EX',
+        expect.any(Number)
+      );
+    });
+
+    it('应该验证URL访问权限', async () => {
+      const fileKey = 'private/user-456/document.pdf';
+      const userId = 'user-123'; // 不同用户
+      
+      const result = await cloudStorageService.generateSignedUrlWithPermission(
+        fileKey,
+        'download',
+        3600,
+        userId
+      );
+      
+      expect(result.success).toBe(false);
+      expect(result.error).toEqual(
+        expect.objectContaining({
+          type: 'ACCESS_DENIED',
+          message: 'Access denied'
+        })
+      );
+    });
+  });
+
+  describe('文件优化', () => {
+    beforeEach(async () => {
+      await cloudStorageService.initialize();
+    });
+
+    it('应该优化图片文件', async () => {
+      const imageBuffer = Buffer.from('test-image-content');
+      const options = {
+        quality: 80,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        format: 'webp'
       };
       
-      mockStorageClient.listFiles.mockResolvedValue(mockFileList);
+      const result = await optimizeImage(imageBuffer, options);
       
-      const result = await storageService.listFiles({
-        folder: 'uploads',
-        limit: 10
+      expect(result.success).toBe(true);
+      expect(result.buffer).toEqual(Buffer.from('optimized-image'));
+      
+      expect(mockSharp).toHaveBeenCalledWith(imageBuffer);
+      expect(mockSharp().resize).toHaveBeenCalledWith(1920, 1080, {
+        fit: 'inside',
+        withoutEnlargement: true
       });
+      expect(mockSharp().webp).toHaveBeenCalledWith({ quality: 80 });
+    });
+
+    it('应该生成多种图片格式', async () => {
+      const imageBuffer = Buffer.from('test-image-content');
+      
+      const result = await cloudStorageService.generateImageVariants(imageBuffer, {
+        formats: ['webp', 'jpeg'],
+        sizes: [
+          { width: 1920, height: 1080, suffix: 'large' },
+          { width: 800, height: 600, suffix: 'medium' },
+          { width: 400, height: 300, suffix: 'small' }
+        ]
+      });
+      
+      expect(result.success).toBe(true);
+      expect(result.variants).toHaveLength(6); // 2格式 × 3尺寸
+      
+      expect(mockSharp).toHaveBeenCalledTimes(6);
+    });
+
+    it('应该优化视频文件', async () => {
+      const videoPath = '/tmp/input-video.mp4';
+      const outputPath = '/tmp/output-video.mp4';
+      const options = {
+        maxBitrate: '2M',
+        maxResolution: '1080p',
+        format: 'mp4'
+      };
+      
+      const result = await optimizeVideo(videoPath, outputPath, options);
+      
+      expect(result.success).toBe(true);
+      
+      expect(mockFfmpeg).toHaveBeenCalled();
+      expect(mockFfmpeg().videoBitrate).toHaveBeenCalledWith('2M');
+      expect(mockFfmpeg().size).toHaveBeenCalledWith('1920x1080');
+      expect(mockFfmpeg().format).toHaveBeenCalledWith('mp4');
+    });
+
+    it('应该提取视频缩略图', async () => {
+      const videoPath = '/tmp/video.mp4';
+      const thumbnailPath = '/tmp/thumbnail.jpg';
+      
+      const result = await cloudStorageService.extractVideoThumbnail(
+        videoPath,
+        thumbnailPath,
+        { timestamp: '00:00:05' }
+      );
+      
+      expect(result.success).toBe(true);
+      
+      expect(mockFfmpeg).toHaveBeenCalled();
+      expect(mockFfmpeg().screenshots).toHaveBeenCalledWith(
+        expect.objectContaining({
+          timestamps: ['00:00:05'],
+          filename: expect.any(String),
+          folder: expect.any(String)
+        })
+      );
+    });
+  });
+
+  describe('文件管理', () => {
+    beforeEach(async () => {
+      await cloudStorageService.initialize();
+    });
+
+    it('应该列出文件夹内容', async () => {
+      const folderPath = 'uploads/2023/01/';
+      
+      mockAlicloudOss.list.mockResolvedValue({
+        objects: [
+          {
+            name: 'uploads/2023/01/file1.jpg',
+            size: 1024000,
+            lastModified: '2023-01-01T12:00:00.000Z'
+          },
+          {
+            name: 'uploads/2023/01/file2.pdf',
+            size: 2048000,
+            lastModified: '2023-01-01T13:00:00.000Z'
+          }
+        ]
+      });
+      
+      const result = await cloudStorageService.listFiles(folderPath);
       
       expect(result.success).toBe(true);
       expect(result.files).toHaveLength(2);
-      expect(result.totalCount).toBe(2);
-      expect(result.hasMore).toBe(false);
+      expect(result.files[0]).toEqual(
+        expect.objectContaining({
+          name: 'uploads/2023/01/file1.jpg',
+          size: 1024000,
+          lastModified: '2023-01-01T12:00:00.000Z'
+        })
+      );
     });
 
-    it('应该支持分页', async () => {
-      const mockPagedResult = {
-        success: true,
-        files: Array.from({ length: 5 }, (_, i) => ({
-          fileId: `file-${i + 1}`,
-          fileName: `file-${i + 1}.jpg`,
-          fileSize: 1024000
-        })),
-        totalCount: 25,
-        hasMore: true,
-        nextToken: 'next-page-token'
-      };
+    it('应该获取文件元数据', async () => {
+      const fileKey = 'uploads/2023/01/01/file-123_test.jpg';
       
-      mockStorageClient.listFiles.mockResolvedValue(mockPagedResult);
-      
-      const result = await storageService.listFiles({
-        limit: 5,
-        offset: 0
-      });
+      const result = await cloudStorageService.getFileMetadata(fileKey);
       
       expect(result.success).toBe(true);
-      expect(result.files).toHaveLength(5);
-      expect(result.hasMore).toBe(true);
-      expect(result.nextToken).toBe('next-page-token');
+      expect(result.metadata).toEqual(
+        expect.objectContaining({
+          size: 1024000,
+          lastModified: '2023-01-01T12:00:00.000Z'
+        })
+      );
+      
+      expect(mockAlicloudOss.head).toHaveBeenCalledWith(fileKey);
     });
 
-    it('应该支持文件过滤', async () => {
-      const mockFilteredResult = {
-        success: true,
-        files: [
+    it('应该复制文件', async () => {
+      const sourceKey = 'uploads/source.jpg';
+      const targetKey = 'uploads/copy.jpg';
+      
+      const result = await cloudStorageService.copyFile(sourceKey, targetKey);
+      
+      expect(result.success).toBe(true);
+      
+      expect(mockAlicloudOss.copy).toHaveBeenCalledWith(
+        targetKey,
+        sourceKey
+      );
+    });
+
+    it('应该移动文件', async () => {
+      const sourceKey = 'uploads/temp/file.jpg';
+      const targetKey = 'uploads/permanent/file.jpg';
+      
+      const result = await cloudStorageService.moveFile(sourceKey, targetKey);
+      
+      expect(result.success).toBe(true);
+      
+      // 验证复制和删除操作
+      expect(mockAlicloudOss.copy).toHaveBeenCalledWith(targetKey, sourceKey);
+      expect(mockAlicloudOss.delete).toHaveBeenCalledWith(sourceKey);
+    });
+
+    it('应该创建文件夹', async () => {
+      const folderPath = 'uploads/new-folder/';
+      
+      const result = await cloudStorageService.createFolder(folderPath);
+      
+      expect(result.success).toBe(true);
+      
+      // 验证创建空对象作为文件夹标记
+      expect(mockAlicloudOss.put).toHaveBeenCalledWith(
+        folderPath,
+        Buffer.alloc(0)
+      );
+    });
+  });
+
+  describe('文件压缩和解压', () => {
+    beforeEach(async () => {
+      await cloudStorageService.initialize();
+    });
+
+    it('应该创建ZIP压缩包', async () => {
+      const files = [
+        { key: 'uploads/file1.jpg', name: 'file1.jpg' },
+        { key: 'uploads/file2.pdf', name: 'file2.pdf' }
+      ];
+      const zipName = 'archive.zip';
+      
+      const result = await cloudStorageService.createZipArchive(files, zipName);
+      
+      expect(result.success).toBe(true);
+      expect(result.zipKey).toBeDefined();
+      
+      expect(mockArchiver.create).toHaveBeenCalledWith('zip');
+    });
+
+    it('应该解压ZIP文件', async () => {
+      const zipKey = 'uploads/archive.zip';
+      const extractPath = 'uploads/extracted/';
+      
+      const result = await cloudStorageService.extractZipArchive(zipKey, extractPath);
+      
+      expect(result.success).toBe(true);
+      expect(result.extractedFiles).toBeDefined();
+      
+      expect(mockUnzipper.Extract).toHaveBeenCalled();
+    });
+  });
+
+  describe('文件统计和分析', () => {
+    beforeEach(async () => {
+      await cloudStorageService.initialize();
+    });
+
+    it('应该生成存储使用报告', async () => {
+      const userId = 'user-123';
+      const reportParams = {
+        startDate: '2023-01-01',
+        endDate: '2023-01-31',
+        groupBy: 'day'
+      };
+      
+      mockSupabase.from().select().mockResolvedValue({
+        data: [
           {
-            fileId: 'image-1',
-            fileName: 'photo1.jpg',
-            mimeType: 'image/jpeg'
-          },
-          {
-            fileId: 'image-2',
-            fileName: 'photo2.png',
-            mimeType: 'image/png'
+            date: '2023-01-01',
+            totalFiles: 100,
+            totalSize: 1073741824, // 1GB
+            uploadCount: 20,
+            downloadCount: 50
           }
         ],
-        totalCount: 2
-      };
-      
-      mockStorageClient.listFiles.mockResolvedValue(mockFilteredResult);
-      
-      const result = await storageService.listFiles({
-        mimeTypeFilter: 'image/*',
-        nameFilter: 'photo'
+        error: null
       });
       
-      expect(result.success).toBe(true);
-      expect(result.files.every(f => f.mimeType.startsWith('image/'))).toBe(true);
-      expect(result.files.every(f => f.fileName.includes('photo'))).toBe(true);
+      const report = await cloudStorageService.generateStorageReport(userId, reportParams);
+      
+      expect(report).toEqual(
+        expect.objectContaining({
+          period: expect.any(Object),
+          summary: expect.objectContaining({
+            totalFiles: expect.any(Number),
+            totalSize: expect.any(Number),
+            averageFileSize: expect.any(Number)
+          }),
+          data: expect.any(Array)
+        })
+      );
+    });
+
+    it('应该分析文件类型分布', async () => {
+      const userId = 'user-123';
+      
+      mockSupabase.from().select().mockResolvedValue({
+        data: [
+          { mimeType: 'image/jpeg', count: 50, totalSize: 524288000 },
+          { mimeType: 'application/pdf', count: 20, totalSize: 209715200 },
+          { mimeType: 'video/mp4', count: 5, totalSize: 1073741824 }
+        ],
+        error: null
+      });
+      
+      const analysis = await cloudStorageService.analyzeFileTypes(userId);
+      
+      expect(analysis).toEqual(
+        expect.objectContaining({
+          distribution: expect.arrayContaining([
+            expect.objectContaining({
+              mimeType: 'image/jpeg',
+              count: 50,
+              totalSize: 524288000,
+              percentage: expect.any(Number)
+            })
+          ]),
+          summary: expect.objectContaining({
+            totalTypes: 3,
+            mostCommonType: 'image/jpeg',
+            largestType: 'video/mp4'
+          })
+        })
+      );
+    });
+
+    it('应该检测重复文件', async () => {
+      const userId = 'user-123';
+      
+      mockSupabase.from().select().mockResolvedValue({
+        data: [
+          {
+            hash: 'abc123',
+            files: [
+              { key: 'uploads/file1.jpg', size: 1024000 },
+              { key: 'uploads/copy.jpg', size: 1024000 }
+            ]
+          }
+        ],
+        error: null
+      });
+      
+      const duplicates = await cloudStorageService.findDuplicateFiles(userId);
+      
+      expect(duplicates).toEqual(
+        expect.objectContaining({
+          duplicateGroups: expect.arrayContaining([
+            expect.objectContaining({
+              hash: 'abc123',
+              files: expect.any(Array),
+              potentialSavings: expect.any(Number)
+            })
+          ]),
+          summary: expect.objectContaining({
+            totalDuplicates: expect.any(Number),
+            potentialSavings: expect.any(Number)
+          })
+        })
+      );
     });
   });
 
-  describe('copyFile', () => {
-    it('应该成功复制文件', async () => {
-      const mockCopyResult = {
-        success: true,
-        sourceFileId: 'source-file-123',
-        targetFileId: 'target-file-456',
-        targetFileName: 'copied-file.jpg',
-        targetUrl: 'https://storage.example.com/test-bucket/copied-file.jpg'
-      };
-      
-      mockStorageClient.copyFile.mockResolvedValue(mockCopyResult);
-      
-      const result = await storageService.copyFile('source-file-123', {
-        targetFolder: 'backups',
-        targetFileName: 'copied-file.jpg'
-      });
-      
-      expect(result.success).toBe(true);
-      expect(result.sourceFileId).toBe('source-file-123');
-      expect(result.targetFileId).toBe('target-file-456');
-      expect(result.targetFileName).toBe('copied-file.jpg');
+  describe('云存储服务性能', () => {
+    beforeEach(async () => {
+      await cloudStorageService.initialize();
     });
 
-    it('应该处理复制错误', async () => {
-      const copyError = new Error('Copy failed: Source file not found');
-      mockStorageClient.copyFile.mockRejectedValue(copyError);
+    it('应该高效处理大量文件上传', async () => {
+      const files = Array.from({ length: 100 }, (_, i) => ({
+        buffer: Buffer.from(`test-content-${i}`),
+        originalName: `file${i}.txt`,
+        mimeType: 'text/plain',
+        size: 1024,
+        userId: 'user-123'
+      }));
       
-      await expect(storageService.copyFile('non-existent-file', {
-        targetFolder: 'backups'
-      })).rejects.toThrow('Copy failed: Source file not found');
+      const { duration } = await testUtils.performanceUtils.measureTime(async () => {
+        return Promise.all(files.map(file => uploadFile(file)));
+      });
+      
+      expect(duration).toBeLessThan(30000); // 应该在30秒内完成
+    });
+
+    it('应该优化文件列表查询性能', async () => {
+      const folderPath = 'uploads/';
+      
+      const { duration } = await testUtils.performanceUtils.measureTime(async () => {
+        return Promise.all(Array.from({ length: 50 }, () => 
+          cloudStorageService.listFiles(folderPath)
+        ));
+      });
+      
+      expect(duration).toBeLessThan(5000); // 应该在5秒内完成
+    });
+
+    it('应该优化签名URL生成性能', async () => {
+      const fileKeys = Array.from({ length: 200 }, (_, i) => `uploads/file${i}.jpg`);
+      
+      const { duration } = await testUtils.performanceUtils.measureTime(async () => {
+        return Promise.all(fileKeys.map(key => 
+          generateSignedUrl(key, 'download', 3600)
+        ));
+      });
+      
+      expect(duration).toBeLessThan(3000); // 应该在3秒内完成
     });
   });
 
-  describe('moveFile', () => {
-    it('应该成功移动文件', async () => {
-      const mockMoveResult = {
-        success: true,
-        fileId: 'moved-file-123',
-        oldPath: 'uploads/old-file.jpg',
-        newPath: 'archive/moved-file.jpg',
-        newUrl: 'https://storage.example.com/test-bucket/archive/moved-file.jpg'
+  describe('错误处理', () => {
+    beforeEach(async () => {
+      await cloudStorageService.initialize();
+    });
+
+    it('应该处理网络连接错误', async () => {
+      mockAlicloudOss.put.mockRejectedValue(
+        new Error('Network connection failed')
+      );
+      
+      const fileData = {
+        buffer: Buffer.from('test-content'),
+        originalName: 'test.txt',
+        mimeType: 'text/plain',
+        size: 1024,
+        userId: 'user-123'
       };
       
-      mockStorageClient.moveFile.mockResolvedValue(mockMoveResult);
-      
-      const result = await storageService.moveFile('file-123', {
-        targetFolder: 'archive',
-        targetFileName: 'moved-file.jpg'
-      });
-      
-      expect(result.success).toBe(true);
-      expect(result.fileId).toBe('moved-file-123');
-      expect(result.newPath).toBe('archive/moved-file.jpg');
-    });
-
-    it('应该处理移动错误', async () => {
-      const moveError = new Error('Move failed: Target folder does not exist');
-      mockStorageClient.moveFile.mockRejectedValue(moveError);
-      
-      await expect(storageService.moveFile('file-123', {
-        targetFolder: 'non-existent-folder'
-      })).rejects.toThrow('Move failed: Target folder does not exist');
-    });
-  });
-
-  describe('getFileInfo', () => {
-    it('应该获取文件信息', async () => {
-      const mockFileInfo = {
-        success: true,
-        fileId: 'info-file-123',
-        fileName: 'info-file.jpg',
-        fileSize: 1024000,
-        mimeType: 'image/jpeg',
-        uploadedAt: '2024-01-01T00:00:00Z',
-        lastModified: '2024-01-01T00:00:00Z',
-        etag: 'info-etag-123',
-        isPublic: true,
-        folder: 'uploads',
-        metadata: {
-          originalName: 'original-info-file.jpg',
-          uploadedBy: 'user-123'
-        }
-      };
-      
-      mockStorageClient.getFileInfo.mockResolvedValue(mockFileInfo);
-      
-      const result = await storageService.getFileInfo('file-123');
-      
-      expect(result.success).toBe(true);
-      expect(result.fileId).toBe('info-file-123');
-      expect(result.fileName).toBe('info-file.jpg');
-      expect(result.fileSize).toBe(1024000);
-      expect(result.metadata).toBeDefined();
-    });
-
-    it('应该处理文件信息获取错误', async () => {
-      const infoError = new Error('File info not found');
-      mockStorageClient.getFileInfo.mockRejectedValue(infoError);
-      
-      const result = await storageService.getFileInfo('non-existent-file');
+      const result = await uploadFile(fileData);
       
       expect(result.success).toBe(false);
-      expect(result.error).toBe('File info not found');
-    });
-  });
-
-  describe('CloudStorageConfig', () => {
-    it('应该使用默认配置', () => {
-      const config = new CloudStorageConfig();
-      
-      expect(config.maxFileSize).toBe(50 * 1024 * 1024); // 50MB
-      expect(config.allowedMimeTypes).toContain('image/jpeg');
-      expect(config.allowedMimeTypes).toContain('application/pdf');
-      expect(config.defaultFolder).toBe('uploads');
-      expect(config.enableCompression).toBe(true);
-      expect(config.retryAttempts).toBe(3);
-      expect(config.timeout).toBe(60000);
-    });
-
-    it('应该允许自定义配置', () => {
-      const customConfig = new CloudStorageConfig({
-        maxFileSize: 10 * 1024 * 1024, // 10MB
-        allowedMimeTypes: ['image/jpeg', 'image/png'],
-        defaultFolder: 'custom-uploads',
-        enableCompression: false,
-        retryAttempts: 5,
-        timeout: 120000
-      });
-      
-      expect(customConfig.maxFileSize).toBe(10 * 1024 * 1024);
-      expect(customConfig.allowedMimeTypes).toEqual(['image/jpeg', 'image/png']);
-      expect(customConfig.defaultFolder).toBe('custom-uploads');
-      expect(customConfig.enableCompression).toBe(false);
-      expect(customConfig.retryAttempts).toBe(5);
-      expect(customConfig.timeout).toBe(120000);
-    });
-
-    it('应该验证配置参数', () => {
-      expect(() => {
-        new CloudStorageConfig({
-          maxFileSize: -1 // 负值
-        });
-      }).toThrow('Max file size must be positive');
-      
-      expect(() => {
-        new CloudStorageConfig({
-          allowedMimeTypes: [] // 空数组
-        });
-      }).toThrow('Allowed MIME types cannot be empty');
-      
-      expect(() => {
-        new CloudStorageConfig({
-          retryAttempts: -1 // 负值
-        });
-      }).toThrow('Retry attempts must be non-negative');
-    });
-  });
-
-  describe('便捷函数', () => {
-    it('uploadFile函数应该正常工作', async () => {
-      const mockResult = {
-        success: true,
-        fileId: 'convenience-file-123',
-        fileName: 'convenience-test.jpg'
-      };
-      
-      mockStorageClient.upload.mockResolvedValue(mockResult);
-      
-      const file = testUtils.createMockFile('test.jpg', 'image/jpeg');
-      const result = await uploadFile(file);
-      
-      expect(result.success).toBe(true);
-      expect(result.fileId).toBe('convenience-file-123');
-    });
-
-    it('downloadFile函数应该正常工作', async () => {
-      const mockData = Buffer.from('convenience-download-data');
-      const mockResult = {
-        success: true,
-        fileData: mockData,
-        fileName: 'convenience-download.jpg'
-      };
-      
-      mockStorageClient.download.mockResolvedValue(mockResult);
-      
-      const result = await downloadFile('file-123');
-      
-      expect(result.success).toBe(true);
-      expect(result.fileData).toEqual(mockData);
-    });
-
-    it('deleteFile函数应该正常工作', async () => {
-      const mockResult = {
-        success: true,
-        fileId: 'convenience-deleted-123'
-      };
-      
-      mockStorageClient.delete.mockResolvedValue(mockResult);
-      
-      const result = await deleteFile('file-123');
-      
-      expect(result.success).toBe(true);
-      expect(result.fileId).toBe('convenience-deleted-123');
-    });
-
-    it('getFileUrl函数应该正常工作', async () => {
-      const mockUrl = 'https://storage.example.com/convenience-url.jpg';
-      mockStorageClient.getSignedUrl.mockResolvedValue(mockUrl);
-      
-      const result = await getFileUrl('file-123');
-      
-      expect(result.success).toBe(true);
-      expect(result.url).toBe(mockUrl);
-    });
-  });
-
-  describe('边界情况和错误处理', () => {
-    it('应该处理空文件', async () => {
-      const emptyFile = testUtils.createMockFile('empty.txt', 'text/plain', 0);
-      
-      await expect(storageService.uploadFile(emptyFile)).rejects.toThrow('File is empty');
-    });
-
-    it('应该处理文件名冲突', async () => {
-      const conflictError = new Error('File already exists');
-      conflictError.name = 'ConflictError';
-      mockStorageClient.upload.mockRejectedValue(conflictError);
-      
-      const file = testUtils.createMockFile('existing-file.jpg', 'image/jpeg');
-      
-      await expect(storageService.uploadFile(file, {
-        overwrite: false
-      })).rejects.toThrow('File already exists');
-    });
-
-    it('应该处理存储配额耗尽', async () => {
-      const quotaError = new Error('Storage quota exceeded');
-      quotaError.name = 'QuotaExceededError';
-      mockStorageClient.upload.mockRejectedValue(quotaError);
-      
-      const file = testUtils.createMockFile('test.jpg', 'image/jpeg');
-      
-      await expect(storageService.uploadFile(file)).rejects.toThrow('Storage quota exceeded');
-    });
-
-    it('应该处理并发上传', async () => {
-      const mockResults = Array.from({ length: 5 }, (_, i) => ({
-        success: true,
-        fileId: `concurrent-file-${i}`,
-        fileName: `concurrent-${i}.jpg`
-      }));
-      
-      mockStorageClient.upload.mockImplementation((_, index) => 
-        Promise.resolve(mockResults[index] || mockResults[0])
+      expect(result.error).toEqual(
+        expect.objectContaining({
+          type: 'NETWORK_ERROR',
+          message: 'Network connection failed'
+        })
       );
       
-      const promises = Array.from({ length: 5 }, (_, i) => {
-        const file = testUtils.createMockFile(`concurrent-${i}.jpg`, 'image/jpeg');
-        return storageService.uploadFile(file);
-      });
-      
-      const results = await Promise.all(promises);
-      
-      expect(results).toHaveLength(5);
-      expect(results.every(r => r.success)).toBe(true);
+      expect(mockErrorHandler.logError).toHaveBeenCalled();
     });
 
-    it('应该处理网络不稳定', async () => {
-      let callCount = 0;
-      mockStorageClient.upload.mockImplementation(() => {
-        callCount++;
-        if (callCount <= 2) {
-          return Promise.reject(new Error('Network timeout'));
-        }
-        return Promise.resolve({
-          success: true,
-          fileId: 'retry-file-123',
-          fileName: 'retry-test.jpg'
-        });
+    it('应该处理存储空间不足错误', async () => {
+      mockAlicloudOss.put.mockRejectedValue({
+        code: 'InsufficientStorage',
+        message: 'Insufficient storage space'
       });
       
-      mockErrorHandler.withRetry.mockImplementation(async (fn) => {
-        let attempts = 0;
-        while (attempts < 3) {
-          try {
-            return await fn();
-          } catch (error) {
-            attempts++;
-            if (attempts >= 3) throw error;
-          }
-        }
-      });
-      
-      const file = testUtils.createMockFile('test.jpg', 'image/jpeg');
-      const result = await storageService.uploadFile(file);
-      
-      expect(result.success).toBe(true);
-      expect(callCount).toBe(3); // 重试了2次后成功
-    });
-  });
-
-  describe('性能测试', () => {
-    it('应该在合理时间内完成文件上传', async () => {
-      const mockResult = {
-        success: true,
-        fileId: 'performance-file-123',
-        fileName: 'performance-test.jpg'
+      const fileData = {
+        buffer: Buffer.from('test-content'),
+        originalName: 'test.txt',
+        mimeType: 'text/plain',
+        size: 1024,
+        userId: 'user-123'
       };
       
-      mockStorageClient.upload.mockResolvedValue(mockResult);
+      const result = await uploadFile(fileData);
       
-      const startTime = Date.now();
-      const file = testUtils.createMockFile('test.jpg', 'image/jpeg', 1024 * 1024); // 1MB
-      const result = await storageService.uploadFile(file);
-      const endTime = Date.now();
-      
-      expect(result.success).toBe(true);
-      expect(endTime - startTime).toBeLessThan(5000); // 应该在5秒内完成
+      expect(result.success).toBe(false);
+      expect(result.error).toEqual(
+        expect.objectContaining({
+          type: 'STORAGE_ERROR',
+          message: 'Insufficient storage space'
+        })
+      );
     });
 
-    it('应该高效处理批量文件操作', async () => {
-      const mockResults = Array.from({ length: 20 }, (_, i) => ({
-        success: true,
-        fileId: `batch-file-${i}`,
-        fileName: `batch-${i}.jpg`
-      }));
-      
-      mockStorageClient.upload.mockImplementation((_, index) => 
-        Promise.resolve(mockResults[index] || mockResults[0])
+    it('应该处理文件损坏错误', async () => {
+      mockFileType.fromBuffer.mockRejectedValue(
+        new Error('File is corrupted')
       );
       
-      const startTime = Date.now();
-      const promises = Array.from({ length: 20 }, (_, i) => {
-        const file = testUtils.createMockFile(`batch-${i}.jpg`, 'image/jpeg');
-        return storageService.uploadFile(file);
-      });
+      const fileData = {
+        buffer: Buffer.from('corrupted-content'),
+        originalName: 'test.jpg',
+        mimeType: 'image/jpeg',
+        size: 1024,
+        userId: 'user-123'
+      };
       
-      const results = await Promise.all(promises);
-      const endTime = Date.now();
+      const result = await uploadFile(fileData);
       
-      expect(results).toHaveLength(20);
-      expect(results.every(r => r.success)).toBe(true);
-      expect(endTime - startTime).toBeLessThan(30000); // 应该在30秒内完成
+      expect(result.success).toBe(false);
+      expect(result.error).toEqual(
+        expect.objectContaining({
+          type: 'FILE_CORRUPTED',
+          message: 'File is corrupted'
+        })
+      );
+    });
+
+    it('应该处理Redis缓存错误', async () => {
+      mockRedis.set.mockRejectedValue(new Error('Redis connection failed'));
+      
+      const fileKey = 'uploads/test.jpg';
+      
+      // 应该降级到直接生成URL，不使用缓存
+      const result = await generateSignedUrl(fileKey, 'download', 3600);
+      
+      expect(result.success).toBe(true); // 仍然成功生成
+      expect(mockErrorHandler.logError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Redis connection failed'
+        })
+      );
     });
   });
 });

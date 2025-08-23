@@ -42,7 +42,10 @@ export class ApiMonitor {
   private constructor() {
     this.config = this.getDefaultConfig();
     this.realtimeMetrics = this.initRealtimeMetrics();
-    this.startMetricsFlush();
+    // 测试环境中禁用定时器
+    if (process.env.NODE_ENV !== 'test') {
+      this.startMetricsFlush();
+    }
   }
 
   /**

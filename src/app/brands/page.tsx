@@ -1,82 +1,53 @@
+'use client'
+
 import Link from 'next/link'
+import { useState, useEffect } from 'react'
+import { aiDataGeneratorService, VirtualBrand } from '@/services/aiDataGeneratorService'
 
 export default function BrandsPage() {
-  const brands = [
-    {
-      id: 1,
-      name: "华为",
-      industry: "科技",
-      description: "华为是全球领先的ICT（信息与通信）基础设施和智能终端提供商，致力于把数字世界带入每个人、每个家庭、每个组织，构建万物互联的智能世界。",
-      logo: "/api/placeholder/150/150",
-      features: ["5G技术领先", "智能终端", "企业服务", "全球布局"],
-      awards: ["世界500强企业", "全球最具价值品牌", "技术创新奖"]
-    },
-    {
-      id: 2,
-      name: "腾讯",
-      industry: "互联网",
-      description: "腾讯是一家以互联网为基础的科技与文化公司，通过技术丰富互联网用户的生活，助力企业数字化升级。",
-      logo: "/api/placeholder/150/150",
-      features: ["社交平台", "游戏娱乐", "云计算", "人工智能"],
-      awards: ["中国互联网企业", "全球游戏公司", "科技创新奖"]
-    },
-    {
-      id: 3,
-      name: "比亚迪",
-      industry: "汽车",
-      description: "比亚迪是一家致力于\"用技术创新，满足人们对美好生活的向往\"的高新技术企业，业务横跨汽车、轨道交通、新能源和电子四大产业。",
-      logo: "/api/placeholder/150/150",
-      features: ["新能源汽车", "电池技术", "轨道交通", "电子制造"],
-      awards: ["全球新能源汽车", "电池技术领先", "绿色创新奖"]
-    },
-    {
-      id: 4,
-      name: "大疆",
-      industry: "无人机",
-      description: "大疆创新是全球领先的无人飞行器控制系统及无人机解决方案的研发和生产商，客户遍布全球100多个国家。",
-      logo: "/api/placeholder/150/150",
-      features: ["无人机技术", "影像系统", "机器人技术", "教育科技"],
-      awards: ["全球无人机", "技术创新", "设计大奖"]
-    },
-    {
-      id: 5,
-      name: "OPPO",
-      industry: "手机",
-      description: "OPPO是一家专注于智能终端产品、软件和互联网服务的科技公司，致力于为用户提供极致的产品体验。",
-      logo: "/api/placeholder/150/150",
-      features: ["智能手机", "影像技术", "快充技术", "IoT生态"],
-      awards: ["全球手机品牌", "影像技术", "设计创新奖"]
-    },
-    {
-      id: 6,
-      name: "vivo",
-      industry: "手机",
-      description: "vivo是一家专注于智能终端和智慧服务的科技公司，致力于为用户提供极致的产品体验和优质的服务。",
-      logo: "/api/placeholder/150/150",
-      features: ["智能手机", "影像系统", "快充技术", "AI技术"],
-      awards: ["全球手机品牌", "影像技术", "用户体验奖"]
-    },
-    {
-      id: 7,
-      name: "美的",
-      industry: "家电",
-      description: "美的集团是一家集消费电器、暖通空调、机器人与自动化系统、智能供应链、芯片产业、电梯产业的科技集团。",
-      logo: "/api/placeholder/150/150",
-      features: ["智能家电", "工业机器人", "暖通空调", "智能制造"],
-      awards: ["全球家电品牌", "智能制造", "技术创新奖"]
-    },
-    {
-      id: 8,
-      name: "格力",
-      industry: "家电",
-      description: "格力电器是一家集研发、生产、销售、服务于一体的国际化家电企业，拥有格力、TOSOT、晶弘三大品牌。",
-      logo: "/api/placeholder/150/150",
-      features: ["空调技术", "智能家电", "工业装备", "新能源"],
-      awards: ["全球空调品牌", "技术创新", "质量标杆奖"]
-    }
-  ]
+  const [brands, setBrands] = useState<VirtualBrand[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedIndustry, setSelectedIndustry] = useState('全部')
 
-  const industries = ["全部", "科技", "互联网", "汽车", "无人机", "手机", "家电", "其他"]
+  // 加载品牌数据
+  const loadBrands = async () => {
+    setLoading(true)
+    try {
+      const virtualBrands = await aiDataGeneratorService.generateBrands(8)
+      setBrands(virtualBrands)
+    } catch (error) {
+      console.error('加载品牌数据失败:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 刷新品牌数据
+  const refreshBrands = () => {
+    loadBrands()
+  }
+
+  useEffect(() => {
+    loadBrands()
+  }, [])
+
+  // 获取所有行业分类
+  const getAllIndustries = () => {
+    const industries = ['全部']
+    brands.forEach(brand => {
+      if (!industries.includes(brand.industry)) {
+        industries.push(brand.industry)
+      }
+    })
+    return industries
+  }
+
+  // 过滤品牌
+  const filteredBrands = selectedIndustry === '全部' 
+    ? brands 
+    : brands.filter(brand => brand.industry === selectedIndustry)
+
+  const industries = getAllIndustries()
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -88,34 +59,44 @@ export default function BrandsPage() {
             <span>/</span>
             <span className="text-gray-600">品牌推荐</span>
           </div>
-          <h1 className="text-3xl font-bold mb-4">品牌推荐</h1>
-          <p className="text-gray-600">推荐优秀品牌，展示深圳设计力量</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold mb-4">虚拟品牌推荐</h1>
+              <p className="text-gray-600">AI生成的虚拟品牌信息，展示多样化的企业形象</p>
+            </div>
+            <button
+              onClick={refreshBrands}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              刷新数据
+            </button>
+          </div>
         </div>
       </div>
 
       {/* 品牌推荐介绍 */}
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-12">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-2xl font-bold mb-4">品牌推荐</h2>
+          <h2 className="text-2xl font-bold mb-4">虚拟品牌展示</h2>
           <p className="text-blue-100 max-w-3xl mx-auto">
-            深圳市商业美术设计促进会品牌推荐栏目致力于展示深圳优秀品牌，
-            推广深圳设计力量，促进品牌与设计的深度融合，推动深圳品牌走向世界。
+            AI生成的虚拟品牌信息展示平台，通过人工智能技术创造多样化的企业形象，
+            展示不同行业的品牌特色和创新理念，为用户提供丰富的品牌参考案例。
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-8">
             <div>
-              <div className="text-3xl mb-2">🏆</div>
-              <h3 className="font-semibold mb-2">优秀品牌</h3>
-              <p className="text-blue-100">精选深圳优秀品牌展示</p>
+              <div className="text-3xl mb-2">🤖</div>
+              <h3 className="font-semibold mb-2">AI生成</h3>
+              <p className="text-blue-100">智能生成虚拟品牌信息</p>
             </div>
             <div>
-              <div className="text-3xl mb-2">🎨</div>
-              <h3 className="font-semibold mb-2">设计力量</h3>
-              <p className="text-blue-100">展示深圳设计创新能力</p>
+              <div className="text-3xl mb-2">🎯</div>
+              <h3 className="font-semibold mb-2">多样化</h3>
+              <p className="text-blue-100">涵盖多个行业领域</p>
             </div>
             <div>
-              <div className="text-3xl mb-2">🌍</div>
-              <h3 className="font-semibold mb-2">全球视野</h3>
-              <p className="text-blue-100">推动深圳品牌走向世界</p>
+              <div className="text-3xl mb-2">🔄</div>
+              <h3 className="font-semibold mb-2">动态更新</h3>
+              <p className="text-blue-100">支持实时刷新数据</p>
             </div>
           </div>
         </div>
@@ -128,7 +109,12 @@ export default function BrandsPage() {
             {industries.map((industry) => (
               <button
                 key={industry}
-                className="px-6 py-2 rounded-full border border-gray-300 hover:bg-blue-600 hover:text-white transition-colors"
+                onClick={() => setSelectedIndustry(industry)}
+                className={`px-6 py-2 rounded-full border transition-colors ${
+                  selectedIndustry === industry
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'border-gray-300 hover:bg-blue-600 hover:text-white'
+                }`}
               >
                 {industry}
               </button>
@@ -136,18 +122,50 @@ export default function BrandsPage() {
           </div>
         </div>
 
+        {/* 加载状态 */}
+        {loading && (
+          <div className="text-center py-12">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <p className="mt-2 text-gray-600">正在加载虚拟品牌数据...</p>
+          </div>
+        )}
+
+        {/* 空状态 */}
+        {!loading && filteredBrands.length === 0 && (
+          <div className="text-center py-12">
+            <div className="text-6xl mb-4">🏢</div>
+            <h3 className="text-xl font-semibold mb-2">暂无品牌信息</h3>
+            <p className="text-gray-600 mb-4">当前筛选条件下没有找到相关品牌</p>
+            <button
+              onClick={refreshBrands}
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              重新加载
+            </button>
+          </div>
+        )}
+
         {/* 品牌列表 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {brands.map((brand) => (
+        {!loading && filteredBrands.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {filteredBrands.map((brand) => (
             <div key={brand.id} className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-lg transition-shadow">
-              <div className="h-48 bg-gray-200 relative flex items-center justify-center">
-                <div className="w-32 h-32 bg-gray-300 rounded-lg"></div>
-                <div className="absolute top-4 right-4">
-                  <span className="px-3 py-1 text-xs font-semibold text-white bg-blue-600 rounded-full">
-                    {brand.industry}
-                  </span>
-                </div>
-              </div>
+               <div className="h-48 bg-gray-200 relative flex items-center justify-center">
+                 <img
+                   src={brand.logo}
+                   alt={brand.name}
+                   className="w-32 h-32 object-contain rounded-lg"
+                   onError={(e) => {
+                     const target = e.target as HTMLImageElement
+                     target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCIgdmlld0JveD0iMCAwIDEyOCAxMjgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMjgiIGhlaWdodD0iMTI4IiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik00MCA0MEg4OFY4OEg0MFY0MFoiIGZpbGw9IiNEMUQ1REIiLz4KPHN2Zz4K'
+                   }}
+                 />
+                 <div className="absolute top-4 right-4">
+                   <span className="px-3 py-1 text-xs font-semibold text-white bg-blue-600 rounded-full">
+                     {brand.industry}
+                   </span>
+                 </div>
+               </div>
               <div className="p-6">
                 <h3 className="font-semibold text-xl mb-3">{brand.name}</h3>
                 <p className="text-gray-600 text-sm mb-4 line-clamp-3">{brand.description}</p>
@@ -189,65 +207,73 @@ export default function BrandsPage() {
                     查看详情
                   </Link>
                 </div>
-              </div>
-            </div>
-          ))}
-        </div>
+               </div>
+             </div>
+             ))}
+           </div>
+         )}
 
         {/* 分页 */}
-        <div className="mt-12 flex justify-center">
-          <div className="flex space-x-2">
-            <button className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">上一页</button>
-            <button className="px-4 py-2 bg-blue-600 text-white rounded">1</button>
-            <button className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">2</button>
-            <button className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">3</button>
-            <button className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">下一页</button>
+        {!loading && filteredBrands.length > 0 && (
+          <div className="mt-12 flex justify-center">
+            <div className="flex space-x-2">
+              <button className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                上一页
+              </button>
+              <button className="px-4 py-2 bg-blue-600 text-white rounded">1</button>
+              <button className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                下一页
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* 品牌服务 */}
+        {/* 虚拟品牌特色 */}
         <div className="mt-16 bg-white rounded-lg p-8 shadow-sm">
-          <h2 className="text-2xl font-bold mb-8 text-center">品牌服务</h2>
+          <h2 className="text-2xl font-bold mb-8 text-center">虚拟品牌特色</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="text-center">
-              <div className="text-4xl mb-4">🎯</div>
-              <h3 className="font-semibold mb-2">品牌策划</h3>
-              <p className="text-gray-600 text-sm">专业的品牌策划服务</p>
+              <div className="text-4xl mb-4">🤖</div>
+              <h3 className="font-semibold mb-2">AI智能生成</h3>
+              <p className="text-gray-600 text-sm">基于AI技术生成品牌信息</p>
             </div>
             <div className="text-center">
               <div className="text-4xl mb-4">🎨</div>
-              <h3 className="font-semibold mb-2">视觉设计</h3>
-              <p className="text-gray-600 text-sm">品牌视觉形象设计</p>
+              <h3 className="font-semibold mb-2">多样化设计</h3>
+              <p className="text-gray-600 text-sm">涵盖各种行业和风格</p>
             </div>
             <div className="text-center">
-              <div className="text-4xl mb-4">📢</div>
-              <h3 className="font-semibold mb-2">品牌推广</h3>
-              <p className="text-gray-600 text-sm">多渠道品牌推广服务</p>
+              <div className="text-4xl mb-4">🔄</div>
+              <h3 className="font-semibold mb-2">实时更新</h3>
+              <p className="text-gray-600 text-sm">支持动态刷新数据</p>
             </div>
             <div className="text-center">
-              <div className="text-4xl mb-4">🤝</div>
-              <h3 className="font-semibold mb-2">合作对接</h3>
-              <p className="text-gray-600 text-sm">品牌合作资源对接</p>
+              <div className="text-4xl mb-4">📊</div>
+              <h3 className="font-semibold mb-2">数据展示</h3>
+              <p className="text-gray-600 text-sm">完整的品牌信息展示</p>
             </div>
           </div>
         </div>
 
-        {/* 申请推荐 */}
+        {/* 虚拟数据说明 */}
         <div className="mt-12 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg p-8 text-center">
-          <h2 className="text-2xl font-bold mb-4">申请品牌推荐</h2>
-          <p className="mb-6">如果您希望您的品牌出现在我们的推荐列表中，请联系我们</p>
+          <h2 className="text-2xl font-bold mb-4">虚拟数据说明</h2>
+          <p className="mb-6">本页面展示的所有品牌信息均为AI生成的虚拟数据，仅用于演示目的</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             <div>
-              <div className="text-lg font-semibold mb-2">品牌咨询</div>
-              <div className="text-2xl font-bold">18503020169</div>
+              <div className="text-lg font-semibold mb-2">数据来源</div>
+              <div className="text-xl font-bold">AI智能生成</div>
             </div>
             <div>
-              <div className="text-lg font-semibold mb-2">商务洽谈</div>
-              <div className="text-2xl font-bold">18128859099</div>
+              <div className="text-lg font-semibold mb-2">更新频率</div>
+              <div className="text-xl font-bold">实时刷新</div>
             </div>
           </div>
-          <button className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
-            立即申请
+          <button 
+            onClick={refreshBrands}
+            className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors"
+          >
+            刷新虚拟数据
           </button>
         </div>
       </div>

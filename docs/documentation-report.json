@@ -1,0 +1,53 @@
+{
+  "timestamp": "2025-08-22T03:13:26.048Z",
+  "version": "1.0.0",
+  "statistics": {
+    "documentationFiles": 6,
+    "apiEndpoints": 9,
+    "postmanTestCases": 10,
+    "totalPages": 6
+  },
+  "files": [
+    {
+      "name": "docs/README.md",
+      "size": 2706,
+      "lastModified": "2025-08-22T03:13:26.046Z"
+    },
+    {
+      "name": "docs/api-documentation.md",
+      "size": 9233,
+      "lastModified": "2025-08-22T03:09:53.868Z"
+    },
+    {
+      "name": "docs/openapi.yaml",
+      "size": 21013,
+      "lastModified": "2025-08-22T03:11:04.324Z"
+    },
+    {
+      "name": "docs/postman-collection.json",
+      "size": 10247,
+      "lastModified": "2025-08-22T03:11:43.312Z"
+    },
+    {
+      "name": "docs/monitoring.md",
+      "size": 6647,
+      "lastModified": "2025-08-22T03:00:01.931Z"
+    },
+    {
+      "name": "docs/security-config.md",
+      "size": 1905,
+      "lastModified": "2025-08-22T03:04:33.889Z"
+    }
+  ],
+  "coverage": {
+    "apiDocumentation": "100%",
+    "openApiSpec": "100%",
+    "postmanCollection": "100%",
+    "examples": "80%"
+  },
+  "quality": {
+    "completeness": "High",
+    "accuracy": "High",
+    "upToDate": "Yes"
+  }
+}

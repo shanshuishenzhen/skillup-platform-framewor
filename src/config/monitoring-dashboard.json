@@ -1,0 +1,450 @@
+{
+  "dashboard": {
+    "title": "SkillUp Platform 监控仪表板",
+    "description": "SkillUp Platform 应用性能和错误监控",
+    "version": "1.0.0",
+    "tags": ["skillup", "platform", "monitoring"],
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    }
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "应用健康状态",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "up{service=\"skillup-platform\"}",
+          "legendFormat": "应用状态"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "错误率",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "rate(http_requests_total{service=\"skillup-platform\",status=~\"5..\"}[5m]) / rate(http_requests_total{service=\"skillup-platform\"}[5m]) * 100",
+          "legendFormat": "错误率 (%)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "平均响应时间",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service=\"skillup-platform\"}[5m])) * 1000",
+          "legendFormat": "P95 响应时间 (ms)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 500
+              },
+              {
+                "color": "red",
+                "value": 1000
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "请求量 (QPS)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "rate(http_requests_total{service=\"skillup-platform\"}[1m])",
+          "legendFormat": "QPS"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": {
+            "mode": "palette-classic"
+          }
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "HTTP 请求趋势",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "targets": [
+        {
+          "expr": "rate(http_requests_total{service=\"skillup-platform\"}[5m])",
+          "legendFormat": "{{method}} {{route}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "barAlignment": 0,
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "insertNulls": false,
+            "showPoints": "never",
+            "pointSize": 5,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "axisPlacement": "auto",
+            "axisLabel": "",
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "vis": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "错误分布",
+      "type": "piechart",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "targets": [
+        {
+          "expr": "sum by (status) (rate(http_requests_total{service=\"skillup-platform\",status=~\"[45]..\"}[5m]))",
+          "legendFormat": "{{status}}"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "pieType": "pie",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "visible",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "数据库连接池",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 12
+      },
+      "targets": [
+        {
+          "expr": "database_connections_active{service=\"skillup-platform\"}",
+          "legendFormat": "活跃连接"
+        },
+        {
+          "expr": "database_connections_idle{service=\"skillup-platform\"}",
+          "legendFormat": "空闲连接"
+        },
+        {
+          "expr": "database_connections_max{service=\"skillup-platform\"}",
+          "legendFormat": "最大连接"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "内存使用情况",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 12
+      },
+      "targets": [
+        {
+          "expr": "process_resident_memory_bytes{service=\"skillup-platform\"} / 1024 / 1024",
+          "legendFormat": "内存使用 (MB)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "decbytes"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "title": "CPU 使用率",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 12
+      },
+      "targets": [
+        {
+          "expr": "rate(process_cpu_seconds_total{service=\"skillup-platform\"}[5m]) * 100",
+          "legendFormat": "CPU 使用率 (%)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "title": "API 端点性能",
+      "type": "table",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service=\"skillup-platform\"}[5m])) by (le, route)) * 1000",
+          "legendFormat": "{{route}}",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "job": true,
+              "instance": true
+            },
+            "indexByName": {},
+            "renameByName": {
+              "route": "API 端点",
+              "Value": "P95 响应时间 (ms)"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "P95 响应时间 (ms)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 500
+                    },
+                    {
+                      "color": "red",
+                      "value": 1000
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "alerts": [
+    {
+      "name": "高错误率告警",
+      "condition": "rate(http_requests_total{service=\"skillup-platform\",status=~\"5..\"}[5m]) / rate(http_requests_total{service=\"skillup-platform\"}[5m]) > 0.05",
+      "duration": "2m",
+      "severity": "critical",
+      "message": "SkillUp Platform 错误率超过 5%",
+      "actions": [
+        {
+          "type": "webhook",
+          "url": "${ALERTING_WEBHOOK_URL}"
+        },
+        {
+          "type": "email",
+          "to": "${ALERTING_EMAIL}"
+        }
+      ]
+    },
+    {
+      "name": "高响应时间告警",
+      "condition": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service=\"skillup-platform\"}[5m])) > 2",
+      "duration": "5m",
+      "severity": "warning",
+      "message": "SkillUp Platform P95 响应时间超过 2 秒",
+      "actions": [
+        {
+          "type": "webhook",
+          "url": "${ALERTING_WEBHOOK_URL}"
+        }
+      ]
+    },
+    {
+      "name": "应用下线告警",
+      "condition": "up{service=\"skillup-platform\"} == 0",
+      "duration": "1m",
+      "severity": "critical",
+      "message": "SkillUp Platform 应用已下线",
+      "actions": [
+        {
+          "type": "webhook",
+          "url": "${ALERTING_WEBHOOK_URL}"
+        },
+        {
+          "type": "email",
+          "to": "${ALERTING_EMAIL}"
+        }
+      ]
+    }
+  ]
+}

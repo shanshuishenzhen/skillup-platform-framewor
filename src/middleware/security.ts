@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createError, AppError, ErrorType, ErrorSeverity } from '@/utils/errorHandler';
 import { getEnvConfig } from '@/utils/envConfig';
+import { validateSession } from '@/utils/supabase';
 
 /**
  * 限流存储接口
@@ -128,16 +129,56 @@ async function checkAuth(request: NextRequest): Promise<{ valid: boolean; user?:
   const authHeader = request.headers.get('authorization');
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.warn('Security middleware: Missing or invalid authorization header', {
+      path: request.nextUrl.pathname,
+      method: request.method,
+      ip: getClientIP(request)
+    });
     return { valid: false, error: 'Missing or invalid authorization header' };
   }
   
   const token = authHeader.substring(7);
   
+  if (!token || token.length < 10) {
+    console.warn('Security middleware: Invalid token format', {
+      path: request.nextUrl.pathname,
+      method: request.method,
+      ip: getClientIP(request)
+    });
+    return { valid: false, error: 'Invalid token format' };
+  }
+  
   try {
     const result = await validateSession(token);
+    
+    if (!result.valid) {
+      console.warn('Security middleware: Session validation failed', {
+        path: request.nextUrl.pathname,
+        method: request.method,
+        ip: getClientIP(request),
+        error: result.error
+      });
+    } else {
+      console.info('Security middleware: Session validated successfully', {
+        path: request.nextUrl.pathname,
+        method: request.method,
+        userId: result.user?.id,
+        ip: getClientIP(request)
+      });
+    }
+    
     return result;
   } catch (error) {
-    return { valid: false, error: error instanceof Error ? error.message : 'Authentication failed' };
+    const errorMessage = error instanceof Error ? error.message : 'Authentication failed';
+    console.error('Security middleware: Authentication error', {
+      path: request.nextUrl.pathname,
+      method: request.method,
+      ip: getClientIP(request),
+      error: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    
+    return { valid: false, error: errorMessage };
   }
 }
 
@@ -186,6 +227,13 @@ export async function security(
     
     // CORS检查
     if (finalConfig.enableCORS && !checkCORS(request, finalConfig)) {
+      console.warn('Security middleware: CORS policy violation', {
+        path: request.nextUrl.pathname,
+        method: request.method,
+        origin: request.headers.get('origin'),
+        ip: getClientIP(request)
+      });
+      
       const response = NextResponse.json(
         { error: 'CORS policy violation' },
         { status: 403 }
@@ -197,6 +245,13 @@ export async function security(
     if (finalConfig.enableRateLimit) {
       const clientIP = getClientIP(request);
       if (!checkRateLimit(clientIP, finalConfig)) {
+        console.warn('Security middleware: Rate limit exceeded', {
+          path: request.nextUrl.pathname,
+          method: request.method,
+          ip: clientIP,
+          userAgent: request.headers.get('user-agent')
+        });
+        
         const response = NextResponse.json(
           { error: 'Rate limit exceeded' },
           { status: 429 }
@@ -235,10 +290,30 @@ export async function security(
     return finalConfig.enableCORS ? addCORSHeaders(request, response, finalConfig) : response;
     
   } catch (error) {
-    console.error('Security middleware error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Security middleware: Critical error', {
+      path: request.nextUrl.pathname,
+      method: request.method,
+      ip: getClientIP(request),
+      error: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined,
+      timestamp: new Date().toISOString()
+    });
+    
+    // 创建结构化错误响应
+    const appError = createError(
+      ErrorType.SECURITY_ERROR,
+      'Security middleware encountered an error',
+      ErrorSeverity.HIGH,
+      { originalError: errorMessage }
+    );
     
     const response = NextResponse.json(
-      { error: 'Internal security error' },
+      { 
+        error: 'Internal security error',
+        code: appError.code,
+        timestamp: appError.timestamp
+      },
       { status: 500 }
     );
     
