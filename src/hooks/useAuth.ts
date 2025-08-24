@@ -17,6 +17,9 @@ import {
   isRegisteredUser, 
   isFaceVerified, 
   canAccessPremiumContent,
+  isAdmin,
+  isSuperAdmin,
+  canAccessAdmin,
   logout as authLogout,
   updateUserInfo,
   PERMISSION_LEVELS
@@ -85,13 +88,47 @@ export function useAuth() {
 
   /**
    * 用户登录
-   * @param user 用户信息
+   * @param userData 用户信息
    * @param token 认证token
    */
-  const login = useCallback((user: User, token: string) => {
+  const login = useCallback((userData: Partial<User>, token: string) => {
     if (typeof window === 'undefined') return;
     
+    const user: User = {
+      ...userData,
+      id: userData.id || '',
+      phone: userData.phone || '',
+      userType: userData.userType || 'guest',
+      createdAt: userData.createdAt || new Date().toISOString(),
+      updatedAt: userData.updatedAt || new Date().toISOString()
+    };
+    
     localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('token', token);
+    updateAuthState();
+  }, [updateAuthState]);
+
+  /**
+   * 管理员登录
+   * @param adminData 管理员信息
+   * @param token 认证token
+   */
+  const adminLogin = useCallback((adminData: Partial<User>, token: string) => {
+    if (typeof window === 'undefined') return;
+    
+    // 为管理员用户添加特殊标识，保留role字段
+    const adminUser: User = {
+      ...adminData,
+      id: adminData.id || '',
+      phone: adminData.phone || '',
+      userType: 'admin' as const,
+      // 保留管理员的role字段，这对权限验证很重要
+      role: adminData.role || 'admin',
+      createdAt: adminData.createdAt || new Date().toISOString(),
+      updatedAt: adminData.updatedAt || new Date().toISOString()
+    };
+    
+    localStorage.setItem('user', JSON.stringify(adminUser));
     localStorage.setItem('token', token);
     updateAuthState();
   }, [updateAuthState]);
@@ -211,6 +248,7 @@ export function useAuth() {
     
     // 操作函数
     login,
+    adminLogin,
     logout,
     updateUser,
     
@@ -219,6 +257,11 @@ export function useAuth() {
     requireAuth,
     requireRegistered,
     requirePremium,
+    canAccessAdmin: () => canAccessAdmin(authState.user),
+    
+    // 管理员权限检查
+    isAdmin: () => isAdmin(authState.user),
+    isSuperAdmin: () => isSuperAdmin(authState.user),
     
     // 工具函数
     getDisplayName,

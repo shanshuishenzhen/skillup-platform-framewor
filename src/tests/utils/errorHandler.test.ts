@@ -93,7 +93,7 @@ interface ErrorRecoveryStrategy {
   type: 'retry' | 'fallback' | 'circuit_breaker' | 'graceful_degradation';
   maxRetries?: number;
   retryDelay?: number;
-  fallbackValue?: any;
+  fallbackValue?: unknown;
   circuitBreakerThreshold?: number;
   recoveryTimeout?: number;
 }
@@ -151,21 +151,21 @@ const mockEnvConfig = {
 };
 
 // 设置 Mock
-(logger as any) = mockLogger;
-(analyticsService as any) = mockAnalyticsService;
-(notificationService as any) = mockNotificationService;
-(auditService as any) = mockAuditService;
-(envConfig as any) = mockEnvConfig;
+(logger as unknown) = mockLogger;
+(analyticsService as unknown) = mockAnalyticsService;
+(notificationService as unknown) = mockNotificationService;
+(auditService as unknown) = mockAuditService;
+(envConfig as unknown) = mockEnvConfig;
 
 // Mock Express 对象
 const createMockRequest = (options: {
   method?: string;
   url?: string;
   headers?: Record<string, string>;
-  body?: any;
-  query?: any;
-  params?: any;
-  user?: any;
+  body?: unknown;
+  query?: unknown;
+  params?: unknown;
+  user?: unknown;
   ip?: string;
   sessionID?: string;
 } = {}): Partial<Request> => ({
@@ -318,7 +318,7 @@ describe('Error Handler', () => {
           details: [
             { field: 'email', message: 'Invalid email' }
           ],
-          timestamp: expect.any(String)
+          timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/)
         }
       });
     });
@@ -334,7 +334,7 @@ describe('Error Handler', () => {
           message: 'Internal server error',
           code: 'INTERNAL_ERROR',
           statusCode: 500,
-          timestamp: expect.any(String)
+          timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/)
         }
       });
     });
@@ -360,7 +360,7 @@ describe('Error Handler', () => {
 
     it('应该处理循环引用', () => {
       const error = new AppError('Test error', 400);
-      const circularObj: any = { error };
+      const circularObj: { error: AppError; self?: unknown } = { error };
       circularObj.self = circularObj;
       error.details = circularObj;
       
@@ -551,7 +551,7 @@ describe('Error Handler', () => {
             code: 'TEST_ERROR'
           }),
           context,
-          timestamp: expect.any(String)
+          timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/)
         })
       );
       
@@ -711,8 +711,8 @@ describe('Error Handler', () => {
           timeout: 1000
         });
         fail('Should have thrown circuit breaker error');
-      } catch (error: any) {
-        expect(error.message).toContain('Circuit breaker is open');
+      } catch (error: unknown) {
+        expect((error as Error).message).toContain('Circuit breaker is open');
       }
     });
 
@@ -851,7 +851,7 @@ describe('Error Handler', () => {
       const res = createMockResponse() as Response;
       const next = createMockNext();
       
-      middleware(null as any, req, res, next);
+      middleware(null as unknown as Error, req, res, next);
       
       expect(res.status).toHaveBeenCalledWith(500);
       expect(res.json).toHaveBeenCalledWith(
@@ -864,7 +864,7 @@ describe('Error Handler', () => {
     });
 
     it('应该处理循环引用错误', () => {
-      const error: any = new Error('Circular error');
+      const error = new Error('Circular error') as Error & { circular?: unknown };
       error.circular = error;
       
       const response = formatErrorResponse(error);

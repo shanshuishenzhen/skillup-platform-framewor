@@ -12,6 +12,27 @@ import { errorHandler } from '../utils/errorHandler';
 import { monitoringService } from '../services/monitoringService';
 import { cacheService } from '../services/cacheService';
 import { EventEmitter } from 'events';
+import { Socket } from 'net';
+
+/**
+ * 扩展 Express Request 接口
+ */
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: string;
+    [key: string]: unknown;
+  };
+}
+
+/**
+ * 扩展连接接口
+ */
+interface ExtendedConnection {
+  remoteAddress?: string;
+  socket?: Socket & {
+    remoteAddress?: string;
+  };
+}
 
 /**
  * API监控配置接口
@@ -40,9 +61,9 @@ interface RequestMonitorData {
   method: string;
   url: string;
   path: string;
-  query: Record<string, any>;
+  query: Record<string, unknown>;
   headers: Record<string, string>;
-  body?: any;
+  body?: unknown;
   userAgent: string;
   ip: string;
   userId?: string;
@@ -51,8 +72,12 @@ interface RequestMonitorData {
   duration?: number;
   statusCode?: number;
   responseSize?: number;
-  error?: any;
-  metadata: Record<string, any>;
+  error?: {
+    message: string;
+    stack?: string;
+    code?: string | number;
+  };
+  metadata: Record<string, unknown>;
   memoryUsage?: NodeJS.MemoryUsage;
   cpuUsage?: NodeJS.CpuUsage;
 }
@@ -103,7 +128,7 @@ class ApiMonitor extends EventEmitter {
   private config: ApiMonitorConfig;
   private activeRequests: Map<string, RequestMonitorData>;
   private requestCounter: number;
-  private statsCache: Map<string, any>;
+  private statsCache: Map<string, ApiStats>;
   private metricsBuffer: RequestMonitorData[];
   private lastCpuUsage?: NodeJS.CpuUsage;
   private alertCooldowns: Map<string, number>;
@@ -219,7 +244,7 @@ class ApiMonitor extends EventEmitter {
       headers: this.config.includeHeaders ? this.sanitizeHeaders(req.headers) : {},
       userAgent: req.get('User-Agent') || '',
       ip: this.getClientIp(req),
-      userId: (req as any).user?.id,
+      userId: (req as AuthenticatedRequest).user?.id,
       startTime: Date.now(),
       memoryUsage: process.memoryUsage(),
       cpuUsage: process.cpuUsage(this.lastCpuUsage),
@@ -282,7 +307,7 @@ class ApiMonitor extends EventEmitter {
   /**
    * 处理请求错误
    */
-  private async handleRequestError(requestId: string, error: any): Promise<void> {
+  private async handleRequestError(requestId: string, error: Error): Promise<void> {
     const requestData = this.activeRequests.get(requestId);
     if (!requestData) return;
 
@@ -548,7 +573,7 @@ class ApiMonitor extends EventEmitter {
   /**
    * 触发告警
    */
-  private triggerAlert(alertType: string, data: any): void {
+  private triggerAlert(alertType: string, data: Record<string, unknown>): void {
     const cooldownKey = `alert_${alertType}`;
     const lastAlert = this.alertCooldowns.get(cooldownKey) || 0;
     const now = Date.now();
@@ -705,7 +730,7 @@ class ApiMonitor extends EventEmitter {
   /**
    * 清理请求头
    */
-  private sanitizeHeaders(headers: any): Record<string, string> {
+  private sanitizeHeaders(headers: Record<string, unknown>): Record<string, string> {
     const sanitized: Record<string, string> = {};
     const sensitiveHeaders = ['authorization', 'cookie', 'x-api-key', 'x-auth-token'];
     
@@ -723,7 +748,7 @@ class ApiMonitor extends EventEmitter {
   /**
    * 清理请求体
    */
-  private sanitizeBody(body: any): any {
+  private sanitizeBody(body: unknown): unknown {
     if (!body) return null;
     
     const bodyStr = JSON.stringify(body);
@@ -752,7 +777,7 @@ class ApiMonitor extends EventEmitter {
       req.ip ||
       req.connection.remoteAddress ||
       req.socket.remoteAddress ||
-      (req.connection as any)?.socket?.remoteAddress ||
+      (req.connection as ExtendedConnection)?.socket?.remoteAddress ||
       req.get('X-Forwarded-For')?.split(',')[0]?.trim() ||
       req.get('X-Real-IP') ||
       req.get('CF-Connecting-IP') ||
@@ -780,7 +805,27 @@ class ApiMonitor extends EventEmitter {
   /**
    * 获取监控仪表板数据
    */
-  async getDashboardData(): Promise<any> {
+  async getDashboardData(): Promise<{
+    realTime: RealTimeMetrics | null;
+    hourly: ApiStats;
+    daily: ApiStats;
+    activeRequests: {
+      total: number;
+      requests: Array<{
+        id: string;
+        method: string;
+        path: string;
+        duration: number;
+        userId?: string;
+        ip: string;
+      }>;
+    };
+    systemHealth: {
+      memoryUsage: NodeJS.MemoryUsage;
+      uptime: number;
+      version: string;
+    };
+  }> {
     try {
       const [stats1h, stats24h, realTimeMetrics] = await Promise.all([
         this.getApiStats('1h'),

@@ -62,7 +62,7 @@ export interface CacheMetrics {
   connectionCount: number;
 }
 
-export interface CacheEntry<T = any> {
+export interface CacheEntry<T = unknown> {
   value: T;
   ttl: number;
   createdAt: number;
@@ -172,7 +172,7 @@ export class CacheService {
   /**
    * 设置缓存值
    */
-  async set(key: string, value: any, options: CacheOptions = {}): Promise<boolean> {
+  async set(key: string, value: unknown, options: CacheOptions = {}): Promise<boolean> {
     try {
       const startTime = Date.now();
       const serializedValue = JSON.stringify(value);
@@ -203,7 +203,7 @@ export class CacheService {
   /**
    * 获取缓存值
    */
-  async get<T = any>(key: string): Promise<T | null> {
+  async get<T = unknown>(key: string): Promise<T | null> {
     try {
       const startTime = Date.now();
       const value = await this.redis.get(key);
@@ -293,7 +293,7 @@ export class CacheService {
   /**
    * 批量设置
    */
-  async mset(data: Record<string, any>): Promise<boolean> {
+  async mset(data: Record<string, unknown>): Promise<boolean> {
     try {
       const pairs: string[] = [];
       for (const [key, value] of Object.entries(data)) {
@@ -312,10 +312,10 @@ export class CacheService {
   /**
    * 批量获取
    */
-  async mget(keys: string[]): Promise<(any | null)[]> {
+  async mget<T = unknown>(keys: string[]): Promise<(T | null)[]> {
     try {
       const values = await this.redis.mget(...keys);
-      return values.map(value => value ? JSON.parse(value) : null);
+      return values.map(value => value ? JSON.parse(value) as T : null);
     } catch (error) {
       logger.error('Cache mget error:', error);
       return keys.map(() => null);
@@ -353,7 +353,7 @@ export class CacheService {
   /**
    * 列表操作 - 左推
    */
-  async lpush(key: string, value: any): Promise<number> {
+  async lpush(key: string, value: unknown): Promise<number> {
     try {
       return await this.redis.lpush(key, JSON.stringify(value));
     } catch (error) {
@@ -365,7 +365,7 @@ export class CacheService {
   /**
    * 列表操作 - 右推
    */
-  async rpush(key: string, value: any): Promise<number> {
+  async rpush(key: string, value: unknown): Promise<number> {
     try {
       return await this.redis.rpush(key, JSON.stringify(value));
     } catch (error) {
@@ -377,10 +377,10 @@ export class CacheService {
   /**
    * 列表操作 - 左弹
    */
-  async lpop(key: string): Promise<any | null> {
+  async lpop<T = unknown>(key: string): Promise<T | null> {
     try {
       const value = await this.redis.lpop(key);
-      return value ? JSON.parse(value) : null;
+      return value ? JSON.parse(value) as T : null;
     } catch (error) {
       logger.error('Cache lpop error:', error);
       return null;
@@ -390,10 +390,10 @@ export class CacheService {
   /**
    * 列表操作 - 右弹
    */
-  async rpop(key: string): Promise<any | null> {
+  async rpop<T = unknown>(key: string): Promise<T | null> {
     try {
       const value = await this.redis.rpop(key);
-      return value ? JSON.parse(value) : null;
+      return value ? JSON.parse(value) as T : null;
     } catch (error) {
       logger.error('Cache rpop error:', error);
       return null;
@@ -403,10 +403,10 @@ export class CacheService {
   /**
    * 列表操作 - 获取范围
    */
-  async lrange(key: string, start: number, stop: number): Promise<any[]> {
+  async lrange<T = unknown>(key: string, start: number, stop: number): Promise<T[]> {
     try {
       const values = await this.redis.lrange(key, start, stop);
-      return values.map(value => JSON.parse(value));
+      return values.map(value => JSON.parse(value) as T);
     } catch (error) {
       logger.error('Cache lrange error:', error);
       return [];
@@ -416,7 +416,7 @@ export class CacheService {
   /**
    * 使用策略设置缓存
    */
-  async setWithStrategy(key: string, value: any, options: CacheOptions): Promise<boolean> {
+  async setWithStrategy(key: string, value: unknown, options: CacheOptions): Promise<boolean> {
     try {
       const serializedValue = JSON.stringify(value);
       
@@ -445,7 +445,7 @@ export class CacheService {
   /**
    * 缓存预热
    */
-  async warmup(data: Record<string, any>): Promise<void> {
+  async warmup(data: Record<string, unknown>): Promise<void> {
     try {
       const keys = Object.keys(data);
       await this.mset(data);

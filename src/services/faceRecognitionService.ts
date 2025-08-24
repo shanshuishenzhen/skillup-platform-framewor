@@ -458,7 +458,13 @@ export class FaceRecognitionService {
    * @param face - 人脸数据
    * @returns 质量分数 (0-1)
    */
-  private calculateFaceQuality(face: any): number {
+  private calculateFaceQuality(face: {
+    faceQuality?: {
+      blur?: number;
+      illumination?: number;
+      completeness?: number;
+    };
+  }): number {
     if (!face.faceQuality) {
       return 0.5; // 默认质量
     }

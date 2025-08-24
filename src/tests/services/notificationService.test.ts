@@ -718,14 +718,12 @@ describe('通知服务测试', () => {
     });
 
     it('应该获取通知历史', async () => {
-      const options = {
+      const history = await getNotificationHistory({
         userId: 'user-123',
         startDate: new Date('2024-01-01'),
         endDate: new Date('2024-12-31'),
         limit: 50
-      };
-      
-      const history = await getNotificationHistory(options);
+      });
       
       expect(Array.isArray(history)).toBe(true);
       expect(history.length).toBeLessThanOrEqual(50);

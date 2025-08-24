@@ -49,6 +49,9 @@ jest.mock('../../services/analyticsService');
 jest.mock('../../config/envConfig');
 jest.mock('@supabase/supabase-js');
 
+// 模块类型定义
+type MockedModule<T> = T & { [K in keyof T]: jest.MockedFunction<T[K]> };
+
 // 类型定义
 interface User {
   id: string;
@@ -102,7 +105,7 @@ interface Course {
 
 interface QueryOptions {
   select?: string;
-  filter?: Record<string, any>;
+  filter?: Record<string, unknown>;
   order?: { column: string; ascending?: boolean }[];
   limit?: number;
   offset?: number;
@@ -112,8 +115,8 @@ interface QueryOptions {
 interface TransactionOperation {
   table: string;
   operation: 'insert' | 'update' | 'delete' | 'upsert';
-  data?: any;
-  filter?: Record<string, any>;
+  data?: Record<string, unknown>;
+  filter?: Record<string, unknown>;
 }
 
 interface SubscriptionOptions {
@@ -253,11 +256,11 @@ const mockChannel = {
 };
 
 // 设置 Mock
-(logger as any) = mockLogger;
-(cacheService as any) = mockCacheService;
-(auditService as any) = mockAuditService;
-(analyticsService as any) = mockAnalyticsService;
-(envConfig as any) = mockEnvConfig;
+jest.mocked(logger).mockReturnValue(mockLogger);
+jest.mocked(cacheService).mockReturnValue(mockCacheService);
+jest.mocked(auditService).mockReturnValue(mockAuditService);
+jest.mocked(analyticsService).mockReturnValue(mockAnalyticsService);
+jest.mocked(envConfig).mockReturnValue(mockEnvConfig);
 (createClient as jest.Mock).mockReturnValue(mockSupabaseClient);
 
 // 测试数据
@@ -448,7 +451,7 @@ describe('Supabase Database Utils', () => {
         'Query execution failed',
         expect.objectContaining({
           table: 'nonexistent_table',
-          error: expect.any(Object)
+          error: expect.objectContaining({})
         })
       );
     });
@@ -466,7 +469,7 @@ describe('Supabase Database Utils', () => {
       expect(mockCacheService.get).toHaveBeenCalledWith(cacheKey);
       expect(mockCacheService.set).toHaveBeenCalledWith(
         cacheKey,
-        expect.any(Object),
+        expect.objectContaining({}),
         300
       );
     });
@@ -549,7 +552,7 @@ describe('Supabase Database Utils', () => {
       expect(result.error).toBeDefined();
       expect(mockLogger.error).toHaveBeenCalledWith(
         'Transaction failed, rolling back',
-        expect.any(Object)
+        expect.objectContaining({})
       );
     });
   });
@@ -603,7 +606,7 @@ describe('Supabase Database Utils', () => {
       
       expect(mockLogger.error).toHaveBeenCalledWith(
         'Failed to subscribe to changes',
-        expect.any(Object)
+        expect.objectContaining({})
       );
     });
   });

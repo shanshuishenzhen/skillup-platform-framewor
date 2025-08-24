@@ -16,6 +16,7 @@
 
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { testUtils } from '../setup';
+import { createClient } from '@supabase/supabase-js';
 
 // 模拟依赖
 jest.mock('@/utils/envConfig');
@@ -164,30 +165,50 @@ import {
   deleteCategory
 } from '@/services/categoryService';
 
+interface MockRedisClient {
+  get: jest.Mock;
+  set: jest.Mock;
+  del: jest.Mock;
+  hget: jest.Mock;
+  hset: jest.Mock;
+}
+
 describe('分类服务模块', () => {
   let categoryService: CategoryService;
-  let mockRedisClient: any;
+  let mockRedisClient: MockRedisClient;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     // 重置所有模拟
     jest.clearAllMocks();
     
     // 设置模拟返回值
-    require('@/utils/envConfig').envConfig = mockEnvConfig;
-    require('@/utils/errorHandler').errorHandler = mockErrorHandler;
-    require('@/services/monitoringService').monitoringService = mockMonitoringService;
-    require('@/services/userService').userService = mockUserService;
-    require('@/services/cloudStorageService').cloudStorageService = mockCloudStorageService;
-    require('@supabase/supabase-js').createClient = jest.fn(() => mockSupabase);
-    require('node:crypto').default = mockCrypto;
-    require('node:fs/promises').default = mockFs;
-    require('node:path').default = mockPath;
-    require('uuid').v4 = mockUuid.v4;
-    require('slugify').default = mockSlugify;
+    const envConfigModule = await import('@/utils/envConfig');
+    envConfigModule.envConfig = mockEnvConfig;
+    const errorHandlerModule = await import('@/utils/errorHandler');
+    errorHandlerModule.errorHandler = mockErrorHandler;
+    const monitoringServiceModule = await import('@/services/monitoringService');
+    monitoringServiceModule.monitoringService = mockMonitoringService;
+    const userServiceModule = await import('@/services/userService');
+    userServiceModule.userService = mockUserService;
+    const cloudStorageServiceModule = await import('@/services/cloudStorageService');
+    cloudStorageServiceModule.cloudStorageService = mockCloudStorageService;
+    const supabaseModule = await import('@supabase/supabase-js');
+    supabaseModule.createClient = jest.fn(() => mockSupabase);
+    const cryptoModule = await import('node:crypto');
+    cryptoModule.default = mockCrypto;
+    const fsModule = await import('node:fs/promises');
+    fsModule.default = mockFs;
+    const pathModule = await import('node:path');
+    pathModule.default = mockPath;
+    const uuidModule = await import('uuid');
+    uuidModule.v4 = mockUuid.v4;
+    const slugifyModule = await import('slugify');
+    slugifyModule.default = mockSlugify;
     
     // 设置Redis模拟
     mockRedisClient = mockRedis.createClient();
-    require('redis').createClient = mockRedis.createClient;
+    const redisModule = await import('redis');
+    redisModule.createClient = mockRedis.createClient;
     
     // 创建分类服务实例
     categoryService = new CategoryService({
@@ -277,7 +298,7 @@ describe('分类服务模块', () => {
     });
 
     it('应该初始化数据库和缓存连接', () => {
-      expect(require('@supabase/supabase-js').createClient).toHaveBeenCalled();
+      expect(jest.mocked(createClient)).toHaveBeenCalled();
       expect(mockRedis.createClient).toHaveBeenCalled();
     });
   });

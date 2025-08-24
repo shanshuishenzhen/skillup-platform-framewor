@@ -22,7 +22,7 @@ export interface AIDataGeneratorConfig {
 }
 
 /**
- * 虚拟课程数据接口
+ * 课程数据接口
  */
 export interface VirtualCourse {
   id: string;
@@ -55,7 +55,7 @@ export interface VirtualCourse {
 }
 
 /**
- * 虚拟用户数据接口
+ * 用户数据接口
  */
 export interface VirtualUser {
   id: string;
@@ -75,7 +75,7 @@ export interface VirtualUser {
 }
 
 /**
- * 虚拟新闻数据接口
+ * 新闻数据接口
  */
 export interface VirtualNews {
   id: string;
@@ -100,7 +100,7 @@ export interface VirtualNews {
 }
 
 /**
- * 虚拟培训项目数据接口
+ * 培训项目数据接口
  */
 export interface VirtualTraining {
   id: string;
@@ -133,7 +133,7 @@ export interface VirtualTraining {
 }
 
 /**
- * 虚拟品牌数据接口
+ * 品牌数据接口
  */
 export interface VirtualBrand {
   id: string;
@@ -155,7 +155,7 @@ export interface VirtualBrand {
 }
 
 /**
- * 虚拟委员会成员数据接口
+ * 委员会成员数据接口
  */
 export interface VirtualCommitteeMember {
   id: string;
@@ -177,7 +177,7 @@ export interface VirtualCommitteeMember {
 }
 
 /**
- * 虚拟活动数据接口
+ * 活动数据接口
  */
 export interface VirtualEvent {
   id: string;
@@ -230,7 +230,7 @@ class AIDataGeneratorService {
   private openai: OpenAI | null = null;
   private config: AIDataGeneratorConfig;
   private isInitialized = false;
-  private dataCache = new Map<string, any>();
+  private dataCache = new Map<string, unknown>();
   private cacheExpiry = new Map<string, number>();
   private readonly CACHE_DURATION = 5 * 60 * 1000; // 5分钟缓存
 
@@ -252,7 +252,7 @@ class AIDataGeneratorService {
     if (this.isInitialized) return;
 
     if (!this.config.apiKey) {
-      console.warn('OpenAI API密钥未配置，将使用预设的虚拟数据');
+      console.warn('OpenAI API密钥未配置，将使用预设的数据');
       this.isInitialized = true;
       return;
     }
@@ -266,7 +266,7 @@ class AIDataGeneratorService {
       });
       this.isInitialized = true;
     } catch (error) {
-      console.warn('OpenAI客户端初始化失败，将使用预设的虚拟数据:', error);
+      console.warn('OpenAI客户端初始化失败，将使用预设的数据:', error);
       this.isInitialized = true;
     }
   }
@@ -349,7 +349,7 @@ class AIDataGeneratorService {
         messages: [
           {
             role: 'system',
-            content: '你是一个专业的虚拟数据生成助手。请生成真实感强、符合中文语境的虚拟数据。所有生成的内容都应该是虚拟的，不包含真实的个人或机构信息。请以JSON格式返回数据。'
+            content: '你是一个专业的数据生成助手。请生成真实感强、符合中文语境的数据。所有生成的内容都应该是模拟的，不包含真实的个人或机构信息。请以JSON格式返回数据。'
           },
           {
             role: 'user',
@@ -380,10 +380,10 @@ class AIDataGeneratorService {
   }
 
   /**
-   * 生成虚拟课程数据
+   * 生成课程数据
    * @param count 生成数量
    * @param category 课程分类
-   * @returns Promise<VirtualCourse[]> 虚拟课程数组
+   * @returns Promise<VirtualCourse[]> 课程数组
    */
   async generateCourses(count: number = 6, category?: string): Promise<VirtualCourse[]> {
     this.initialize();
@@ -449,11 +449,11 @@ class AIDataGeneratorService {
         要求：
         1. 课程标题要吸引人且专业
         2. 详细的课程描述
-        3. 虚拟讲师信息（中文姓名、简介、评分）
+        3. 讲师信息（中文姓名、简介、评分）
         4. 合理的价格设置
         5. 课程大纲（3-5个模块，每个模块包含具体课程）
         6. 相关标签和特色
-        7. 所有内容必须是虚拟的，不能包含真实信息
+        7. 所有内容必须是模拟的，不能包含真实信息
         
         请严格按照以下JSON格式返回：
         {
@@ -504,10 +504,10 @@ class AIDataGeneratorService {
   }
 
   /**
-   * 生成虚拟用户数据
+   * 生成用户数据
    * @param count 生成数量
    * @param role 用户角色
-   * @returns Promise<VirtualUser[]> 虚拟用户数组
+   * @returns Promise<VirtualUser[]> 用户数组
    */
   async generateUsers(count: number = 10, role?: 'student' | 'instructor' | 'admin'): Promise<VirtualUser[]> {
     this.initialize();
@@ -551,10 +551,10 @@ class AIDataGeneratorService {
   }
 
   /**
-   * 生成虚拟新闻数据
+   * 生成新闻数据
    * @param count 生成数量
    * @param category 新闻分类
-   * @returns Promise<VirtualNews[]> 虚拟新闻数组
+   * @returns Promise<VirtualNews[]> 新闻数组
    */
   async generateNews(count: number = 8, category?: string): Promise<VirtualNews[]> {
     this.initialize();
@@ -598,10 +598,10 @@ class AIDataGeneratorService {
   }
 
   /**
-   * 生成虚拟培训项目数据
+   * 生成培训项目数据
    * @param count 生成数量
    * @param type 培训类型
-   * @returns Promise<VirtualTraining[]> 虚拟培训项目数组
+   * @returns Promise<VirtualTraining[]> 培训项目数组
    */
   async generateTrainings(count: number = 6, type?: 'online' | 'offline' | 'hybrid'): Promise<VirtualTraining[]> {
     this.initialize();
@@ -673,10 +673,10 @@ class AIDataGeneratorService {
   }
 
   /**
-   * 生成虚拟品牌数据
+   * 生成品牌数据
    * @param count 生成数量
    * @param industry 行业类型
-   * @returns Promise<VirtualBrand[]> 虚拟品牌数组
+   * @returns Promise<VirtualBrand[]> 品牌数组
    */
   async generateBrands(count: number = 8, industry?: string): Promise<VirtualBrand[]> {
     this.initialize();
@@ -725,9 +725,9 @@ class AIDataGeneratorService {
   }
 
   /**
-   * 生成虚拟委员会成员数据
+   * 生成委员会成员数据
    * @param count 生成数量
-   * @returns Promise<VirtualCommitteeMember[]> 虚拟委员会成员数组
+   * @returns Promise<VirtualCommitteeMember[]> 委员会成员数组
    */
   async generateCommitteeMembers(count: number = 12): Promise<VirtualCommitteeMember[]> {
     this.initialize();
@@ -778,10 +778,10 @@ class AIDataGeneratorService {
   }
 
   /**
-   * 生成虚拟活动数据
+   * 生成活动数据
    * @param count 生成数量
    * @param type 活动类型
-   * @returns Promise<VirtualEvent[]> 虚拟活动数组
+   * @returns Promise<VirtualEvent[]> 活动数组
    */
   async generateEvents(count: number = 6, type?: 'conference' | 'workshop' | 'seminar' | 'networking' | 'webinar'): Promise<VirtualEvent[]> {
     this.initialize();

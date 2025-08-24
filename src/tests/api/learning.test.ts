@@ -38,6 +38,26 @@ const mockEnvConfig = envConfig as jest.Mocked<typeof envConfig>;
 const mockLogger = logger as jest.Mocked<typeof logger>;
 const mockJwt = jwt as jest.Mocked<typeof jwt>;
 
+// Mock 接口定义
+interface MockSupabaseQuery {
+  select: jest.MockedFunction<any>;
+  eq: jest.MockedFunction<any>;
+  neq: jest.MockedFunction<any>;
+  gt: jest.MockedFunction<any>;
+  gte: jest.MockedFunction<any>;
+  lt: jest.MockedFunction<any>;
+  lte: jest.MockedFunction<any>;
+  like: jest.MockedFunction<any>;
+  ilike: jest.MockedFunction<any>;
+  in: jest.MockedFunction<any>;
+  is: jest.MockedFunction<any>;
+  order: jest.MockedFunction<any>;
+  limit: jest.MockedFunction<any>;
+  range: jest.MockedFunction<any>;
+  single: jest.MockedFunction<any>;
+  mockResolvedValue: jest.MockedFunction<any>;
+}
+
 // 测试数据
 const testUser = {
   id: 'user-123',
@@ -225,7 +245,7 @@ describe('Learning API', () => {
       range: jest.fn().mockReturnThis(),
       single: jest.fn().mockResolvedValue({ data: testLearningSession, error: null }),
       mockResolvedValue: jest.fn().mockResolvedValue({ data: [testLearningSession], error: null })
-    } as any);
+    } as MockSupabaseQuery);
     
     // 设置缓存服务
     mockCacheService.get.mockResolvedValue(null);

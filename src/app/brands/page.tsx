@@ -61,8 +61,8 @@ export default function BrandsPage() {
           </div>
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold mb-4">虚拟品牌推荐</h1>
-              <p className="text-gray-600">AI生成的虚拟品牌信息，展示多样化的企业形象</p>
+              <h1 className="text-3xl font-bold mb-4">品牌推荐</h1>
+          <p className="text-gray-600">AI生成的品牌信息，展示多样化的企业形象</p>
             </div>
             <button
               onClick={refreshBrands}
@@ -77,16 +77,16 @@ export default function BrandsPage() {
       {/* 品牌推荐介绍 */}
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-12">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-2xl font-bold mb-4">虚拟品牌展示</h2>
+          <h2 className="text-2xl font-bold mb-4">品牌展示</h2>
           <p className="text-blue-100 max-w-3xl mx-auto">
-            AI生成的虚拟品牌信息展示平台，通过人工智能技术创造多样化的企业形象，
+            AI生成的品牌信息展示平台，通过人工智能技术创造多样化的企业形象，
             展示不同行业的品牌特色和创新理念，为用户提供丰富的品牌参考案例。
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-8">
             <div>
               <div className="text-3xl mb-2">🤖</div>
               <h3 className="font-semibold mb-2">AI生成</h3>
-              <p className="text-blue-100">智能生成虚拟品牌信息</p>
+              <p className="text-blue-100">智能生成品牌信息</p>
             </div>
             <div>
               <div className="text-3xl mb-2">🎯</div>
@@ -126,7 +126,7 @@ export default function BrandsPage() {
         {loading && (
           <div className="text-center py-12">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="mt-2 text-gray-600">正在加载虚拟品牌数据...</p>
+            <p className="mt-2 text-gray-600">正在加载品牌数据...</p>
           </div>
         )}
 
@@ -228,9 +228,9 @@ export default function BrandsPage() {
           </div>
         )}
 
-        {/* 虚拟品牌特色 */}
+        {/* 品牌特色 */}
         <div className="mt-16 bg-white rounded-lg p-8 shadow-sm">
-          <h2 className="text-2xl font-bold mb-8 text-center">虚拟品牌特色</h2>
+          <h2 className="text-2xl font-bold mb-8 text-center">品牌特色</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="text-center">
               <div className="text-4xl mb-4">🤖</div>
@@ -255,10 +255,10 @@ export default function BrandsPage() {
           </div>
         </div>
 
-        {/* 虚拟数据说明 */}
+        {/* 数据说明 */}
         <div className="mt-12 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg p-8 text-center">
-          <h2 className="text-2xl font-bold mb-4">虚拟数据说明</h2>
-          <p className="mb-6">本页面展示的所有品牌信息均为AI生成的虚拟数据，仅用于演示目的</p>
+          <h2 className="text-2xl font-bold mb-4">数据说明</h2>
+          <p className="mb-6">本页面展示的所有品牌信息均为AI生成的数据，仅用于演示目的</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             <div>
               <div className="text-lg font-semibold mb-2">数据来源</div>
@@ -273,7 +273,7 @@ export default function BrandsPage() {
             onClick={refreshBrands}
             className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors"
           >
-            刷新虚拟数据
+            刷新数据
           </button>
         </div>
       </div>

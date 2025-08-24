@@ -7,7 +7,6 @@ import { supabase } from '@/lib/supabase';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { verifyCode } from '@/services/smsService';
-import { baiduFaceService } from '@/services/baiduFaceService';
 import { getEnvConfig } from '@/utils/envConfig';
 import { 
   withRetry, 

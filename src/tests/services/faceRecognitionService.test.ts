@@ -12,6 +12,12 @@
 
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { testUtils } from '../setup';
+import { getSupabaseClient } from '@/utils/supabase';
+import { monitoringService } from '@/services/monitoringService';
+import { cloudStorageService } from '@/services/cloudStorageService';
+import { createCanvas, loadImage } from 'canvas';
+import sharp from 'sharp';
+import { loadLayersModel, tensor, dispose, memory } from '@tensorflow/tfjs-node';
 
 // 模拟人脸识别库
 const mockFaceAPI = {
@@ -132,16 +138,16 @@ describe('人脸识别服务模块', () => {
     jest.clearAllMocks();
     
     // 设置模拟返回值
-    require('@/utils/supabase').getSupabaseClient = jest.fn().mockReturnValue(mockSupabase);
-    require('@/services/monitoringService').monitoringService = mockMonitoringService;
-    require('@/services/cloudStorageService').cloudStorageService = mockCloudStorageService;
-    require('canvas').createCanvas = mockCanvas.createCanvas;
-    require('canvas').loadImage = mockCanvas.loadImage;
-    require('sharp').default = mockSharp;
-    require('@tensorflow/tfjs-node').loadLayersModel = mockTensorFlow.loadLayersModel;
-    require('@tensorflow/tfjs-node').tensor = mockTensorFlow.tensor;
-    require('@tensorflow/tfjs-node').dispose = mockTensorFlow.dispose;
-    require('@tensorflow/tfjs-node').memory = mockTensorFlow.memory;
+    jest.mocked(getSupabaseClient).mockReturnValue(mockSupabase);
+    jest.mocked(monitoringService).mockImplementation(() => mockMonitoringService);
+    jest.mocked(cloudStorageService).mockImplementation(() => mockCloudStorageService);
+    jest.mocked(createCanvas).mockImplementation(mockCanvas.createCanvas);
+    jest.mocked(loadImage).mockImplementation(mockCanvas.loadImage);
+    jest.mocked(sharp).mockImplementation(mockSharp);
+    jest.mocked(loadLayersModel).mockImplementation(mockTensorFlow.loadLayersModel);
+    jest.mocked(tensor).mockImplementation(mockTensorFlow.tensor);
+    jest.mocked(dispose).mockImplementation(mockTensorFlow.dispose);
+    jest.mocked(memory).mockImplementation(mockTensorFlow.memory);
     
     // 模拟模型加载
     mockFaceAPI.nets.ssdMobilenetv1.loadFromUri.mockResolvedValue(true);

@@ -15,22 +15,13 @@
 import { 
   BaiduFaceService,
   createBaiduFaceService,
-  getBaiduFaceService,
   FaceDetectionResult,
   FaceRecognitionResult,
   FaceComparisonResult,
   FaceSearchResult,
   LivenessDetectionResult,
   FaceAttributeResult,
-  FaceLibraryInfo,
-  FaceUserInfo,
-  FaceImage,
-  FaceQuality,
-  FaceFeature,
-  DetectionOptions,
-  RecognitionOptions,
-  ComparisonOptions,
-  SearchOptions
+  FaceImage
 } from '../../services/baiduFaceService';
 import { logger } from '../../utils/logger';
 import { cacheService } from '../../services/cacheService';
@@ -49,39 +40,7 @@ jest.mock('../../config/envConfig');
 jest.mock('axios');
 jest.mock('form-data');
 
-// 类型定义
-interface BaiduFaceConfig {
-  apiKey: string;
-  secretKey: string;
-  baseUrl: string;
-  timeout: number;
-  retryAttempts: number;
-  retryDelay: number;
-  enableCache: boolean;
-  cacheExpiry: number;
-  qualityThreshold: number;
-  confidenceThreshold: number;
-  maxFaceCount: number;
-  enableLiveness: boolean;
-  enableAttributes: boolean;
-}
-
-interface FaceDetectionOptions {
-  faceField?: string;
-  maxFaceNum?: number;
-  faceType?: string;
-  livenessControl?: string;
-  qualityControl?: string;
-}
-
-interface FaceLibraryOptions {
-  groupId: string;
-  userId?: string;
-  userInfo?: string;
-  qualityControl?: string;
-  livenessControl?: string;
-  actionType?: string;
-}
+// 移除未使用的类型定义
 
 // Mock 实例
 const mockLogger = {
@@ -154,13 +113,13 @@ const mockFormData = {
 };
 
 // 设置 Mock
-(logger as any) = mockLogger;
-(cacheService as any) = mockCacheService;
-(analyticsService as any) = mockAnalyticsService;
-(auditService as any) = mockAuditService;
-(envConfig as any) = mockEnvConfig;
-(axios as any) = mockAxios;
-(FormData as any) = jest.fn(() => mockFormData);
+const mockLoggerTyped = logger as jest.Mocked<typeof logger>;
+const mockCacheServiceTyped = cacheService as jest.Mocked<typeof cacheService>;
+const mockAnalyticsServiceTyped = analyticsService as jest.Mocked<typeof analyticsService>;
+const mockAuditServiceTyped = auditService as jest.Mocked<typeof auditService>;
+const mockEnvConfigTyped = envConfig as jest.Mocked<typeof envConfig>;
+const mockAxiosTyped = axios as jest.Mocked<typeof axios>;
+const mockFormDataTyped = FormData as jest.MockedClass<typeof FormData>;
 
 // 测试数据
 const testFaceImage: FaceImage = {
@@ -1059,7 +1018,12 @@ describe('Baidu Face Service', () => {
     });
 
     it('应该处理无效图片', async () => {
-      const invalidImage = {
+      interface InvalidImageData {
+        image: string;
+        imageType: string;
+      }
+      
+      const invalidImage: InvalidImageData = {
         image: 'invalid-base64',
         imageType: 'BASE64'
       };
@@ -1072,7 +1036,7 @@ describe('Baidu Face Service', () => {
         }
       });
       
-      await expect(baiduFaceService.detectFace(invalidImage as any))
+      await expect(baiduFaceService.detectFace(invalidImage as FaceImage))
         .rejects.toThrow('not a valid image');
     });
 
@@ -1108,7 +1072,8 @@ describe('Baidu Face Service', () => {
       expect(mockLogger.warn).toHaveBeenCalledWith(
         'Retrying Baidu Face API request',
         expect.objectContaining({
-          attempt: expect.any(Number)
+          attempt: expect.any(Number),
+          error: expect.any(String)
         })
       );
     });
@@ -1163,7 +1128,8 @@ describe('Baidu Face Service', () => {
       expect(mockLogger.debug).toHaveBeenCalledWith(
         'Processing large image',
         expect.objectContaining({
-          imageSize: expect.any(Number)
+          imageSize: expect.any(Number),
+          format: expect.any(String)
         })
       );
     });
@@ -1174,12 +1140,17 @@ describe('Baidu Face Service', () => {
    */
   describe('Edge Cases', () => {
     it('应该处理空图片', async () => {
-      const emptyImage = {
+      interface EmptyImageData {
+        image: string;
+        imageType: string;
+      }
+      
+      const emptyImage: EmptyImageData = {
         image: '',
         imageType: 'BASE64'
       };
       
-      await expect(baiduFaceService.detectFace(emptyImage as any))
+      await expect(baiduFaceService.detectFace(emptyImage as FaceImage))
         .rejects.toThrow('Image data is required');
     });
 
@@ -1201,12 +1172,17 @@ describe('Baidu Face Service', () => {
     });
 
     it('应该处理无效的图片格式', async () => {
-      const invalidFormatImage = {
+      interface InvalidFormatImageData {
+        image: string;
+        imageType: string;
+      }
+      
+      const invalidFormatImage: InvalidFormatImageData = {
         image: testFaceImage.image,
         imageType: 'INVALID_FORMAT'
       };
       
-      await expect(baiduFaceService.detectFace(invalidFormatImage as any))
+      await expect(baiduFaceService.detectFace(invalidFormatImage as FaceImage))
         .rejects.toThrow('Invalid image type');
     });
 
@@ -1242,7 +1218,9 @@ describe('Baidu Face Service', () => {
         expect.objectContaining({
           face_field: 'age,gender,表情,美颜'
         }),
-        expect.any(Object)
+        expect.objectContaining({
+          headers: expect.any(Object)
+        })
       );
     });
   });

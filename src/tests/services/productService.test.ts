@@ -16,6 +16,24 @@
 
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { testUtils } from '../setup';
+import { envConfig } from '@/utils/envConfig';
+import { errorHandler } from '@/utils/errorHandler';
+import { monitoringService } from '@/services/monitoringService';
+import { userService } from '@/services/userService';
+import { cloudStorageService } from '@/services/cloudStorageService';
+import { aiService } from '@/services/aiService';
+import { inventoryService } from '@/services/inventoryService';
+import { categoryService } from '@/services/categoryService';
+import { reviewService } from '@/services/reviewService';
+import { createClient } from '@supabase/supabase-js';
+import crypto from 'node:crypto';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import sharp from 'sharp';
+import { Decimal } from 'decimal.js';
+import moment from 'moment';
+import { Client as ElasticsearchClient } from 'elasticsearch';
+import { createClient as createRedisClient } from 'redis';
 
 // 模拟依赖
 jest.mock('@/utils/envConfig');
@@ -233,36 +251,47 @@ import {
 
 describe('商品服务模块', () => {
   let productService: ProductService;
-  let mockElasticsearchClient: any;
-  let mockRedisClient: any;
+  let mockElasticsearchClient: {
+    search: jest.MockedFunction<any>;
+    index: jest.MockedFunction<any>;
+    update: jest.MockedFunction<any>;
+    delete: jest.MockedFunction<any>;
+  };
+  let mockRedisClient: {
+    get: jest.MockedFunction<any>;
+    set: jest.MockedFunction<any>;
+    del: jest.MockedFunction<any>;
+    exists: jest.MockedFunction<any>;
+    expire: jest.MockedFunction<any>;
+  };
 
   beforeEach(() => {
     // 重置所有模拟
     jest.clearAllMocks();
     
     // 设置模拟返回值
-    require('@/utils/envConfig').envConfig = mockEnvConfig;
-    require('@/utils/errorHandler').errorHandler = mockErrorHandler;
-    require('@/services/monitoringService').monitoringService = mockMonitoringService;
-    require('@/services/userService').userService = mockUserService;
-    require('@/services/cloudStorageService').cloudStorageService = mockCloudStorageService;
-    require('@/services/aiService').aiService = mockAiService;
-    require('@/services/inventoryService').inventoryService = mockInventoryService;
-    require('@/services/categoryService').categoryService = mockCategoryService;
-    require('@/services/reviewService').reviewService = mockReviewService;
-    require('@supabase/supabase-js').createClient = jest.fn(() => mockSupabase);
-    require('node:crypto').default = mockCrypto;
-    require('node:fs/promises').default = mockFs;
-    require('node:path').default = mockPath;
-    require('sharp').default = mockSharp;
-    require('decimal.js').default = mockDecimal;
-    require('moment').default = mockMoment;
+    jest.mocked(envConfig).mockReturnValue(mockEnvConfig);
+    jest.mocked(errorHandler).mockReturnValue(mockErrorHandler);
+    jest.mocked(monitoringService).mockReturnValue(mockMonitoringService);
+    jest.mocked(userService).mockReturnValue(mockUserService);
+    jest.mocked(cloudStorageService).mockReturnValue(mockCloudStorageService);
+    jest.mocked(aiService).mockReturnValue(mockAiService);
+    jest.mocked(inventoryService).mockReturnValue(mockInventoryService);
+    jest.mocked(categoryService).mockReturnValue(mockCategoryService);
+    jest.mocked(reviewService).mockReturnValue(mockReviewService);
+    jest.mocked(createClient).mockReturnValue(mockSupabase);
+    jest.mocked(crypto).mockReturnValue(mockCrypto);
+    jest.mocked(fs).mockReturnValue(mockFs);
+    jest.mocked(path).mockReturnValue(mockPath);
+    jest.mocked(sharp).mockReturnValue(mockSharp);
+    jest.mocked(Decimal).mockReturnValue(mockDecimal);
+    jest.mocked(moment).mockReturnValue(mockMoment);
     
     // 设置Elasticsearch和Redis模拟
     mockElasticsearchClient = new mockElasticsearch.Client();
     mockRedisClient = mockRedis.createClient();
-    require('elasticsearch').Client = mockElasticsearch.Client;
-    require('redis').createClient = mockRedis.createClient;
+    jest.mocked(ElasticsearchClient).mockImplementation(mockElasticsearch.Client);
+    jest.mocked(createRedisClient).mockImplementation(mockRedis.createClient);
     
     // 创建商品服务实例
     productService = new ProductService({
@@ -404,7 +433,7 @@ describe('商品服务模块', () => {
     });
 
     it('应该初始化数据库和搜索引擎连接', () => {
-      expect(require('@supabase/supabase-js').createClient).toHaveBeenCalled();
+      expect(jest.mocked(createClient)).toHaveBeenCalled();
       expect(mockElasticsearch.Client).toHaveBeenCalled();
       expect(mockRedis.createClient).toHaveBeenCalled();
     });

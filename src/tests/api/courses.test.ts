@@ -275,14 +275,14 @@ const mockJwt = {
 };
 
 // 设置 Mock
-(supabaseClient as any) = mockSupabaseClient;
-(cacheService as any) = mockCacheService;
-(auditService as any) = mockAuditService;
-(analyticsService as any) = mockAnalyticsService;
-(learningProgressService as any) = mockLearningProgressService;
-(aiService as any) = mockAiService;
-(envConfig as any) = mockEnvConfig;
-(jwt as any) = mockJwt;
+(supabaseClient as Record<string, unknown>) = mockSupabaseClient;
+(cacheService as Record<string, unknown>) = mockCacheService;
+(auditService as Record<string, unknown>) = mockAuditService;
+(analyticsService as Record<string, unknown>) = mockAnalyticsService;
+(learningProgressService as Record<string, unknown>) = mockLearningProgressService;
+(aiService as Record<string, unknown>) = mockAiService;
+(envConfig as Record<string, unknown>) = mockEnvConfig;
+(jwt as Record<string, unknown>) = mockJwt;
 
 // 测试数据
 const testCourse: Course = {
@@ -498,16 +498,16 @@ describe('Courses API', () => {
                 level: 'beginner',
                 price: 299.00,
                 rating: 4.8
-              })
-            ]),
+              }) as Record<string, unknown>
+            ]) as unknown[],
             pagination: expect.objectContaining({
               page: 1,
               limit: 20,
               total: 156,
               totalPages: 8
-            })
-          })
-        })
+            }) as Record<string, unknown>
+          }) as Record<string, unknown>
+        }) as Record<string, unknown>
       );
       
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('courses');
@@ -525,7 +525,7 @@ describe('Courses API', () => {
         expect.objectContaining({
           page: 2,
           limit: 10
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -609,8 +609,8 @@ describe('Courses API', () => {
             chapters: expect.any(Array),
             reviews: expect.any(Array),
             relatedCourses: expect.any(Array)
-          })
-        })
+          }) as Record<string, unknown>
+        }) as Record<string, unknown>
       );
       
       expect(mockSupabaseClient.eq).toHaveBeenCalledWith('id', 'course-123456');
@@ -618,7 +618,7 @@ describe('Courses API', () => {
         'course.view',
         expect.objectContaining({
           courseId: 'course-123456'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -636,7 +636,7 @@ describe('Courses API', () => {
         expect.objectContaining({
           success: false,
           message: '课程不存在'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -652,8 +652,8 @@ describe('Courses API', () => {
             progress: 45.5,
             completedLessons: 5,
             totalLessons: 11
-          })
-        })
+          }) as Record<string, unknown>
+        }) as Record<string, unknown>
       );
       
       expect(mockLearningProgressService.getCourseProgress).toHaveBeenCalledWith(
@@ -673,7 +673,7 @@ describe('Courses API', () => {
         expect.objectContaining({
           limit: 5,
           excludeEnrolled: false
-        })
+        }) as Record<string, unknown>
       );
     });
   });
@@ -719,8 +719,8 @@ describe('Courses API', () => {
             id: 'course-new',
             title: '新的JavaScript课程',
             status: 'draft'
-          })
-        })
+          }) as Record<string, unknown>
+        }) as Record<string, unknown>
       );
       
       expect(mockSupabaseClient.insert).toHaveBeenCalledWith(
@@ -728,7 +728,7 @@ describe('Courses API', () => {
           title: '新的JavaScript课程',
           instructor_id: 'user-instructor',
           status: 'draft'
-        })
+        }) as Record<string, unknown>
       );
       
       expect(mockAuditService.log).toHaveBeenCalledWith(
@@ -736,7 +736,7 @@ describe('Courses API', () => {
         expect.objectContaining({
           courseId: 'course-new',
           instructorId: 'user-instructor'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -758,13 +758,13 @@ describe('Courses API', () => {
             expect.objectContaining({
               field: 'title',
               message: '课程标题不能为空'
-            }),
+            }) as Record<string, unknown>,
             expect.objectContaining({
               field: 'price',
               message: '价格不能为负数'
-            })
-          ])
-        })
+            }) as Record<string, unknown>
+          ]) as unknown[]
+        }) as Record<string, unknown>
       );
     });
 
@@ -784,7 +784,7 @@ describe('Courses API', () => {
         expect.objectContaining({
           success: false,
           message: '权限不足，只有讲师可以创建课程'
-        })
+        }) as Record<string, unknown>
       );
     });
   });
@@ -818,7 +818,7 @@ describe('Courses API', () => {
         expect.objectContaining({
           success: true,
           message: '课程更新成功'
-        })
+        }) as Record<string, unknown>
       );
       
       expect(mockSupabaseClient.update).toHaveBeenCalledWith(
@@ -827,7 +827,7 @@ describe('Courses API', () => {
           price: 399.00,
           description: '更新的课程描述',
           updated_at: expect.any(String)
-        })
+        }) as Record<string, unknown>
       );
       
       expect(mockCacheService.del).toHaveBeenCalledWith(
@@ -851,7 +851,7 @@ describe('Courses API', () => {
         expect.objectContaining({
           success: false,
           message: '权限不足，只能修改自己的课程'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -890,21 +890,21 @@ describe('Courses API', () => {
         expect.objectContaining({
           success: true,
           message: '课程发布成功'
-        })
+        }) as Record<string, unknown>
       );
       
       expect(mockSupabaseClient.update).toHaveBeenCalledWith(
         expect.objectContaining({
           status: 'published',
           published_at: expect.any(String)
-        })
+        }) as Record<string, unknown>
       );
       
       expect(mockAuditService.log).toHaveBeenCalledWith(
         'course.publish',
         expect.objectContaining({
           courseId: 'course-123456'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -926,8 +926,8 @@ describe('Courses API', () => {
           message: '课程内容不完整，无法发布',
           errors: expect.arrayContaining([
             '课程至少需要包含一个章节'
-          ])
-        })
+          ]) as unknown[]
+        }) as Record<string, unknown>
       );
     });
   });
@@ -954,14 +954,14 @@ describe('Courses API', () => {
         expect.objectContaining({
           success: true,
           message: '课程删除成功'
-        })
+        }) as Record<string, unknown>
       );
       
       expect(mockSupabaseClient.update).toHaveBeenCalledWith(
         expect.objectContaining({
           status: 'archived',
           archived_at: expect.any(String)
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -981,7 +981,7 @@ describe('Courses API', () => {
         expect.objectContaining({
           success: false,
           message: '课程已有学员报名，无法删除'
-        })
+        }) as Record<string, unknown>
       );
     });
   });
@@ -1018,8 +1018,8 @@ describe('Courses API', () => {
           data: expect.objectContaining({
             enrollmentId: expect.any(String),
             courseId: 'course-123456'
-          })
-        })
+          }) as Record<string, unknown>
+        }) as Record<string, unknown>
       );
       
       expect(mockSupabaseClient.insert).toHaveBeenCalledWith(
@@ -1027,7 +1027,7 @@ describe('Courses API', () => {
           course_id: 'course-123456',
           user_id: 'user-123',
           payment_status: 'completed'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -1049,8 +1049,8 @@ describe('Courses API', () => {
             paymentUrl: expect.any(String),
             orderId: expect.any(String),
             amount: expect.any(Number)
-          })
-        })
+          }) as Record<string, unknown>
+        }) as Record<string, unknown>
       );
     });
 
@@ -1069,7 +1069,7 @@ describe('Courses API', () => {
         expect.objectContaining({
           success: false,
           message: '您已经报名了这门课程'
-        })
+        }) as Record<string, unknown>
       );
     });
   });
@@ -1108,8 +1108,8 @@ describe('Courses API', () => {
             id: expect.any(String),
             rating: 5,
             title: '非常棒的课程'
-          })
-        })
+          }) as Record<string, unknown>
+        }) as Record<string, unknown>
       );
       
       expect(mockSupabaseClient.insert).toHaveBeenCalledWith(
@@ -1120,7 +1120,7 @@ describe('Courses API', () => {
           title: '非常棒的课程',
           content: '内容丰富，讲解清晰，强烈推荐！',
           is_verified_purchase: true
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -1144,7 +1144,7 @@ describe('Courses API', () => {
         expect.objectContaining({
           success: false,
           message: '只有报名学员才能评价课程'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -1163,7 +1163,7 @@ describe('Courses API', () => {
         expect.objectContaining({
           field: 'rating',
           message: '评分必须在1-5之间'
-        })
+        }) as Record<string, unknown>
       );
     });
   });
@@ -1190,9 +1190,9 @@ describe('Courses API', () => {
               id: 'category-programming',
               name: '编程开发',
               courseCount: 156
-            })
-          ])
-        })
+            }) as Record<string, unknown>
+          ]) as unknown[]
+        }) as Record<string, unknown>
       );
       
       expect(mockSupabaseClient.eq).toHaveBeenCalledWith('is_active', true);
@@ -1220,10 +1220,10 @@ describe('Courses API', () => {
               expect.objectContaining({
                 id: 'child-js',
                 parentId: 'parent-tech'
-              })
-            ])
-          })
-        ])
+              }) as Record<string, unknown>
+            ]) as unknown[]
+          }) as Record<string, unknown>
+        ]) as unknown[]
       );
     });
   });
@@ -1244,15 +1244,15 @@ describe('Courses API', () => {
             courses: expect.any(Array),
             suggestions: expect.any(Array),
             filters: expect.any(Object)
-          })
-        })
+          }) as Record<string, unknown>
+        }) as Record<string, unknown>
       );
       
       expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
         'search_courses',
         expect.objectContaining({
           search_query: 'JavaScript 前端'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -1274,8 +1274,8 @@ describe('Courses API', () => {
             'JavaScript',
             'JavaScript 基础',
             'JavaScript 高级'
-          ])
-        })
+          ]) as unknown[]
+        }) as Record<string, unknown>
       );
     });
   });
@@ -1297,7 +1297,7 @@ describe('Courses API', () => {
         expect.objectContaining({
           success: false,
           message: '服务器内部错误'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -1310,7 +1310,7 @@ describe('Courses API', () => {
         expect.objectContaining({
           success: false,
           message: '无效的课程ID格式'
-        })
+        }) as Record<string, unknown>
       );
     });
   });
@@ -1361,8 +1361,8 @@ describe('Courses API', () => {
             processed: 3,
             successful: expect.any(Number),
             failed: expect.any(Number)
-          })
-        })
+          }) as Record<string, unknown>
+        }) as Record<string, unknown>
       );
     });
   });

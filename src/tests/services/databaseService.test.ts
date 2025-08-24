@@ -759,11 +759,9 @@ describe('数据库服务测试', () => {
       expect(typeof updateDatabaseConfig).toBe('function');
     });
 
-    it('应该导出所有类型定义', () => {
-      expect(DatabaseConfig).toBeDefined();
-      expect(QueryResult).toBeDefined();
-      expect(TransactionCallback).toBeDefined();
-      expect(DatabaseStats).toBeDefined();
-      expect(PoolStatus).toBeDefined();
-      expect(HealthStatus).toBeDefined();
+    it('应该导出数据库服务实例', () => {
+      expect(databaseService).toBeDefined();
+      expect(typeof databaseService).toBe('object');
     });
+  });
+});

@@ -540,12 +540,10 @@ describe('学习记录服务测试', () => {
     });
 
     it('应该按时间范围筛选统计', async () => {
-      const options = {
+      await getLearningStats('user-123', {
         startDate: '2024-01-01',
         endDate: '2024-01-31'
-      };
-      
-      await getLearningStats('user-123', options);
+      });
       
       expect(mockSupabase.rpc).toHaveBeenCalledWith(
         'get_learning_stats',
@@ -580,13 +578,11 @@ describe('学习记录服务测试', () => {
     });
 
     it('应该生成学习报告', async () => {
-      const options = {
+      const result = await generateLearningReport({
         userId: 'user-123',
         period: 'weekly',
         format: 'json'
-      };
-      
-      const result = await generateLearningReport(options);
+      });
       
       expect(result.success).toBe(true);
       expect(result.report).toBeDefined();
@@ -594,12 +590,10 @@ describe('学习记录服务测试', () => {
     });
 
     it('应该计算报告摘要', async () => {
-      const options = {
+      const result = await generateLearningReport({
         userId: 'user-123',
         period: 'weekly'
-      };
-      
-      const result = await generateLearningReport(options);
+      });
       
       expect(result.report.summary.totalTimeSpent).toBe(5400); // 3600 + 1800
       expect(result.report.summary.totalLessonsCompleted).toBe(3); // 2 + 1
@@ -607,12 +601,10 @@ describe('学习记录服务测试', () => {
     });
 
     it('应该生成学习趋势', async () => {
-      const options = {
+      const result = await generateLearningReport({
         userId: 'user-123',
         period: 'monthly'
-      };
-      
-      const result = await generateLearningReport(options);
+      });
       
       expect(result.report.trends).toBeDefined();
       expect(result.report.trends.timeSpentTrend).toBeDefined();
@@ -620,13 +612,11 @@ describe('学习记录服务测试', () => {
     });
 
     it('应该支持不同报告格式', async () => {
-      const options = {
+      const result = await generateLearningReport({
         userId: 'user-123',
         period: 'weekly',
         format: 'pdf'
-      };
-      
-      const result = await generateLearningReport(options);
+      });
       
       expect(result.success).toBe(true);
       expect(result.report.format).toBe('pdf');
@@ -634,12 +624,10 @@ describe('学习记录服务测试', () => {
     });
 
     it('应该缓存报告数据', async () => {
-      const options = {
+      await generateLearningReport({
         userId: 'user-123',
         period: 'weekly'
-      };
-      
-      await generateLearningReport(options);
+      });
       
       expect(mockRedis.set).toHaveBeenCalledWith(
         expect.stringMatching(/^report:/),
@@ -779,12 +767,10 @@ describe('学习记录服务测试', () => {
     });
 
     it('应该按时间范围筛选历史', async () => {
-      const options = {
+      await getLearningHistory('user-123', {
         startDate: '2024-01-01',
         endDate: '2024-01-31'
-      };
-      
-      await getLearningHistory('user-123', options);
+      });
       
       expect(mockSupabase.from().gte).toHaveBeenCalledWith(
         'timestamp',
@@ -797,11 +783,9 @@ describe('学习记录服务测试', () => {
     });
 
     it('应该按课程筛选历史', async () => {
-      const options = {
+      await getLearningHistory('user-123', {
         courseId: 'course-123'
-      };
-      
-      await getLearningHistory('user-123', options);
+      });
       
       expect(mockSupabase.from().eq).toHaveBeenCalledWith(
         'courseId',
@@ -810,12 +794,10 @@ describe('学习记录服务测试', () => {
     });
 
     it('应该支持分页查询', async () => {
-      const options = {
+      await getLearningHistory('user-123', {
         page: 2,
         limit: 20
-      };
-      
-      await getLearningHistory('user-123', options);
+      });
       
       expect(mockSupabase.from().limit).toHaveBeenCalledWith(20);
       expect(mockSupabase.from().offset).toHaveBeenCalledWith(20);

@@ -228,11 +228,11 @@ jest.mock('decimal.js', () => jest.fn(() => mockDecimal));
 
 // 导入要测试的模块
 let orderService: OrderService;
-let createOrder: (orderData: any) => Promise<any>;
-let updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<any>;
-let cancelOrder: (orderId: string, reason?: string) => Promise<any>;
-let getOrderById: (orderId: string) => Promise<any>;
-let addToCart: (userId: string, courseId: string, quantity?: number) => Promise<any>;
+let createOrder: (orderData: Partial<Order>) => Promise<{ success: boolean; order?: Order; error?: string }>;
+let updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<{ success: boolean; order?: Order; error?: string }>;
+let cancelOrder: (orderId: string, reason?: string) => Promise<{ success: boolean; order?: Order; error?: string }>;
+let getOrderById: (orderId: string) => Promise<{ success: boolean; order?: Order; error?: string }>;
+let addToCart: (userId: string, courseId: string, quantity?: number) => Promise<{ success: boolean; cartItem?: CartItem; error?: string }>;
 
 beforeAll(async () => {
   // 动态导入模块

@@ -1,14 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Menu, ChevronDown } from 'lucide-react';
+import { Menu, ChevronDown, Settings } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
 const navigation = [
   { name: '首页', href: '/' },
   { name: '关于我们', href: '/about' },
   { name: '产品服务', href: '/services', children: [
     { name: '在线学习', href: '/courses' },
+    { name: '技能培训学习', href: '/skill-training' },
+    { name: '技能等级考试', href: '/skill-exam' },
     { name: '技术咨询', href: '/consulting' },
     { name: '解决方案', href: '/solutions' },
   ]},
@@ -18,6 +21,44 @@ const navigation = [
 
 export default function Header() {
   const [, setMobileMenuOpen] = useState(false);
+  const { user, isLoggedIn } = useAuth();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // 检查用户是否为管理员
+  useEffect(() => {
+    const checkAdminPermission = async () => {
+      if (isLoggedIn && user) {
+        try {
+          const token = localStorage.getItem('token');
+          if (!token) {
+            setIsAdmin(false);
+            return;
+          }
+          
+          const response = await fetch('/api/admin/check-permission', {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            setIsAdmin(result.success === true);
+          } else {
+            setIsAdmin(false);
+          }
+        } catch (error) {
+          console.error('检查管理员权限失败:', error);
+          setIsAdmin(false);
+        }
+      } else {
+        setIsAdmin(false);
+      }
+    };
+
+    checkAdminPermission();
+  }, [isLoggedIn, user]);
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 glass-effect">
@@ -83,21 +124,54 @@ export default function Header() {
               )}
             </div>
           ))}
+          
+          {/* 管理员入口 */}
+          {isAdmin && (
+            <div className="relative group">
+              <Link
+                href="/admin"
+                className="flex items-center gap-x-1 text-sm font-semibold leading-6 text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 transition-colors"
+                title="管理后台"
+              >
+                <Settings className="h-4 w-4" />
+                管理后台
+              </Link>
+            </div>
+          )}
         </div>
 
         <div className="hidden lg:flex lg:flex-1 lg:justify-end lg:gap-x-6">
-          <Link
-            href="/login"
-            className="text-sm font-semibold leading-6 text-gray-900 dark:text-gray-100 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-          >
-            登录
-          </Link>
-          <Link
-            href="/register"
-            className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500"
-          >
-            注册
-          </Link>
+          {isLoggedIn ? (
+            <>
+              <span className="text-sm font-semibold leading-6 text-gray-900 dark:text-gray-100">
+                欢迎，{user?.name || user?.email}
+              </span>
+              <button
+                onClick={() => {
+                  localStorage.removeItem('token');
+                  window.location.reload();
+                }}
+                className="text-sm font-semibold leading-6 text-gray-900 dark:text-gray-100 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+              >
+                退出
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className="text-sm font-semibold leading-6 text-gray-900 dark:text-gray-100 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+              >
+                登录
+              </Link>
+              <Link
+                href="/register"
+                className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500"
+              >
+                注册
+              </Link>
+            </>
+          )}
         </div>
       </nav>
     </header>

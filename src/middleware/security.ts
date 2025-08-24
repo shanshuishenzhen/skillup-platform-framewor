@@ -125,7 +125,16 @@ function checkCORS(request: NextRequest, config: SecurityConfig): boolean {
  * @param request - Next.js请求对象
  * @returns 验证结果
  */
-async function checkAuth(request: NextRequest): Promise<{ valid: boolean; user?: any; error?: string }> {
+async function checkAuth(request: NextRequest): Promise<{ 
+  valid: boolean; 
+  user?: {
+    id: string;
+    email?: string;
+    role?: string;
+    [key: string]: unknown;
+  }; 
+  error?: string 
+}> {
   const authHeader = request.headers.get('authorization');
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {

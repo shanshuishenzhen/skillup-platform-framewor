@@ -38,14 +38,14 @@ export interface MetricData {
   value: number;
   timestamp?: Date;
   tags?: Record<string, string>;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface EventData {
   event: string;
   userId?: string;
   sessionId?: string;
-  properties?: Record<string, any>;
+  properties?: Record<string, unknown>;
   timestamp?: Date;
 }
 
@@ -58,7 +58,7 @@ export interface AnalyticsQuery {
   sessionId?: string;
   aggregation?: AggregationType;
   groupBy?: string[];
-  filters?: Record<string, any>;
+  filters?: Record<string, unknown>;
   limit?: number;
   offset?: number;
 }
@@ -66,8 +66,8 @@ export interface AnalyticsQuery {
 export interface AnalyticsResult {
   metrics: Record<string, number>;
   events: EventData[];
-  aggregations: Record<string, any>;
-  trends: Record<string, any>;
+  aggregations: Record<string, unknown>;
+  trends: Record<string, unknown>;
   insights: string[];
 }
 
@@ -184,7 +184,7 @@ export class AnalyticsService {
   /**
    * 记录指标数据
    */
-  async track(event: string, properties?: Record<string, any>, userId?: string): Promise<void> {
+  async track(event: string, properties?: Record<string, unknown>, userId?: string): Promise<void> {
     try {
       if (!this.config.enableAnalytics) {
         return;
@@ -565,7 +565,7 @@ export class AnalyticsService {
   /**
    * 聚合数据
    */
-  async aggregateData(query: AnalyticsQuery): Promise<Record<string, any>> {
+  async aggregateData(query: AnalyticsQuery): Promise<Record<string, unknown>> {
     try {
       const result = await this.query(query);
       return result.aggregations;
@@ -656,11 +656,11 @@ export class AnalyticsService {
    * 处理聚合
    */
   private processAggregations(
-    metrics: any[], 
+    metrics: AnalyticsEvent[], 
     aggregation?: AggregationType, 
     groupBy?: string[]
-  ): Record<string, any> {
-    const result: Record<string, any> = {};
+  ): Record<string, number> {
+    const result: Record<string, number> = {};
     
     if (!aggregation) {
       return result;
@@ -672,17 +672,17 @@ export class AnalyticsService {
     for (const [key, values] of Object.entries(grouped)) {
       switch (aggregation) {
         case 'sum':
-          result[key] = values.reduce((sum: number, item: any) => sum + (item.value || 0), 0);
+          result[key] = values.reduce((sum: number, item: AnalyticsEvent) => sum + (item.value || 0), 0);
           break;
         case 'avg':
           result[key] = values.length > 0 ? 
-            values.reduce((sum: number, item: any) => sum + (item.value || 0), 0) / values.length : 0;
+            values.reduce((sum: number, item: AnalyticsEvent) => sum + (item.value || 0), 0) / values.length : 0;
           break;
         case 'min':
-          result[key] = Math.min(...values.map((item: any) => item.value || 0));
+          result[key] = Math.min(...values.map((item: AnalyticsEvent) => item.value || 0));
           break;
         case 'max':
-          result[key] = Math.max(...values.map((item: any) => item.value || 0));
+          result[key] = Math.max(...values.map((item: AnalyticsEvent) => item.value || 0));
           break;
         case 'count':
           result[key] = values.length;
@@ -696,7 +696,7 @@ export class AnalyticsService {
   /**
    * 分组数据
    */
-  private groupBy(data: any[], keys: string[]): Record<string, any[]> {
+  private groupBy(data: AnalyticsEvent[], keys: string[]): Record<string, AnalyticsEvent[]> {
     return data.reduce((groups, item) => {
       const key = keys.map(k => item[k]).join('_');
       if (!groups[key]) {
@@ -710,7 +710,7 @@ export class AnalyticsService {
   /**
    * 处理指标数据
    */
-  private processMetrics(metrics: any[]): Record<string, number> {
+  private processMetrics(metrics: AnalyticsEvent[]): Record<string, number> {
     const result: Record<string, number> = {};
     
     for (const metric of metrics) {
@@ -726,7 +726,11 @@ export class AnalyticsService {
   /**
    * 计算趋势
    */
-  private calculateTrends(metrics: any[], events: any[]): Record<string, any> {
+  private calculateTrends(metrics: AnalyticsEvent[], events: AnalyticsEvent[]): {
+    metricsGrowth: number;
+    eventsGrowth: number;
+    seasonality: Record<string, number>;
+  } {
     // 简单趋势计算实现
     return {
       metricsGrowth: this.calculateGrowthRate(metrics),
@@ -738,7 +742,7 @@ export class AnalyticsService {
   /**
    * 计算增长率
    */
-  private calculateGrowthRate(data: any[]): number {
+  private calculateGrowthRate(data: AnalyticsEvent[]): number {
     if (data.length < 2) return 0;
     
     const sorted = data.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
@@ -753,7 +757,7 @@ export class AnalyticsService {
   /**
    * 检测季节性
    */
-  private detectSeasonality(data: any[]): Record<string, number> {
+  private detectSeasonality(data: AnalyticsEvent[]): Record<string, number> {
     // 简单的季节性检测
     const hourly: Record<string, number> = {};
     
@@ -768,7 +772,11 @@ export class AnalyticsService {
   /**
    * 生成洞察
    */
-  private generateInsights(metrics: any[], events: any[], trends: any): string[] {
+  private generateInsights(metrics: AnalyticsEvent[], events: AnalyticsEvent[], trends: {
+    metricsGrowth: number;
+    eventsGrowth: number;
+    seasonality: Record<string, number>;
+  }): string[] {
     const insights: string[] = [];
     
     // 基于数据生成简单洞察
@@ -820,7 +828,14 @@ export class AnalyticsService {
   /**
    * 获取用户统计
    */
-  private async getUserStats(startDate: Date, endDate: Date): Promise<any> {
+  private async getUserStats(startDate: Date, endDate: Date): Promise<{
+    total: number;
+    active: number;
+    new: number;
+    returning: number;
+    growth: number;
+    retention: Record<string, number>;
+  }> {
     // 模拟用户统计数据
     return {
       total: 1000,
@@ -839,7 +854,11 @@ export class AnalyticsService {
   /**
    * 获取会话统计
    */
-  private async getSessionStats(startDate: Date, endDate: Date): Promise<any> {
+  private async getSessionStats(startDate: Date, endDate: Date): Promise<{
+    total: number;
+    avgDuration: number;
+    bounceRate: number;
+  }> {
     // 模拟会话统计数据
     return {
       total: 2500,
@@ -851,7 +870,12 @@ export class AnalyticsService {
   /**
    * 获取内容统计
    */
-  private async getContentStats(startDate: Date, endDate: Date): Promise<any> {
+  private async getContentStats(startDate: Date, endDate: Date): Promise<{
+    totalViews: number;
+    uniqueViews: number;
+    avgDuration: number;
+    popular: Array<{ id: string; title: string; views: number }>;
+  }> {
     // 模拟内容统计数据
     return {
       totalViews: 15000,
@@ -868,7 +892,12 @@ export class AnalyticsService {
   /**
    * 获取性能统计
    */
-  private async getPerformanceStats(startDate: Date, endDate: Date): Promise<any> {
+  private async getPerformanceStats(startDate: Date, endDate: Date): Promise<{
+    loadTime: number;
+    errorRate: number;
+    apiTime: number;
+    uptime: number;
+  }> {
     // 模拟性能统计数据
     return {
       loadTime: 1.2, // 1.2秒
@@ -881,7 +910,7 @@ export class AnalyticsService {
   /**
    * 处理学习数据
    */
-  private processLearningData(data: any[]): LearningAnalytics {
+  private processLearningData(data: AnalyticsEvent[]): LearningAnalytics {
     // 模拟学习分析数据处理
     return {
       courseProgress: {
@@ -924,7 +953,7 @@ export class AnalyticsService {
   /**
    * 处理行为数据
    */
-  private processBehaviorData(data: any[]): UserBehaviorAnalytics {
+  private processBehaviorData(data: AnalyticsEvent[]): UserBehaviorAnalytics {
     // 模拟用户行为分析数据处理
     return {
       sessionData: {
@@ -980,7 +1009,7 @@ export class AnalyticsService {
   /**
    * 执行线性回归预测
    */
-  private performLinearRegression(data: any[]): Array<{
+  private performLinearRegression(data: AnalyticsEvent[]): Array<{
     date: Date;
     value: number;
     confidence: number;

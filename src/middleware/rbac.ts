@@ -102,6 +102,26 @@ export async function verifyJWTToken(token: string): Promise<JWTPayload | null> 
  */
 export async function getUserRoleFromDB(userId: string): Promise<UserRole | null> {
   try {
+    // 首先尝试从admin_users表查询
+    const { data: adminUser, error: adminError } = await supabase
+      .from('admin_users')
+      .select('role')
+      .eq('id', userId)
+      .single();
+
+    if (!adminError && adminUser) {
+      // 将数据库中的角色映射到枚举
+      switch (adminUser.role) {
+        case 'super_admin':
+          return UserRole.SUPER_ADMIN;
+        case 'admin':
+          return UserRole.ADMIN;
+        default:
+          return UserRole.ADMIN; // 默认为管理员
+      }
+    }
+
+    // 如果不是管理员，再从users表查询
     const { data: user, error } = await supabase
       .from('users')
       .select('role')

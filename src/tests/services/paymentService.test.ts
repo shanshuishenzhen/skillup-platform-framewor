@@ -530,12 +530,6 @@ describe('支付服务测试', () => {
     });
 
     it('应该成功列出订单', async () => {
-      const options = {
-        userId: 'user-123',
-        status: 'completed',
-        limit: 10,
-        offset: 0
-      };
       
       mockDatabase.query.mockResolvedValueOnce([
         {
@@ -550,7 +544,12 @@ describe('支付服务测试', () => {
         }
       ]);
       
-      const orders = await listOrders(options);
+      const orders = await listOrders({
+        userId: 'user-123',
+        status: 'completed',
+        limit: 10,
+        offset: 0
+      });
       
       expect(Array.isArray(orders)).toBe(true);
       expect(orders.length).toBe(2);
@@ -681,11 +680,6 @@ describe('支付服务测试', () => {
     });
 
     it('应该成功列出退款记录', async () => {
-      const options = {
-        paymentId: 'payment-123',
-        status: 'completed',
-        limit: 10
-      };
       
       mockDatabase.query.mockResolvedValueOnce([
         {
@@ -700,7 +694,11 @@ describe('支付服务测试', () => {
         }
       ]);
       
-      const refunds = await listRefunds(options);
+      const refunds = await listRefunds({
+        paymentId: 'payment-123',
+        status: 'completed',
+        limit: 10
+      });
       
       expect(Array.isArray(refunds)).toBe(true);
       expect(refunds.length).toBe(2);

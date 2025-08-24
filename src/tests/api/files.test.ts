@@ -29,6 +29,33 @@ jest.mock('../../services/notificationService');
 jest.mock('jsonwebtoken');
 jest.mock('fs');
 
+// Mock 类型定义
+interface MockSupabaseQuery {
+  select: jest.MockedFunction<any>;
+  insert: jest.MockedFunction<any>;
+  update: jest.MockedFunction<any>;
+  delete: jest.MockedFunction<any>;
+  upsert: jest.MockedFunction<any>;
+  eq: jest.MockedFunction<any>;
+  neq: jest.MockedFunction<any>;
+  in: jest.MockedFunction<any>;
+  gte: jest.MockedFunction<any>;
+  lte: jest.MockedFunction<any>;
+  like: jest.MockedFunction<any>;
+  ilike: jest.MockedFunction<any>;
+  order: jest.MockedFunction<any>;
+  limit: jest.MockedFunction<any>;
+  offset: jest.MockedFunction<any>;
+  single: jest.MockedFunction<any>;
+  then: jest.MockedFunction<any>;
+}
+
+interface MockFileStats {
+  size: number;
+  isFile: () => boolean;
+  isDirectory: () => boolean;
+}
+
 const mockSupabase = supabase as jest.Mocked<typeof supabase>;
 const mockCacheService = cacheService as jest.Mocked<typeof cacheService>;
 const mockFileUploadService = fileUploadService as jest.Mocked<typeof fileUploadService>;
@@ -177,7 +204,7 @@ describe('文件上传API集成测试', () => {
       offset: jest.fn().mockReturnThis(),
       single: jest.fn().mockResolvedValue({ data: testFile, error: null }),
       then: jest.fn()
-    } as any);
+    } as MockSupabaseQuery);
     
     mockCacheService.get.mockResolvedValue(null);
     mockCacheService.set.mockResolvedValue(true);
@@ -217,7 +244,7 @@ describe('文件上传API集成测试', () => {
       size: 1024000,
       isFile: () => true,
       isDirectory: () => false
-    } as any);
+    } as MockFileStats);
   });
   
   afterEach(() => {

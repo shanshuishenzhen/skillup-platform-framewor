@@ -13,13 +13,24 @@ export interface User {
   faceVerified?: boolean;
   createdAt: string;
   updatedAt: string;
+  // 管理员用户特有字段
+  username?: string;
+  email?: string;
+  real_name?: string;
+  role?: string;
+  permissions?: string[];
+  status?: string;
+  department?: string;
+  position?: string;
 }
 
 // 权限级别定义
 export const PERMISSION_LEVELS = {
   GUEST: 0,        // 游客用户
   REGISTERED: 1,   // 注册用户
-  PREMIUM: 2       // 付费用户
+  PREMIUM: 2,      // 付费用户
+  ADMIN: 3,        // 管理员
+  SUPER_ADMIN: 4   // 超级管理员
 } as const;
 
 // 用户类型到权限级别的映射
@@ -27,6 +38,12 @@ export const USER_TYPE_TO_PERMISSION: Record<UserType, number> = {
   guest: PERMISSION_LEVELS.GUEST,
   registered: PERMISSION_LEVELS.REGISTERED,
   premium: PERMISSION_LEVELS.PREMIUM
+};
+
+// 管理员角色到权限级别的映射
+export const ADMIN_ROLE_TO_PERMISSION: Record<string, number> = {
+  admin: PERMISSION_LEVELS.ADMIN,
+  super_admin: PERMISSION_LEVELS.SUPER_ADMIN
 };
 
 /**
@@ -76,6 +93,12 @@ export function hasPermission(requiredLevel: number, user?: User | null): boolea
   
   if (!currentUser) {
     return requiredLevel <= PERMISSION_LEVELS.GUEST;
+  }
+  
+  // 检查是否为管理员用户
+  if (currentUser.role && ADMIN_ROLE_TO_PERMISSION[currentUser.role]) {
+    const adminLevel = ADMIN_ROLE_TO_PERMISSION[currentUser.role];
+    return adminLevel >= requiredLevel;
   }
   
   const userLevel = USER_TYPE_TO_PERMISSION[currentUser.userType];
@@ -129,11 +152,55 @@ export function isFaceVerified(user?: User | null): boolean {
 export function canAccessPremiumContent(user?: User | null): boolean {
   const currentUser = user || getCurrentUser();
   
+  // 管理员可以访问所有内容
+  if (isAdmin(currentUser)) {
+    return true;
+  }
+  
   if (!isPremiumUser(currentUser)) {
     return false;
   }
   
   return isFaceVerified(currentUser);
+}
+
+/**
+ * 检查用户是否为管理员
+ * @param user 用户信息（可选）
+ * @returns 是否为管理员
+ */
+export function isAdmin(user?: User | null): boolean {
+  const currentUser = user || getCurrentUser();
+  
+  if (!currentUser || !currentUser.role) {
+    return false;
+  }
+  
+  return ADMIN_ROLE_TO_PERMISSION[currentUser.role] >= PERMISSION_LEVELS.ADMIN;
+}
+
+/**
+ * 检查用户是否为超级管理员
+ * @param user 用户信息（可选）
+ * @returns 是否为超级管理员
+ */
+export function isSuperAdmin(user?: User | null): boolean {
+  const currentUser = user || getCurrentUser();
+  
+  if (!currentUser || !currentUser.role) {
+    return false;
+  }
+  
+  return currentUser.role === 'super_admin';
+}
+
+/**
+ * 检查用户是否可以访问管理后台
+ * @param user 用户信息（可选）
+ * @returns 是否可以访问管理后台
+ */
+export function canAccessAdmin(user?: User | null): boolean {
+  return isAdmin(user);
 }
 
 /**

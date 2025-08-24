@@ -7,7 +7,7 @@ import { aiDataGeneratorService, VirtualMember, VirtualEnterprise } from '@/serv
 
 /**
  * 会员页面组件
- * 展示AI生成的虚拟个人会员和企业会员信息
+ * 展示AI生成的个人会员和企业会员信息
  */
 export default function MembersPage() {
   const [personalMembers, setPersonalMembers] = useState<VirtualMember[]>([])
@@ -52,12 +52,12 @@ export default function MembersPage() {
           <div className="flex items-center space-x-4 mb-6">
             <Link href="/" className="text-blue-600 hover:underline">首页</Link>
             <span>/</span>
-            <span className="text-gray-600">虚拟会员展示</span>
+            <span className="text-gray-600">会员展示</span>
           </div>
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold mb-4">虚拟会员展示</h1>
-              <p className="text-gray-600">AI生成的虚拟会员信息，展示多样化的个人和企业风采</p>
+              <h1 className="text-3xl font-bold mb-4">会员展示</h1>
+        <p className="text-gray-600">AI生成的会员信息，展示多样化的个人和企业风采</p>
             </div>
             <button
               onClick={refreshMembers}
@@ -72,7 +72,7 @@ export default function MembersPage() {
               ) : (
                 <>
                   <RefreshCw className="w-4 h-4" />
-                  刷新虚拟数据
+                  刷新数据
                 </>
               )}
             </button>
@@ -91,11 +91,11 @@ export default function MembersPage() {
 
         {/* 个人风采 */}
         <div className="mb-16">
-          <h2 className="text-2xl font-bold mb-8 text-center">虚拟个人会员</h2>
+          <h2 className="text-2xl font-bold mb-8 text-center">个人会员</h2>
           {loading ? (
             <div className="flex flex-col items-center justify-center py-12">
               <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-              <p className="text-gray-600">正在生成虚拟会员数据...</p>
+              <p className="text-gray-600">正在生成会员数据...</p>
             </div>
           ) : personalMembers.length === 0 ? (
             <div className="text-center py-12">
@@ -153,11 +153,11 @@ export default function MembersPage() {
 
         {/* 企业风采 */}
         <div>
-          <h2 className="text-2xl font-bold mb-8 text-center">虚拟企业会员</h2>
+          <h2 className="text-2xl font-bold mb-8 text-center">企业会员</h2>
           {loading ? (
             <div className="flex flex-col items-center justify-center py-12">
               <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-              <p className="text-gray-600">正在生成虚拟企业数据...</p>
+              <p className="text-gray-600">正在生成企业数据...</p>
             </div>
           ) : enterpriseMembers.length === 0 ? (
             <div className="text-center py-12">
@@ -217,10 +217,10 @@ export default function MembersPage() {
           )}
         </div>
 
-        {/* 虚拟数据说明 */}
+        {/* 数据说明 */}
         <div className="mt-16 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg p-8 text-center">
-          <h2 className="text-2xl font-bold mb-4">虚拟会员数据说明</h2>
-          <p className="mb-6">本页面展示的所有会员信息均为AI生成的虚拟数据</p>
+          <h2 className="text-2xl font-bold mb-4">会员数据说明</h2>
+          <p className="mb-6">本页面展示的所有会员信息均为AI生成的数据</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <div>
               <div className="text-3xl mb-2">✅</div>
@@ -230,7 +230,7 @@ export default function MembersPage() {
             <div>
               <div className="text-3xl mb-2">🔄</div>
               <h3 className="font-semibold mb-2">更新频率</h3>
-              <p className="text-blue-100 text-sm">每次刷新都会生成新的虚拟数据</p>
+              <p className="text-blue-100 text-sm">每次刷新都会生成新的数据</p>
             </div>
             <div>
               <div className="text-3xl mb-2">📋</div>
@@ -238,7 +238,7 @@ export default function MembersPage() {
               <p className="text-blue-100 text-sm">用于展示系统功能和界面设计</p>
             </div>
           </div>
-          <div className="text-lg font-bold">注意：本页面所有数据均为虚拟信息，仅用于演示目的</div>
+          <div className="text-lg font-bold">注意：本页面所有数据均为演示信息，仅用于演示目的</div>
         </div>
       </div>
     </div>

@@ -53,6 +53,34 @@ export interface CDNStats {
 }
 
 /**
+ * CDN操作结果接口
+ */
+export interface CDNOperationResult {
+  RequestId: string;
+  [key: string]: unknown;
+}
+
+/**
+ * 域名列表结果接口
+ */
+export interface DomainListResult {
+  RequestId: string;
+  PageNumber: number;
+  PageSize: number;
+  TotalCount: number;
+  Domains: {
+    PageData: Array<{
+      DomainName: string;
+      DomainStatus: string;
+      CdnType: string;
+      Cname: string;
+      GmtCreated: string;
+      GmtModified: string;
+    }>;
+  };
+}
+
+/**
  * 阿里云CDN客户端类
  * 提供CDN域名管理、缓存控制、统计查询等功能
  */
@@ -75,9 +103,9 @@ export class AliCloudCDN {
   /**
    * 添加CDN域名
    * @param domainConfig 域名配置
-   * @returns Promise<any> 添加结果
+   * @returns Promise<CDNOperationResult> 添加结果
    */
-  async addDomain(domainConfig: DomainConfig): Promise<any> {
+  async addDomain(domainConfig: DomainConfig): Promise<CDNOperationResult> {
     const params = {
       DomainName: domainConfig.domainName,
       CdnType: domainConfig.cdnType,
@@ -93,9 +121,9 @@ export class AliCloudCDN {
   /**
    * 删除CDN域名
    * @param domainName 域名
-   * @returns Promise<any> 删除结果
+   * @returns Promise<CDNOperationResult> 删除结果
    */
-  async deleteDomain(domainName: string): Promise<any> {
+  async deleteDomain(domainName: string): Promise<CDNOperationResult> {
     const params = {
       DomainName: domainName
     };
@@ -108,9 +136,9 @@ export class AliCloudCDN {
   /**
    * 启用CDN域名
    * @param domainName 域名
-   * @returns Promise<any> 启用结果
+   * @returns Promise<CDNOperationResult> 启用结果
    */
-  async startDomain(domainName: string): Promise<any> {
+  async startDomain(domainName: string): Promise<CDNOperationResult> {
     const params = {
       DomainName: domainName
     };
@@ -123,9 +151,9 @@ export class AliCloudCDN {
   /**
    * 停用CDN域名
    * @param domainName 域名
-   * @returns Promise<any> 停用结果
+   * @returns Promise<CDNOperationResult> 停用结果
    */
-  async stopDomain(domainName: string): Promise<any> {
+  async stopDomain(domainName: string): Promise<CDNOperationResult> {
     const params = {
       DomainName: domainName
     };
@@ -138,9 +166,9 @@ export class AliCloudCDN {
   /**
    * 刷新CDN缓存
    * @param tasks 刷新任务列表
-   * @returns Promise<any> 刷新结果
+   * @returns Promise<CDNOperationResult> 刷新结果
    */
-  async refreshCache(tasks: RefreshTask[]): Promise<any> {
+  async refreshCache(tasks: RefreshTask[]): Promise<CDNOperationResult> {
     const objectPaths = tasks.map(task => task.objectPath).join('\n');
     const objectType = tasks[0]?.objectType || 'File';
 
@@ -157,9 +185,9 @@ export class AliCloudCDN {
   /**
    * 预热CDN缓存
    * @param tasks 预热任务列表
-   * @returns Promise<any> 预热结果
+   * @returns Promise<CDNOperationResult> 预热结果
    */
-  async preheatCache(tasks: PreheatTask[]): Promise<any> {
+  async preheatCache(tasks: PreheatTask[]): Promise<CDNOperationResult> {
     const objectPaths = tasks.map(task => task.objectPath).join('\n');
 
     const params = {
@@ -175,9 +203,9 @@ export class AliCloudCDN {
    * 获取域名列表
    * @param pageNumber 页码
    * @param pageSize 每页大小
-   * @returns Promise<any> 域名列表
+   * @returns Promise<DomainListResult> 域名列表
    */
-  async getDomainList(pageNumber: number = 1, pageSize: number = 20): Promise<any> {
+  async getDomainList(pageNumber: number = 1, pageSize: number = 20): Promise<DomainListResult> {
     const params = {
       PageNumber: pageNumber,
       PageSize: pageSize
@@ -191,9 +219,9 @@ export class AliCloudCDN {
   /**
    * 获取域名配置信息
    * @param domainName 域名
-   * @returns Promise<any> 域名配置
+   * @returns Promise<CDNOperationResult> 域名配置
    */
-  async getDomainConfig(domainName: string): Promise<any> {
+  async getDomainConfig(domainName: string): Promise<CDNOperationResult> {
     const params = {
       DomainName: domainName
     };
@@ -222,7 +250,7 @@ export class AliCloudCDN {
     });
 
     // 转换为统计数据格式
-    return result.BpsDataPerInterval?.DataModule?.map((item: any) => ({
+    return result.BpsDataPerInterval?.DataModule?.map((item: { Value: number; TimeStamp: string }) => ({
       domainName,
       bandwidth: item.Value,
       traffic: 0, // 需要单独查询
@@ -235,9 +263,9 @@ export class AliCloudCDN {
   /**
    * 获取刷新任务状态
    * @param taskId 任务ID
-   * @returns Promise<any> 任务状态
+   * @returns Promise<CDNOperationResult> 任务状态
    */
-  async getRefreshTaskStatus(taskId: string): Promise<any> {
+  async getRefreshTaskStatus(taskId: string): Promise<CDNOperationResult> {
     const params = {
       TaskId: taskId
     };
@@ -250,9 +278,9 @@ export class AliCloudCDN {
   /**
    * 获取预热任务状态
    * @param taskId 任务ID
-   * @returns Promise<any> 任务状态
+   * @returns Promise<CDNOperationResult> 任务状态
    */
-  async getPreheatTaskStatus(taskId: string): Promise<any> {
+  async getPreheatTaskStatus(taskId: string): Promise<CDNOperationResult> {
     const params = {
       TaskId: taskId
     };

@@ -187,12 +187,12 @@ const mockSupabaseClient: MockSupabaseClient = {
 };
 
 // 设置 Mock
-(logger as any) = mockLogger;
-(envConfig as any) = mockEnvConfig;
-(cacheService as any) = mockCacheService;
-(auditService as any) = mockAuditService;
-(analyticsService as any) = mockAnalyticsService;
-(createClient as jest.MockedFunction<typeof createClient>).mockReturnValue(mockSupabaseClient as any);
+(logger as unknown) = mockLogger;
+(envConfig as unknown) = mockEnvConfig;
+(cacheService as unknown) = mockCacheService;
+(auditService as unknown) = mockAuditService;
+(analyticsService as unknown) = mockAnalyticsService;
+(createClient as jest.MockedFunction<typeof createClient>).mockReturnValue(mockSupabaseClient as unknown);
 
 describe('Supabase Database Utilities', () => {
   // 测试数据

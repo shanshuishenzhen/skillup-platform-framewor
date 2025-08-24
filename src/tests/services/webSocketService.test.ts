@@ -16,6 +16,24 @@
 
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { testUtils } from '../setup';
+import { envConfig } from '@/utils/envConfig';
+import { errorHandler } from '@/utils/errorHandler';
+import { monitoringService } from '@/services/monitoringService';
+import { authService } from '@/services/authService';
+import { userService } from '@/services/userService';
+import { notificationService } from '@/services/notificationService';
+import { createClient } from '@supabase/supabase-js';
+import * as socketIo from 'socket.io';
+import socketIoRedis from 'socket.io-redis';
+import * as redis from 'redis';
+import bull from 'bull';
+import lodash from 'lodash';
+import jsonwebtoken from 'jsonwebtoken';
+import * as rateLimiterFlexible from 'rate-limiter-flexible';
+import * as crypto from 'node:crypto';
+import * as events from 'node:events';
+import { v4 as uuid } from 'uuid';
+import moment from 'moment';
 
 // 模拟依赖
 jest.mock('@/utils/envConfig');
@@ -284,35 +302,38 @@ import {
 
 describe('WebSocket服务模块', () => {
   let wsService: WebSocketService;
-  let mockServer: any;
+  let mockServer: {
+    listen: jest.Mock;
+    close: jest.Mock;
+  };
 
   beforeEach(() => {
     // 重置所有模拟
     jest.clearAllMocks();
     
     // 设置模拟返回值
-    require('@/utils/envConfig').envConfig = mockEnvConfig;
-    require('@/utils/errorHandler').errorHandler = mockErrorHandler;
-    require('@/services/monitoringService').monitoringService = mockMonitoringService;
-    require('@/services/authService').authService = mockAuthService;
-    require('@/services/userService').userService = mockUserService;
-    require('@/services/notificationService').notificationService = mockNotificationService;
+    jest.mocked(envConfig).mockReturnValue(mockEnvConfig);
+    jest.mocked(errorHandler).mockReturnValue(mockErrorHandler);
+    jest.mocked(monitoringService).mockReturnValue(mockMonitoringService);
+    jest.mocked(authService).mockReturnValue(mockAuthService);
+    jest.mocked(userService).mockReturnValue(mockUserService);
+    jest.mocked(notificationService).mockReturnValue(mockNotificationService);
     
     // 设置Supabase模拟
-    require('@supabase/supabase-js').createClient = jest.fn(() => mockSupabase);
+    jest.mocked(createClient).mockReturnValue(mockSupabase);
     
     // 设置其他依赖模拟
-    require('socket.io').Server = mockSocketIOServer;
-    require('socket.io-redis').default = mockRedisAdapter;
-    require('redis').createClient = jest.fn(() => mockRedis);
-    require('bull').default = jest.fn(() => mockBullQueue);
-    require('lodash').default = mockLodash;
-    require('jsonwebtoken').default = mockJwt;
-    require('rate-limiter-flexible').RateLimiterRedis = jest.fn(() => mockRateLimiter);
-    require('node:crypto').default = mockCrypto;
-    require('node:events').EventEmitter = jest.fn(() => mockEventEmitter);
-    require('uuid').default = mockUuid;
-    require('moment').default = mockMoment;
+    jest.mocked(socketIo.Server).mockImplementation(() => mockSocketIOServer);
+    jest.mocked(socketIoRedis).mockReturnValue(mockRedisAdapter);
+    jest.mocked(redis.createClient).mockReturnValue(mockRedis);
+    jest.mocked(bull).mockReturnValue(mockBullQueue);
+    jest.mocked(lodash).mockReturnValue(mockLodash);
+    jest.mocked(jsonwebtoken).mockReturnValue(mockJwt);
+    jest.mocked(rateLimiterFlexible.RateLimiterRedis).mockImplementation(() => mockRateLimiter);
+    jest.mocked(crypto).mockReturnValue(mockCrypto);
+    jest.mocked(events.EventEmitter).mockImplementation(() => mockEventEmitter);
+    jest.mocked(uuid).mockReturnValue(mockUuid);
+    jest.mocked(moment).mockReturnValue(mockMoment);
     
     // 创建模拟HTTP服务器
     mockServer = {

@@ -178,13 +178,13 @@ const mockEnvConfig = {
 };
 
 // 设置 Mock
-(logger as any) = mockLogger;
-(supabaseClient as any) = mockSupabaseClient;
-(cacheService as any) = mockCacheService;
-(analyticsService as any) = mockAnalyticsService;
-(aiService as any) = mockAiService;
-(auditService as any) = mockAuditService;
-(envConfig as any) = mockEnvConfig;
+const mockLoggerTyped = logger as jest.Mocked<typeof logger>;
+const mockSupabaseClientTyped = supabaseClient as jest.Mocked<typeof supabaseClient>;
+const mockCacheServiceTyped = cacheService as jest.Mocked<typeof cacheService>;
+const mockAnalyticsServiceTyped = analyticsService as jest.Mocked<typeof analyticsService>;
+const mockAiServiceTyped = aiService as jest.Mocked<typeof aiService>;
+const mockAuditServiceTyped = auditService as jest.Mocked<typeof auditService>;
+const mockEnvConfigTyped = envConfig as jest.Mocked<typeof envConfig>;
 
 // 测试数据
 const testUser = {
@@ -1147,18 +1147,26 @@ describe('Learning Progress Service', () => {
     });
 
     it('应该处理无效数据', async () => {
+      interface CourseProgressData {
+        userId: string;
+        courseId: string;
+        progress: number;
+      }
+      
       const invalidData = {
         userId: '', // 空字符串
         courseId: null, // null值
         progress: -10 // 无效进度
       };
       
-      const result = await learningProgressService.updateCourseProgress(invalidData as any);
+      const result = await learningProgressService.updateCourseProgress(invalidData as CourseProgressData);
       
       expect(result).toBe(false);
       expect(mockLogger.warn).toHaveBeenCalledWith(
         'Invalid progress data',
-        expect.any(Object)
+        expect.objectContaining({
+          data: expect.any(Object)
+        })
       );
     });
 
@@ -1172,7 +1180,9 @@ describe('Learning Progress Service', () => {
       expect(recommendations).toEqual([]);
       expect(mockLogger.error).toHaveBeenCalledWith(
         'Failed to generate recommendations',
-        expect.any(Object)
+        expect.objectContaining({
+          error: expect.any(String)
+        })
       );
     });
   });

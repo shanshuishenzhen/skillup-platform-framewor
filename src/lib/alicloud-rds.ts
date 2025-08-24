@@ -45,16 +45,32 @@ interface RDSConfig {
 }
 
 /**
+ * 数据库行记录类型
+ */
+type DatabaseRow = Record<string, unknown>
+
+/**
+ * 数据库字段信息类型
+ */
+type DatabaseField = {
+  name: string
+  dataTypeID?: number
+  dataTypeSize?: number
+  dataTypeModifier?: number
+  format?: string
+}
+
+/**
  * 查询结果接口
  * @interface QueryResult
- * @property {any[]} rows - 查询结果行
+ * @property {DatabaseRow[]} rows - 查询结果行
  * @property {number} rowCount - 影响行数
- * @property {any} fields - 字段信息
+ * @property {DatabaseField[]} fields - 字段信息
  */
 interface QueryResult {
-  rows: any[]
+  rows: DatabaseRow[]
   rowCount: number
-  fields?: any
+  fields?: DatabaseField[]
 }
 
 /**
@@ -201,13 +217,13 @@ class AliCloudRDS {
   /**
    * 执行查询（带重试机制）
    * @param {string} sql - SQL语句
-   * @param {any[]} params - 查询参数
+   * @param {unknown[]} params - 查询参数
    * @param {number} retryCount - 当前重试次数
    * @returns {Promise<QueryResult>} 查询结果
    * @example
    * const result = await rdsClient.query('SELECT * FROM users WHERE id = $1', [1])
    */
-  async query(sql: string, params: any[] = [], retryCount: number = 0): Promise<QueryResult> {
+  async query(sql: string, params: unknown[] = [], retryCount: number = 0): Promise<QueryResult> {
     if (!this.pool) {
       throw new Error('数据库连接池未初始化，请先调用 initialize() 方法')
     }
@@ -262,10 +278,10 @@ class AliCloudRDS {
   /**
    * 判断是否为连接相关错误
    * @private
-   * @param {any} error - 错误对象
+   * @param {unknown} error - 错误对象
    * @returns {boolean} 是否为连接错误
    */
-  private isConnectionError(error: any): boolean {
+  private isConnectionError(error: unknown): boolean {
     if (!error) return false
     
     const errorMessage = error.message?.toLowerCase() || ''
@@ -286,9 +302,20 @@ class AliCloudRDS {
   }
 
   /**
+   * 数据库客户端类型
+   */
+  type DatabaseClient = {
+    query: (sql: string, params?: unknown[]) => Promise<QueryResult>
+    release?: () => void
+    beginTransaction?: () => Promise<void>
+    commit?: () => Promise<void>
+    rollback?: () => Promise<void>
+  }
+
+  /**
    * 执行事务
    * @param {Function} callback - 事务回调函数
-   * @returns {Promise<any>} 事务结果
+   * @returns {Promise<T>} 事务结果
    * @example
    * const result = await rdsClient.transaction(async (client) => {
    *   await client.query('INSERT INTO users (name) VALUES ($1)', ['John'])
@@ -296,7 +323,7 @@ class AliCloudRDS {
    *   return { success: true }
    * })
    */
-  async transaction(callback: (client: any) => Promise<any>): Promise<any> {
+  async transaction<T = unknown>(callback: (client: DatabaseClient) => Promise<T>): Promise<T> {
     if (!this.pool) {
       throw new Error('数据库连接池未初始化，请先调用 initialize() 方法')
     }
@@ -349,12 +376,21 @@ class AliCloudRDS {
   }
 
   /**
+   * 数据库信息类型
+   */
+  type DatabaseInfo = {
+    type: string
+    version: string
+    database: string
+  }
+
+  /**
    * 获取数据库信息
-   * @returns {Promise<any>} 数据库信息
+   * @returns {Promise<DatabaseInfo>} 数据库信息
    * @example
    * const dbInfo = await rdsClient.getDatabaseInfo()
    */
-  async getDatabaseInfo(): Promise<any> {
+  async getDatabaseInfo(): Promise<DatabaseInfo> {
     try {
       if (this.config.type === DatabaseType.POSTGRESQL) {
         const result = await this.query('SELECT version()')
@@ -420,10 +456,10 @@ class AliCloudRDS {
   /**
    * 处理连接错误
    * @private
-   * @param {any} error - 错误对象
+   * @param {unknown} error - 错误对象
    * @returns {Promise<void>}
    */
-  private async handleConnectionError(error: any): Promise<void> {
+  private async handleConnectionError(error: unknown): Promise<void> {
     this.isConnected = false
     
     if (this.retryCount < this.config.maxRetries!) {

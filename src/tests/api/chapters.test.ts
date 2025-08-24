@@ -102,7 +102,14 @@ const testNote = {
 };
 
 // 生成JWT令牌的辅助函数
-const generateToken = (user: any) => {
+interface TokenUser {
+  id: string;
+  email: string;
+  role: string;
+  email_verified: boolean;
+}
+
+const generateToken = (user: TokenUser) => {
   return `Bearer token-${user.id}`;
 };
 
@@ -142,9 +149,13 @@ describe('Chapters API', () => {
     
     // 设置文件系统
     mockFs.existsSync = jest.fn().mockReturnValue(true);
+    interface MockStats {
+      size: number;
+    }
+    
     mockFs.statSync = jest.fn().mockReturnValue({
       size: 1024 * 1024 * 50 // 50MB
-    } as any);
+    } as MockStats);
   });
 
   /**
@@ -152,6 +163,13 @@ describe('Chapters API', () => {
    */
   describe('GET /api/courses/:courseId/chapters', () => {
     it('应该返回课程章节列表', async () => {
+      interface MockSupabaseQuery {
+        select: jest.MockedFunction<any>;
+        eq: jest.MockedFunction<any>;
+        single: jest.MockedFunction<any>;
+        order: jest.MockedFunction<any>;
+      }
+      
       mockSupabase.from.mockReturnValueOnce({
         select: jest.fn().mockReturnValue({
           eq: jest.fn().mockReturnValue({
@@ -161,7 +179,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       mockSupabase.from.mockReturnValueOnce({
         select: jest.fn().mockReturnValue({
@@ -172,7 +190,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       const response = await request(app)
         .get('/api/courses/course-123/chapters');
@@ -200,7 +218,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       mockSupabase.from.mockReturnValueOnce({
         select: jest.fn().mockReturnValue({
@@ -211,7 +229,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       // 检查是否已报名
       mockSupabase.from.mockReturnValueOnce({
@@ -225,7 +243,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       const response = await request(app)
         .get('/api/courses/course-123/chapters')
@@ -257,7 +275,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       const response = await request(app)
         .get('/api/courses/nonexistent-course/chapters');
@@ -286,7 +304,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       const response = await request(app)
         .get('/api/courses/course-123/chapters/chapter-123');
@@ -317,7 +335,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       mockSupabase.from.mockReturnValueOnce({
         select: jest.fn().mockReturnValue({
@@ -330,7 +348,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       const response = await request(app)
         .get('/api/courses/course-123/chapters/chapter-123')
@@ -363,7 +381,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       // 检查是否已报名
       mockSupabase.from.mockReturnValueOnce({
@@ -377,7 +395,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       const response = await request(app)
         .get('/api/courses/course-123/chapters/chapter-123')
@@ -408,7 +426,32 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
+      
+      interface MockSupabaseInsert {
+        insert: jest.MockedFunction<any>;
+        select: jest.MockedFunction<any>;
+      }
+      
+      interface MockSupabaseUpdate {
+        update: jest.MockedFunction<any>;
+        eq: jest.MockedFunction<any>;
+        select: jest.MockedFunction<any>;
+      }
+      
+      interface MockSupabaseDelete {
+        delete: jest.MockedFunction<any>;
+        eq: jest.MockedFunction<any>;
+      }
+      
+      interface MockSupabaseStorage {
+        from: jest.MockedFunction<any>;
+      }
+      
+      interface MockSupabaseUpsert {
+        upsert: jest.MockedFunction<any>;
+        select: jest.MockedFunction<any>;
+      }
       
       mockSupabase.from.mockReturnValueOnce({
         insert: jest.fn().mockReturnValue({
@@ -417,7 +460,7 @@ describe('Chapters API', () => {
             error: null
           })
         })
-      } as any);
+      } as MockSupabaseInsert);
       
       const response = await request(app)
         .post('/api/courses/course-123/chapters')
@@ -458,7 +501,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       const response = await request(app)
         .post('/api/courses/course-123/chapters')
@@ -495,7 +538,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       const response = await request(app)
         .post('/api/courses/course-123/chapters')
@@ -524,7 +567,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       // 查询现有章节数量
       mockSupabase.from.mockReturnValueOnce({
@@ -534,7 +577,7 @@ describe('Chapters API', () => {
             error: null
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       mockSupabase.from.mockReturnValueOnce({
         insert: jest.fn().mockReturnValue({
@@ -547,7 +590,7 @@ describe('Chapters API', () => {
             error: null
           })
         })
-      } as any);
+      } as MockSupabaseInsert);
       
       const response = await request(app)
         .post('/api/courses/course-123/chapters')
@@ -587,7 +630,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       mockSupabase.from.mockReturnValueOnce({
         update: jest.fn().mockReturnValue({
@@ -601,7 +644,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseUpdate);
       
       const response = await request(app)
         .put('/api/courses/course-123/chapters/chapter-123')
@@ -636,7 +679,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       mockSupabase.from.mockReturnValueOnce({
         update: jest.fn().mockReturnValue({
@@ -647,7 +690,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseUpdate);
       
       await request(app)
         .put('/api/courses/course-123/chapters/chapter-123')
@@ -687,7 +730,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       mockSupabase.from.mockReturnValueOnce({
         delete: jest.fn().mockReturnValue({
@@ -696,7 +739,7 @@ describe('Chapters API', () => {
             error: null
           })
         })
-      } as any);
+      } as MockSupabaseDelete);
       
       const response = await request(app)
         .delete('/api/courses/course-123/chapters/chapter-123')
@@ -734,7 +777,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       mockSupabase.from.mockReturnValueOnce({
         delete: jest.fn().mockReturnValue({
@@ -743,7 +786,7 @@ describe('Chapters API', () => {
             error: null
           })
         })
-      } as any);
+      } as MockSupabaseDelete);
       
       // 更新后续章节的顺序
       mockSupabase.from.mockReturnValueOnce({
@@ -760,7 +803,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       mockSupabase.from.mockReturnValueOnce({
         update: jest.fn().mockReturnValue({
@@ -769,7 +812,7 @@ describe('Chapters API', () => {
             error: null
           })
         })
-      } as any);
+      } as MockSupabaseUpdate);
       
       const response = await request(app)
         .delete('/api/courses/course-123/chapters/chapter-123')
@@ -803,7 +846,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       // Mock Supabase Storage
       mockSupabase.storage = {
@@ -820,7 +863,7 @@ describe('Chapters API', () => {
             }
           })
         })
-      } as any;
+      } as MockSupabaseStorage;
       
       mockSupabase.from.mockReturnValueOnce({
         update: jest.fn().mockReturnValue({
@@ -834,7 +877,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseUpdate);
       
       const response = await request(app)
         .post('/api/courses/course-123/chapters/chapter-123/video')
@@ -906,7 +949,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       // 检查是否已报名
       mockSupabase.from.mockReturnValueOnce({
@@ -920,7 +963,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       mockSupabase.from.mockReturnValueOnce({
         upsert: jest.fn().mockReturnValue({
@@ -933,7 +976,7 @@ describe('Chapters API', () => {
             error: null
           })
         })
-      } as any);
+      } as MockSupabaseUpsert);
       
       const response = await request(app)
         .put('/api/courses/course-123/chapters/chapter-123/progress')
@@ -995,7 +1038,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       mockSupabase.from.mockReturnValueOnce({
         select: jest.fn().mockReturnValue({
@@ -1008,7 +1051,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       const response = await request(app)
         .put('/api/courses/course-123/chapters/chapter-123/progress')
@@ -1044,7 +1087,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       mockSupabase.from.mockReturnValueOnce({
         insert: jest.fn().mockReturnValue({
@@ -1053,7 +1096,7 @@ describe('Chapters API', () => {
             error: null
           })
         })
-      } as any);
+      } as MockSupabaseInsert);
       
       const response = await request(app)
         .post('/api/courses/course-123/chapters/chapter-123/notes')
@@ -1108,7 +1151,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       const response = await request(app)
         .get('/api/courses/course-123/chapters/chapter-123/notes')
@@ -1165,7 +1208,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       mockSupabase.storage = {
         from: jest.fn().mockReturnValue({
@@ -1174,7 +1217,7 @@ describe('Chapters API', () => {
             error: { message: 'Upload failed' }
           })
         })
-      } as any;
+      } as MockSupabaseStorage;
       
       const response = await request(app)
         .post('/api/courses/course-123/chapters/chapter-123/video')
@@ -1200,7 +1243,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       mockSupabase.from.mockReturnValueOnce({
         select: jest.fn().mockReturnValue({
@@ -1211,7 +1254,7 @@ describe('Chapters API', () => {
             })
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       const startTime = Date.now();
       
@@ -1248,7 +1291,7 @@ describe('Chapters API', () => {
             error: null
           })
         })
-      } as any);
+      } as MockSupabaseQuery);
       
       const promises = Array.from({ length: 3 }, (_, i) =>
         request(app)

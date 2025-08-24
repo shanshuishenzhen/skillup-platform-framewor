@@ -16,6 +16,23 @@
 
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { testUtils } from '../setup';
+import { envConfig } from '@/utils/envConfig';
+import { errorHandler } from '@/utils/errorHandler';
+import { monitoringService } from '@/services/monitoringService';
+import { userService } from '@/services/userService';
+import { productService } from '@/services/productService';
+import { orderService } from '@/services/orderService';
+import { cloudStorageService } from '@/services/cloudStorageService';
+import { notificationService } from '@/services/notificationService';
+import { aiService } from '@/services/aiService';
+import { createClient } from '@supabase/supabase-js';
+import * as crypto from 'node:crypto';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import * as redis from 'redis';
+import { v4 as uuid } from 'uuid';
+import moment from 'moment';
+import sentiment from 'sentiment';
 
 // 模拟依赖
 jest.mock('@/utils/envConfig');
@@ -212,35 +229,42 @@ import {
   getProductReviews
 } from '@/services/reviewService';
 
+interface MockRedisClient {
+  get: jest.Mock;
+  set: jest.Mock;
+  del: jest.Mock;
+  zadd: jest.Mock;
+  zrange: jest.Mock;
+}
+
 describe('评价服务模块', () => {
   let reviewService: ReviewService;
-  let mockRedisClient: any;
+  let mockRedisClient: MockRedisClient;
 
   beforeEach(() => {
     // 重置所有模拟
     jest.clearAllMocks();
     
     // 设置模拟返回值
-    require('@/utils/envConfig').envConfig = mockEnvConfig;
-    require('@/utils/errorHandler').errorHandler = mockErrorHandler;
-    require('@/services/monitoringService').monitoringService = mockMonitoringService;
-    require('@/services/userService').userService = mockUserService;
-    require('@/services/productService').productService = mockProductService;
-    require('@/services/orderService').orderService = mockOrderService;
-    require('@/services/cloudStorageService').cloudStorageService = mockCloudStorageService;
-    require('@/services/notificationService').notificationService = mockNotificationService;
-    require('@/services/aiService').aiService = mockAiService;
-    require('@supabase/supabase-js').createClient = jest.fn(() => mockSupabase);
-    require('node:crypto').default = mockCrypto;
-    require('node:fs/promises').default = mockFs;
-    require('node:path').default = mockPath;
-    require('uuid').v4 = mockUuid.v4;
-    require('moment').default = mockMoment;
-    require('sentiment').default = mockSentiment;
+    jest.mocked(envConfig).mockReturnValue(mockEnvConfig);
+    jest.mocked(errorHandler).mockReturnValue(mockErrorHandler);
+    jest.mocked(monitoringService).mockReturnValue(mockMonitoringService);
+    jest.mocked(userService).mockReturnValue(mockUserService);
+    jest.mocked(productService).mockReturnValue(mockProductService);
+    jest.mocked(orderService).mockReturnValue(mockOrderService);
+    jest.mocked(cloudStorageService).mockReturnValue(mockCloudStorageService);
+    jest.mocked(notificationService).mockReturnValue(mockNotificationService);
+    jest.mocked(aiService).mockReturnValue(mockAiService);
+    jest.mocked(createClient).mockReturnValue(mockSupabase);
+    jest.mocked(crypto).mockReturnValue(mockCrypto);
+    jest.mocked(fs).mockReturnValue(mockFs);
+    jest.mocked(path).mockReturnValue(mockPath);
+    jest.mocked(uuid).mockReturnValue(mockUuid.v4);
+    jest.mocked(moment).mockReturnValue(mockMoment);
+    jest.mocked(sentiment).mockReturnValue(mockSentiment);
     
     // 设置Redis模拟
-    mockRedisClient = mockRedis.createClient();
-    require('redis').createClient = mockRedis.createClient;
+    jest.mocked(redis.createClient).mockReturnValue(mockRedis.createClient);
     
     // 创建评价服务实例
     reviewService = new ReviewService({

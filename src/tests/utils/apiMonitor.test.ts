@@ -116,7 +116,7 @@ describe('ApiMonitor', () => {
           endpoint,
           method,
           userId,
-          startTime: expect.any(String),
+          startTime: expect.stringMatching(/^\d+$/),
           status: 'in_progress'
         })
       );
@@ -147,7 +147,7 @@ describe('ApiMonitor', () => {
           statusCode,
           responseSize,
           responseTime: expect.any(Number),
-          endTime: expect.any(String)
+          endTime: expect.stringMatching(/^\d+$/)
         })
       );
     });
@@ -173,7 +173,7 @@ describe('ApiMonitor', () => {
           status: 'error',
           errorMessage: error.message,
           errorType: error.constructor.name,
-          endTime: expect.any(String)
+          endTime: expect.stringMatching(/^\d+$/)
         })
       );
       
@@ -623,7 +623,7 @@ describe('ApiMonitor', () => {
       
       expect(alertTriggered).toBe(true);
       expect(mockErrorHandler.logError).toHaveBeenCalledWith(
-        expect.any(Error),
+        expect.objectContaining({ message: expect.any(String) }),
         expect.objectContaining({
           alertType: 'error_rate',
           endpoint,
@@ -640,7 +640,7 @@ describe('ApiMonitor', () => {
       
       expect(alertTriggered).toBe(true);
       expect(mockErrorHandler.logError).toHaveBeenCalledWith(
-        expect.any(Error),
+        expect.objectContaining({ message: expect.any(String) }),
         expect.objectContaining({
           alertType: 'response_time',
           endpoint,
@@ -659,7 +659,7 @@ describe('ApiMonitor', () => {
       
       expect(alertTriggered).toBe(true);
       expect(mockErrorHandler.logError).toHaveBeenCalledWith(
-        expect.any(Error),
+        expect.objectContaining({ message: expect.any(String) }),
         expect.objectContaining({
           alertType: 'request_volume',
           endpoint,

@@ -181,12 +181,12 @@ const mockAxios = {
 };
 
 // 设置 Mock
-(logger as any) = mockLogger;
-(cacheService as any) = mockCacheService;
-(analyticsService as any) = mockAnalyticsService;
-(auditService as any) = mockAuditService;
-(envConfig as any) = mockEnvConfig;
-(axios as any) = mockAxios;
+const mockLoggerTyped = logger as jest.Mocked<typeof logger>;
+const mockCacheServiceTyped = cacheService as jest.Mocked<typeof cacheService>;
+const mockAnalyticsServiceTyped = analyticsService as jest.Mocked<typeof analyticsService>;
+const mockAuditServiceTyped = auditService as jest.Mocked<typeof auditService>;
+const mockEnvConfigTyped = envConfig as jest.Mocked<typeof envConfig>;
+const mockAxiosTyped = axios as jest.Mocked<typeof axios>;
 
 // 测试数据
 const testUser = {
@@ -1105,22 +1105,31 @@ describe('AI Service', () => {
       expect(result).toEqual([]);
       expect(mockLogger.warn).toHaveBeenCalledWith(
         'AI API rate limit exceeded, using fallback',
-        expect.any(Object)
+        expect.objectContaining({
+          error: expect.any(String)
+        })
       );
     });
 
     it('应该处理无效输入', async () => {
-      const invalidInput = {
+      interface InvalidRecommendationInput {
+        userId: string;
+        interests: null;
+      }
+      
+      const invalidInput: InvalidRecommendationInput = {
         userId: '', // 空字符串
         interests: null // null值
       };
       
-      const result = await aiService.generateRecommendations(invalidInput as any);
+      const result = await aiService.generateRecommendations(invalidInput as { userId: string; interests: string[] });
       
       expect(result).toEqual([]);
       expect(mockLogger.error).toHaveBeenCalledWith(
         'Invalid input for AI recommendation',
-        expect.any(Object)
+        expect.objectContaining({
+          input: expect.any(Object)
+        })
       );
     });
 
@@ -1153,7 +1162,9 @@ describe('AI Service', () => {
       });
       expect(mockLogger.warn).toHaveBeenCalledWith(
         'AI sentiment analysis timeout, using default',
-        expect.any(Object)
+        expect.objectContaining({
+          error: expect.any(String)
+        })
       );
     });
   });

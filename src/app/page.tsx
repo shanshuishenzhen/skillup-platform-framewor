@@ -18,11 +18,11 @@ export default function HomePage() {
     const loadVirtualData = async () => {
       try {
         setLoading(true)
-        // 生成虚拟新闻数据
+        // 生成新闻数据
         const virtualNews = await aiDataGeneratorService.generateNews(3)
         setNews(virtualNews)
         
-        // 生成虚拟统计数据
+        // 生成统计数据
         const virtualStats = {
           members: `${Math.floor(Math.random() * 50 + 10)}万`,
           talents: `${Math.floor(Math.random() * 30 + 5)}万`,
@@ -31,7 +31,7 @@ export default function HomePage() {
         }
         setStats(virtualStats)
       } catch (error) {
-        console.error('加载虚拟数据失败:', error)
+        console.error('加载数据失败:', error)
       } finally {
         setLoading(false)
       }
@@ -184,7 +184,7 @@ export default function HomePage() {
           {loading ? (
             <div className="text-center py-8">
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <p className="mt-2 text-gray-600">正在加载虚拟资讯...</p>
+              <p className="mt-2 text-gray-600">正在加载资讯...</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -222,6 +222,96 @@ export default function HomePage() {
         </div>
       </div>
 
+      {/* 核心功能模块 */}
+      <div className="bg-gradient-to-r from-blue-50 to-purple-50 py-16">
+        <div className="container mx-auto px-4">
+          <h2 className="text-3xl font-bold text-center mb-12 text-gray-800">核心功能服务</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            {/* 技能培训学习 */}
+            <Link href="/skill-training" className="group">
+              <div className="bg-white rounded-xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2">
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    </svg>
+                  </div>
+                  <h3 className="text-2xl font-bold mb-4 text-gray-800 group-hover:text-blue-600 transition-colors">技能培训学习</h3>
+                  <p className="text-gray-600 mb-6 leading-relaxed">提供专业的技能培训课程，涵盖多个行业领域，助力个人职业发展和技能提升</p>
+                  <div className="flex justify-center space-x-4 text-sm text-gray-500 mb-6">
+                    <span className="flex items-center">
+                      <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      在线学习
+                    </span>
+                    <span className="flex items-center">
+                      <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      实践项目
+                    </span>
+                    <span className="flex items-center">
+                      <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      专家指导
+                    </span>
+                  </div>
+                  <div className="inline-flex items-center text-blue-600 font-semibold group-hover:text-blue-700">
+                    开始学习
+                    <svg className="w-4 h-4 ml-2 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </Link>
+
+            {/* 技能等级考试 */}
+            <Link href="/skill-exam" className="group">
+              <div className="bg-white rounded-xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2">
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                    </svg>
+                  </div>
+                  <h3 className="text-2xl font-bold mb-4 text-gray-800 group-hover:text-purple-600 transition-colors">技能等级考试</h3>
+                  <p className="text-gray-600 mb-6 leading-relaxed">权威的技能等级认证考试，获得行业认可的专业资格证书，提升职场竞争力</p>
+                  <div className="flex justify-center space-x-4 text-sm text-gray-500 mb-6">
+                    <span className="flex items-center">
+                      <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      权威认证
+                    </span>
+                    <span className="flex items-center">
+                      <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      在线考试
+                    </span>
+                    <span className="flex items-center">
+                      <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      证书颁发
+                    </span>
+                  </div>
+                  <div className="inline-flex items-center text-purple-600 font-semibold group-hover:text-purple-700">
+                    报名考试
+                    <svg className="w-4 h-4 ml-2 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </Link>
+          </div>
+        </div>
+      </div>
+
       {/* 页脚 */}
       <footer className="bg-gray-800 text-white py-8">
         <div className="container mx-auto px-4">
@@ -250,7 +340,7 @@ export default function HomePage() {
             </div>
           </div>
           <div className="border-t border-gray-700 mt-8 pt-8 text-center text-sm text-gray-400">
-            <p>&copy; 2024 创新技能发展促进会. 保留所有权利. | 本站所有内容均为虚拟演示数据</p>
+            <p>&copy; 2024 创新技能发展促进会. 保留所有权利.</p>
           </div>
         </div>
       </footer>

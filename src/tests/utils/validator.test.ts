@@ -19,7 +19,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import {
-  validator,
   isRequired,
   isString,
   isNumber,
@@ -97,11 +96,7 @@ import {
   getValidationErrors,
   formatValidationError,
   isValidationError,
-  ValidationError,
-  ValidationResult,
-  ValidatorFunction,
-  ValidationSchema,
-  ValidationOptions
+  ValidationError
 } from '../../utils/validator';
 import { errorHandler } from '../../utils/errorHandler';
 import { envConfig } from '../../config/envConfig';
@@ -881,30 +876,27 @@ describe('验证器工具测试', () => {
 
     it('应该清理HTML内容', () => {
       const dirtyHTML = '<script>alert("xss")</script><p>Safe content</p>';
-      const cleanHTML = sanitizeHTML(dirtyHTML);
+      sanitizeHTML(dirtyHTML);
       
-      expect(mockDOMPurify.sanitize).toHaveBeenCalledWith(dirtyHTML, expect.any(Object));
+      expect(mockDOMPurify.sanitize).toHaveBeenCalledWith(dirtyHTML, expect.objectContaining({}));
     });
 
     it('应该转义特殊字符', () => {
-      const unsafeString = '<script>alert("xss")</script>';
-      const escapedString = escape(unsafeString);
+      escape('<script>alert("xss")</script>');
       
-      expect(mockValidatorLib.escape).toHaveBeenCalledWith(unsafeString);
+      expect(mockValidatorLib.escape).toHaveBeenCalledWith('<script>alert("xss")</script>');
     });
 
     it('应该反转义字符', () => {
-      const escapedString = '&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;';
-      const unescapedString = unescape(escapedString);
+      unescape('&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;');
       
-      expect(mockValidatorLib.unescape).toHaveBeenCalledWith(escapedString);
+      expect(mockValidatorLib.unescape).toHaveBeenCalledWith('&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;');
     });
 
     it('应该标准化邮箱地址', () => {
-      const email = 'User@Example.COM';
-      const normalizedEmail = normalize(email, 'email');
+      normalize('User@Example.COM', 'email');
       
-      expect(mockValidatorLib.normalizeEmail).toHaveBeenCalledWith(email);
+      expect(mockValidatorLib.normalizeEmail).toHaveBeenCalledWith('User@Example.COM');
     });
   });
 
@@ -1298,4 +1290,6 @@ describe('验证器工具便捷函数', () => {
     expect(typeof createValidator).toBe('function');
     expect(typeof combineValidators).toBe('function');
     expect(typeof conditionalValidator).toBe('function');
-    expect(typeof asyncValidator).toB
+    expect(typeof asyncValidator).toBe('function');
+  });
+});

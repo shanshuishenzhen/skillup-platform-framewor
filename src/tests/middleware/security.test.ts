@@ -37,6 +37,11 @@ jest.mock('crypto');
 jest.mock('validator');
 jest.mock('isomorphic-dompurify');
 
+// Mock 类型定义
+interface MockedModule<T> {
+  [K in keyof T]: T[K] extends (...args: unknown[]) => unknown ? jest.MockedFunction<T[K]> : T[K];
+}
+
 // 类型定义
 interface SecurityConfig {
   rateLimit: {
@@ -108,7 +113,7 @@ interface SecurityThreat {
   details: {
     endpoint: string;
     method: string;
-    payload?: any;
+    payload?: unknown;
     headers?: Record<string, string>;
     timestamp: string;
     blocked: boolean;
@@ -289,30 +294,30 @@ const mockCreateHash = jest.fn().mockReturnValue({
 });
 
 // 设置 Mock
-(cacheService as any) = mockCacheService;
-(auditService as any) = mockAuditService;
-(analyticsService as any) = mockAnalyticsService;
-(notificationService as any) = mockNotificationService;
-(supabaseClient as any) = mockSupabaseClient;
-(logger as any) = mockLogger;
-(envConfig as any) = { security: mockSecurityConfig };
-(validator as any) = mockValidator;
-(DOMPurify as any) = mockDOMPurify;
-(createHash as jest.Mock) = mockCreateHash;
+const mockCacheServiceTyped = cacheService as jest.Mocked<typeof cacheService>;
+const mockAuditServiceTyped = auditService as jest.Mocked<typeof auditService>;
+const mockAnalyticsServiceTyped = analyticsService as jest.Mocked<typeof analyticsService>;
+const mockNotificationServiceTyped = notificationService as jest.Mocked<typeof notificationService>;
+const mockSupabaseClientTyped = supabaseClient as jest.Mocked<typeof supabaseClient>;
+const mockLoggerTyped = logger as jest.Mocked<typeof logger>;
+const mockEnvConfigTyped = envConfig as jest.Mocked<typeof envConfig>;
+const mockValidatorTyped = validator as jest.Mocked<typeof validator>;
+const mockDOMPurifyTyped = DOMPurify as jest.Mocked<typeof DOMPurify>;
+const mockCreateHashTyped = createHash as jest.MockedFunction<typeof createHash>;
 
 // Mock Express 对象
 const createMockRequest = (options: {
   method?: string;
   url?: string;
   headers?: Record<string, string>;
-  body?: any;
-  query?: any;
-  params?: any;
+  body?: unknown;
+  query?: unknown;
+  params?: unknown;
   cookies?: Record<string, string>;
-  user?: any;
+  user?: unknown;
   ip?: string;
   sessionID?: string;
-  files?: any[];
+  files?: unknown[];
 } = {}): Partial<Request> => ({
   method: options.method || 'GET',
   url: options.url || '/api/courses',
@@ -615,7 +620,7 @@ describe('Security Middleware', () => {
           keyGenerator: (req: Request) => req.user?.id || req.ip
         }
       };
-      (envConfig as any) = { security: userBasedConfig };
+      jest.mocked(envConfig).security = userBasedConfig;
       
       mockCacheService.get.mockResolvedValue('75');
       
@@ -810,7 +815,7 @@ describe('Security Middleware', () => {
           mode: 'block' as const
         }
       };
-      (envConfig as any) = { security: blockConfig };
+      jest.mocked(envConfig).security = ipBasedConfig;
       
       const req = createMockRequest({
         method: 'POST',
@@ -880,7 +885,7 @@ describe('Security Middleware', () => {
           whitelist: ['192.168.1.1', '10.0.0.1']
         }
       };
-      (envConfig as any) = { security: whitelistConfig };
+      jest.mocked(envConfig).security = endpointBasedConfig;
       
       const req = createMockRequest({
         ip: '192.168.1.1'
@@ -1122,7 +1127,7 @@ describe('Security Middleware', () => {
 
     it('应该处理安全配置错误', async () => {
       // 设置无效配置
-      (envConfig as any) = { security: null };
+      jest.mocked(envConfig).security = null;
       
       const req = createMockRequest() as Request;
       const res = createMockResponse() as Response;

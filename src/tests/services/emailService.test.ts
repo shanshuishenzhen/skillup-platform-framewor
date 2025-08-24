@@ -239,17 +239,17 @@ const mockCrypto = {
 };
 
 // 设置 Mock
-(logger as any) = mockLogger;
-(cacheService as any) = mockCacheService;
-(analyticsService as any) = mockAnalyticsService;
-(auditService as any) = mockAuditService;
-(supabaseClient as any) = mockSupabaseClient;
-(envConfig as any) = mockEnvConfig;
-(nodemailer as any) = mockNodemailer;
-(handlebars as any) = mockHandlebars;
-(fs as any) = mockFs;
-(path as any) = mockPath;
-(crypto as any) = mockCrypto;
+(logger as unknown) = mockLogger;
+(cacheService as unknown) = mockCacheService;
+(analyticsService as unknown) = mockAnalyticsService;
+(auditService as unknown) = mockAuditService;
+(supabaseClient as unknown) = mockSupabaseClient;
+(envConfig as unknown) = mockEnvConfig;
+(nodemailer as unknown) = mockNodemailer;
+(handlebars as unknown) = mockHandlebars;
+(fs as unknown) = mockFs;
+(path as unknown) = mockPath;
+(crypto as unknown) = mockCrypto;
 
 // 测试数据
 const testEmailMessage: EmailMessage = {
@@ -1482,7 +1482,7 @@ describe('Email Service', () => {
     });
 
     it('应该处理循环引用的模板数据', async () => {
-      const circularData: any = { name: '张三' };
+      const circularData: Record<string, unknown> = { name: '张三' };
       circularData.self = circularData;
       
       await expect(

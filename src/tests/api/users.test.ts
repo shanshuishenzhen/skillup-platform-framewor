@@ -41,6 +41,11 @@ jest.mock('jsonwebtoken');
 jest.mock('bcryptjs');
 jest.mock('crypto');
 
+// Mock 类型定义
+interface MockedModule<T> {
+  [K in keyof T]: T[K] extends (...args: unknown[]) => unknown ? jest.MockedFunction<T[K]> : T[K];
+}
+
 // 类型定义
 interface User {
   id: string;
@@ -130,7 +135,7 @@ interface UserAchievement {
   achievementId: string;
   unlockedAt: Date;
   progress: number;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
 
 interface UserLearningStats {
@@ -154,7 +159,7 @@ interface UserActivity {
   type: 'course_start' | 'lesson_complete' | 'quiz_pass' | 'achievement_unlock' | 'certificate_earn';
   entityType: 'course' | 'lesson' | 'quiz' | 'achievement' | 'certificate';
   entityId: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   createdAt: Date;
 }
 
@@ -283,18 +288,18 @@ const mockCrypto = {
 };
 
 // 设置 Mock
-(supabaseClient as any) = mockSupabaseClient;
-(cacheService as any) = mockCacheService;
-(auditService as any) = mockAuditService;
-(analyticsService as any) = mockAnalyticsService;
-(learningProgressService as any) = mockLearningProgressService;
-(emailService as any) = mockEmailService;
-(smsService as any) = mockSmsService;
-(baiduFaceService as any) = mockBaiduFaceService;
-(envConfig as any) = mockEnvConfig;
-(jwt as any) = mockJwt;
-(bcrypt as any) = mockBcrypt;
-(crypto as any) = mockCrypto;
+jest.mocked(supabaseClient).mockReturnValue(mockSupabaseClient);
+jest.mocked(cacheService).mockReturnValue(mockCacheService);
+jest.mocked(auditService).mockReturnValue(mockAuditService);
+jest.mocked(analyticsService).mockReturnValue(mockAnalyticsService);
+jest.mocked(learningProgressService).mockReturnValue(mockLearningProgressService);
+jest.mocked(emailService).mockReturnValue(mockEmailService);
+jest.mocked(smsService).mockReturnValue(mockSmsService);
+jest.mocked(baiduFaceService).mockReturnValue(mockBaiduFaceService);
+jest.mocked(envConfig).mockReturnValue(mockEnvConfig);
+jest.mocked(jwt).mockReturnValue(mockJwt);
+jest.mocked(bcrypt).mockReturnValue(mockBcrypt);
+jest.mocked(crypto).mockReturnValue(mockCrypto);
 
 // 测试数据
 const testUser: User = {

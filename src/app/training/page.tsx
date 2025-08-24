@@ -12,7 +12,7 @@ export default function TrainingPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // 加载虚拟培训数据
+  // 加载培训数据
   const loadTraining = async () => {
     try {
       setLoading(true);
@@ -49,9 +49,9 @@ export default function TrainingPage() {
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <h1 className="text-4xl font-bold mb-4">虚拟技能培训</h1>
+            <h1 className="text-4xl font-bold mb-4">技能培训</h1>
             <p className="text-xl text-blue-100 max-w-3xl mx-auto">
-              AI生成的虚拟职业技能培训项目，展示多样化的培训内容
+              AI生成的职业技能培训项目，展示多样化的培训内容
             </p>
             <div className="mt-6">
               <button
@@ -69,7 +69,7 @@ export default function TrainingPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* 课程列表 */}
-        <h2 className="text-3xl font-bold text-center mb-12 text-gray-900">虚拟培训课程</h2>
+        <h2 className="text-3xl font-bold text-center mb-12 text-gray-900">培训课程</h2>
         
         {loading ? (
           <div className="flex justify-center items-center py-20">
@@ -162,35 +162,35 @@ export default function TrainingPage() {
         {/* 培训优势 */}
         <div className="bg-gradient-to-br from-gray-50 to-blue-50 py-16 mt-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 className="text-3xl font-bold text-center mb-12 text-gray-900">虚拟培训优势</h2>
+            <h2 className="text-3xl font-bold text-center mb-12 text-gray-900">培训优势</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
               <div className="text-center group">
                 <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
                   <span className="text-3xl">🎓</span>
                 </div>
                 <h3 className="font-bold mb-3 text-gray-900">AI智能认证</h3>
-                <p className="text-gray-600 text-sm leading-relaxed">虚拟智能化职业技能认证体系</p>
+                <p className="text-gray-600 text-sm leading-relaxed">智能化职业技能认证体系</p>
               </div>
               <div className="text-center group">
                 <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
                   <span className="text-3xl">🤖</span>
                 </div>
-                <h3 className="font-bold mb-3 text-gray-900">虚拟导师</h3>
-                <p className="text-gray-600 text-sm leading-relaxed">AI生成的专业虚拟导师团队</p>
+                <h3 className="font-bold mb-3 text-gray-900">专业导师</h3>
+                <p className="text-gray-600 text-sm leading-relaxed">AI生成的专业导师团队</p>
               </div>
               <div className="text-center group">
                 <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
                   <span className="text-3xl">💡</span>
                 </div>
                 <h3 className="font-bold mb-3 text-gray-900">智能推荐</h3>
-                <p className="text-gray-600 text-sm leading-relaxed">个性化虚拟学习路径规划</p>
+                <p className="text-gray-600 text-sm leading-relaxed">个性化学习路径规划</p>
               </div>
               <div className="text-center group">
                 <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
                   <span className="text-3xl">🚀</span>
                 </div>
-                <h3 className="font-bold mb-3 text-gray-900">虚拟实战</h3>
-                <p className="text-gray-600 text-sm leading-relaxed">模拟真实项目的虚拟实践环境</p>
+                <h3 className="font-bold mb-3 text-gray-900">实战演练</h3>
+                <p className="text-gray-600 text-sm leading-relaxed">模拟真实项目的实践环境</p>
               </div>
             </div>
           </div>
@@ -199,16 +199,16 @@ export default function TrainingPage() {
         {/* 联系方式 */}
         <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 text-white py-16">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 className="text-3xl font-bold mb-8">开启虚拟学习之旅</h2>
+            <h2 className="text-3xl font-bold mb-8">开启学习之旅</h2>
             <p className="text-blue-100 mb-8 max-w-2xl mx-auto text-lg leading-relaxed">
-              体验AI生成的虚拟培训内容，探索未来教育的无限可能
+              体验AI生成的培训内容，探索未来教育的无限可能
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button className="bg-white text-blue-600 px-8 py-4 rounded-xl font-bold hover:bg-gray-100 transition-all duration-200 transform hover:scale-105 shadow-lg">
-                体验虚拟咨询
+                体验咨询
               </button>
               <button className="border-2 border-white text-white px-8 py-4 rounded-xl font-bold hover:bg-white hover:text-blue-600 transition-all duration-200 transform hover:scale-105">
-                探索更多虚拟课程
+                探索更多课程
               </button>
             </div>
           </div>

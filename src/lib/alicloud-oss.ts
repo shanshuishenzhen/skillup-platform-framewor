@@ -165,13 +165,23 @@ class AliCloudOSS {
   }
 
   /**
+   * 文件信息类型
+   */
+  type FileInfo = {
+    size: string
+    contentType: string
+    lastModified: string
+    etag: string
+  }
+
+  /**
    * 获取文件信息
    * @param {string} key - 文件键名
-   * @returns {Promise<any>} 文件信息
+   * @returns {Promise<FileInfo>} 文件信息
    * @example
    * const fileInfo = await ossClient.getFileInfo('images/image.jpg')
    */
-  async getFileInfo(key: string): Promise<any> {
+  async getFileInfo(key: string): Promise<FileInfo> {
     try {
       const result = await this.client.head(key)
       return {

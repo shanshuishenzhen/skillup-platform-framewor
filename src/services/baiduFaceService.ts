@@ -5,7 +5,7 @@
  * 提供人脸检测、比对、注册、搜索等功能
  */
 
-import { envConfig } from '../utils/envConfig';
+import { getEnvConfig } from '../utils/envConfig';
 import {
   ErrorType,
   ErrorSeverity,
@@ -234,9 +234,9 @@ class BaiduFaceService {
   private readonly authUrl = 'https://aip.baidubce.com/oauth/2.0/token';
 
   constructor() {
-    const config = envConfig.getBaiduAI();
-    this.apiKey = config.apiKey;
-    this.secretKey = config.secretKey;
+    const envConfig = getEnvConfig();
+    this.apiKey = envConfig.baidu.apiKey;
+    this.secretKey = envConfig.baidu.secretKey;
 
     if (!this.apiKey || !this.secretKey) {
       throw createError(

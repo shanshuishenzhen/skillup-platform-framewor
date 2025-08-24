@@ -40,12 +40,12 @@ export default function CommitteesPage() {
           <div className="flex items-center space-x-4 mb-6">
             <Link href="/" className="text-blue-600 hover:underline">首页</Link>
             <span>/</span>
-            <span className="text-gray-600">虚拟专业委员会</span>
+            <span className="text-gray-600">专业委员会</span>
           </div>
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold mb-4">虚拟专业委员会</h1>
-              <p className="text-gray-600">AI生成的虚拟专业委员会信息，展示多样化的组织架构</p>
+              <h1 className="text-3xl font-bold mb-4">专业委员会</h1>
+              <p className="text-gray-600">AI生成的专业委员会信息，展示多样化的组织架构</p>
             </div>
             <button
               onClick={refreshCommittees}
@@ -62,10 +62,10 @@ export default function CommitteesPage() {
       {/* 委员会介绍 */}
       <div className="bg-blue-600 text-white py-12">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-2xl font-bold mb-4">虚拟委员会介绍</h2>
+          <h2 className="text-2xl font-bold mb-4">委员会介绍</h2>
           <p className="text-blue-100 max-w-3xl mx-auto">
-            本页面展示AI生成的虚拟专业委员会信息，涵盖多个专业领域的组织架构。
-            这些虚拟委员会数据用于演示不同类型的专业组织形式，展示多样化的委员会结构和活动内容。
+            本页面展示AI生成的专业委员会信息，涵盖多个专业领域的组织架构。
+            这些委员会数据用于演示不同类型的专业组织形式，展示多样化的委员会结构和活动内容。
           </p>
         </div>
       </div>
@@ -75,7 +75,7 @@ export default function CommitteesPage() {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-16">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-            <p className="text-gray-600">正在加载虚拟委员会数据...</p>
+            <p className="text-gray-600">正在加载委员会数据...</p>
           </div>
         ) : committees.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16">
@@ -153,9 +153,9 @@ export default function CommitteesPage() {
           </div>
         )}
 
-        {/* 虚拟委员会特色 */}
+        {/* 委员会特色 */}
         <div className="mt-16 bg-white rounded-lg p-8 shadow-sm">
-          <h2 className="text-2xl font-bold mb-8 text-center">虚拟委员会特色</h2>
+          <h2 className="text-2xl font-bold mb-8 text-center">委员会特色</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="text-center">
               <div className="text-4xl mb-4">🤖</div>
@@ -180,14 +180,14 @@ export default function CommitteesPage() {
           </div>
         </div>
 
-        {/* 虚拟数据说明 */}
+        {/* 数据说明 */}
         <div className="mt-12 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg p-8 text-center">
-          <h2 className="text-2xl font-bold mb-4">虚拟数据说明</h2>
-          <p className="mb-6">本页面展示的所有委员会信息均为AI生成的虚拟数据</p>
+          <h2 className="text-2xl font-bold mb-4">数据说明</h2>
+          <p className="mb-6">本页面展示的所有委员会信息均为AI生成的数据</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <div>
               <div className="text-lg font-semibold mb-2">数据来源</div>
-              <p className="text-blue-100 text-sm">AI智能生成的虚拟委员会信息</p>
+              <p className="text-blue-100 text-sm">AI智能生成的委员会信息</p>
             </div>
             <div>
               <div className="text-lg font-semibold mb-2">更新频率</div>
@@ -202,7 +202,7 @@ export default function CommitteesPage() {
             onClick={loadCommittees}
             className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors"
           >
-            刷新虚拟数据
+            刷新数据
           </button>
         </div>
       </div>

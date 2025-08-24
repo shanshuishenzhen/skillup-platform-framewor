@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login, isLoggedIn } = useAuth();
+  const { login, adminLogin, isLoggedIn } = useAuth();
   const [formData, setFormData] = useState({
     phone: '',
     password: '',
@@ -98,13 +98,28 @@ export default function LoginPage() {
     setError('');
 
     try {
+      // 检测是否为管理员登录（特定手机号）
+      const isAdminLogin = formData.phone === '13823738278';
+      
       // 根据登录类型构建请求体
       const requestBody = loginType === 'password' 
         ? { phone: formData.phone, password: formData.password }
         : { phone: formData.phone, verificationCode: formData.smsCode };
 
+      // 根据用户类型选择API端点
+      const apiEndpoint = isAdminLogin && loginType === 'password' 
+        ? '/api/admin/auth/login' 
+        : '/api/auth/login';
+      
+      // 管理员只支持密码登录
+      if (isAdminLogin && loginType === 'sms') {
+        setError('管理员账户仅支持密码登录');
+        setLoading(false);
+        return;
+      }
+
       // 调用API接口进行登录
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -114,25 +129,31 @@ export default function LoginPage() {
 
       const result = await response.json();
       
-      if (result.success && result.data) {
-        // 使用useAuth hook进行登录
-        login(result.data.user, result.data.token);
-        
+      if (result.success && result.user && result.token) {
         toast.success('登录成功！');
         
-        // 根据用户类型和人脸验证状态跳转
-        const returnUrl = searchParams.get('returnUrl');
-        if (result.data.user.userType === 'premium' && !result.data.user.faceVerified) {
-          const faceVerifyUrl = returnUrl 
-            ? `/face-verification?returnUrl=${encodeURIComponent(returnUrl)}`
-            : '/face-verification';
-          router.push(faceVerifyUrl);
+        // 登录成功
+        if (isAdminLogin) {
+          // 使用管理员登录函数
+          await adminLogin(result.user, result.token);
+          router.push('/admin');
         } else {
-          router.push(returnUrl || '/');
+          // 使用普通用户登录函数
+          await login(result.user, result.token);
+          // 根据用户类型和人脸验证状态跳转
+          const returnUrl = searchParams.get('returnUrl');
+          if (result.user.userType === 'premium' && !result.user.faceVerified) {
+            const faceVerifyUrl = returnUrl 
+              ? `/face-verification?returnUrl=${encodeURIComponent(returnUrl)}`
+              : '/face-verification';
+            router.push(faceVerifyUrl);
+          } else {
+            router.push(returnUrl || '/');
+          }
         }
       } else {
-        setError(result.error || '登录失败');
-        toast.error(result.error || '登录失败');
+        setError(result.error || result.message || '登录失败');
+        toast.error(result.error || result.message || '登录失败');
       }
     } catch (error) {
       console.error('登录错误:', error);

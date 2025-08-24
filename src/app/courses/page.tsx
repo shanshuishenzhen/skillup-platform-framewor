@@ -36,7 +36,7 @@ export default function CoursesPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // 加载虚拟课程数据
+  // 加载课程数据
   const loadCourses = async () => {
     try {
       setLoading(true);
@@ -44,7 +44,7 @@ export default function CoursesPage() {
       setAllCourses(virtualCourses);
       setCourses(virtualCourses);
     } catch (error) {
-      console.error('加载课程数据失败:', error);
+      console.error('生成课程数据失败:', error);
     } finally {
       setLoading(false);
     }
@@ -109,12 +109,12 @@ export default function CoursesPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <div className="flex items-center justify-center gap-4 mb-4">
-              <h1 className="text-4xl font-bold">智慧学习平台</h1>
+              <h1 className="text-4xl font-bold">课程中心</h1>
               <button
                 onClick={refreshCourses}
                 disabled={refreshing}
                 className="bg-white/20 hover:bg-white/30 text-white p-2 rounded-lg transition-colors duration-200 disabled:opacity-50"
-                title="刷新课程数据"
+                title="刷新数据"
               >
                 <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
               </button>
@@ -196,7 +196,7 @@ export default function CoursesPage() {
         {loading && (
           <div className="text-center py-16">
             <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-            <p className="text-gray-600">正在加载课程数据...</p>
+            <p className="text-gray-600">正在生成课程数据...</p>
           </div>
         )}
 

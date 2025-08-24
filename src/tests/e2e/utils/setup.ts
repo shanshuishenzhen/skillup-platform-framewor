@@ -58,7 +58,7 @@ expect.extend({
     }
   },
 
-  toHaveValidTimestamp(received: any) {
+  toHaveValidTimestamp(received: string | number | Date) {
     const timestamp = new Date(received);
     const pass = !isNaN(timestamp.getTime());
     

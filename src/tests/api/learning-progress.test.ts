@@ -63,7 +63,21 @@ interface TestLesson {
   duration: number; // 分钟
   order: number;
   type: 'video' | 'text' | 'quiz' | 'assignment';
-  content: any;
+  content: {
+    videoUrl?: string;
+    text?: string;
+    questions?: Array<{
+      id: string;
+      question: string;
+      options: string[];
+      correctAnswer: number;
+    }>;
+    assignment?: {
+      instructions: string;
+      submissionFormat: string;
+      maxScore: number;
+    };
+  };
   isRequired: boolean;
 }
 
@@ -223,14 +237,14 @@ const mockLogger = {
 };
 
 // 设置 Mock
-(supabase as any) = mockSupabase;
-(jwtService as any) = mockJwtService;
-(cacheService as any) = mockCacheService;
-(auditService as any) = mockAuditService;
-(analyticsService as any) = mockAnalyticsService;
-(aiService as any) = mockAiService;
-(notificationService as any) = mockNotificationService;
-(logger as any) = mockLogger;
+(supabase as jest.Mocked<typeof supabase>) = mockSupabase;
+(jwtService as jest.Mocked<typeof jwtService>) = mockJwtService;
+(cacheService as jest.Mocked<typeof cacheService>) = mockCacheService;
+(auditService as jest.Mocked<typeof auditService>) = mockAuditService;
+(analyticsService as jest.Mocked<typeof analyticsService>) = mockAnalyticsService;
+(aiService as jest.Mocked<typeof aiService>) = mockAiService;
+(notificationService as jest.Mocked<typeof notificationService>) = mockNotificationService;
+(logger as jest.Mocked<typeof logger>) = mockLogger;
 
 // 测试数据
 const testUser: TestUser = {
@@ -1213,7 +1227,9 @@ describe('Learning Progress API', () => {
       expect(mockSupabase.from).toHaveBeenCalledWith('learning_progress');
       expect(mockLogger.warn).toHaveBeenCalledWith(
         'Cache service error, falling back to database',
-        expect.any(Object)
+        expect.objectContaining({
+          error: expect.any(String)
+        })
       );
     });
   });
@@ -1283,7 +1299,10 @@ describe('Learning Progress API', () => {
       
       expect(mockCacheService.set).toHaveBeenCalledWith(
         `progress:${testUser.id}:${testCourse.id}`,
-        expect.any(Object),
+        expect.objectContaining({
+          id: expect.any(String),
+          progress: expect.any(Number)
+        }),
         1800 // 30分钟缓存
       );
     });

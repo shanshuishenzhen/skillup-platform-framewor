@@ -16,6 +16,27 @@
 
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { testUtils } from '../setup';
+import { envConfig } from '@/utils/envConfig';
+import { errorHandler } from '@/utils/errorHandler';
+import { monitoringService } from '@/services/monitoringService';
+import { userService } from '@/services/userService';
+import { cloudStorageService } from '@/services/cloudStorageService';
+import { createClient } from '@supabase/supabase-js';
+import * as firebaseAdmin from 'firebase-admin';
+import * as webPush from 'web-push';
+import * as azureNotificationHubs from '@azure/notification-hubs';
+import * as awsSdk from 'aws-sdk';
+import * as handlebars from 'handlebars';
+import * as redis from 'redis';
+import * as bull from 'bull';
+import * as lodash from 'lodash';
+import * as cron from 'cron';
+import * as nodeSchedule from 'node-schedule';
+import * as crypto from 'node:crypto';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import * as uuid from 'uuid';
+import * as moment from 'moment';
 
 // 模拟依赖
 jest.mock('@/utils/envConfig');
@@ -287,31 +308,31 @@ describe('推送通知服务模块', () => {
     jest.clearAllMocks();
     
     // 设置模拟返回值
-    require('@/utils/envConfig').envConfig = mockEnvConfig;
-    require('@/utils/errorHandler').errorHandler = mockErrorHandler;
-    require('@/services/monitoringService').monitoringService = mockMonitoringService;
-    require('@/services/userService').userService = mockUserService;
-    require('@/services/cloudStorageService').cloudStorageService = mockCloudStorageService;
+    (jest.mocked(envConfig) as jest.MockedFunction<typeof envConfig>).mockReturnValue(mockEnvConfig);
+    (jest.mocked(errorHandler) as jest.MockedFunction<typeof errorHandler>).mockReturnValue(mockErrorHandler);
+    (jest.mocked(monitoringService) as jest.MockedFunction<typeof monitoringService>).mockReturnValue(mockMonitoringService);
+    (jest.mocked(userService) as jest.MockedFunction<typeof userService>).mockReturnValue(mockUserService);
+    (jest.mocked(cloudStorageService) as jest.MockedFunction<typeof cloudStorageService>).mockReturnValue(mockCloudStorageService);
     
     // 设置Supabase模拟
-    require('@supabase/supabase-js').createClient = jest.fn(() => mockSupabase);
+    jest.mocked(createClient).mockReturnValue(mockSupabase);
     
     // 设置其他依赖模拟
-    require('firebase-admin').default = mockFirebaseAdmin;
-    require('web-push').default = mockWebPush;
-    require('@azure/notification-hubs').default = mockAzureNotificationHubs;
-    require('aws-sdk').SNS = jest.fn(() => mockAWSSNS);
-    require('handlebars').default = mockHandlebars;
-    require('redis').createClient = jest.fn(() => mockRedis);
-    require('bull').default = jest.fn(() => mockBullQueue);
-    require('lodash').default = mockLodash;
-    require('cron').default = mockCron;
-    require('node-schedule').default = mockNodeSchedule;
-    require('node:crypto').default = mockCrypto;
-    require('node:fs/promises').default = mockFs;
-    require('node:path').default = mockPath;
-    require('uuid').default = mockUuid;
-    require('moment').default = mockMoment;
+    (jest.mocked(firebaseAdmin) as jest.MockedFunction<typeof firebaseAdmin>).mockReturnValue(mockFirebaseAdmin);
+    (jest.mocked(webPush) as jest.MockedFunction<typeof webPush>).mockReturnValue(mockWebPush);
+    (jest.mocked(azureNotificationHubs) as jest.MockedFunction<typeof azureNotificationHubs>).mockReturnValue(mockAzureNotificationHubs);
+    (jest.mocked(awsSdk.SNS) as jest.MockedFunction<typeof awsSdk.SNS>).mockImplementation(() => mockAWSSNS);
+    (jest.mocked(handlebars) as jest.MockedFunction<typeof handlebars>).mockReturnValue(mockHandlebars);
+    (jest.mocked(redis.createClient) as jest.MockedFunction<typeof redis.createClient>).mockReturnValue(mockRedis);
+    (jest.mocked(bull) as jest.MockedFunction<typeof bull>).mockReturnValue(mockBullQueue);
+    (jest.mocked(lodash) as jest.MockedFunction<typeof lodash>).mockReturnValue(mockLodash);
+    (jest.mocked(cron) as jest.MockedFunction<typeof cron>).mockReturnValue(mockCron);
+    (jest.mocked(nodeSchedule) as jest.MockedFunction<typeof nodeSchedule>).mockReturnValue(mockNodeSchedule);
+    (jest.mocked(crypto) as jest.MockedFunction<typeof crypto>).mockReturnValue(mockCrypto);
+    (jest.mocked(fs) as jest.MockedFunction<typeof fs>).mockReturnValue(mockFs);
+    (jest.mocked(path) as jest.MockedFunction<typeof path>).mockReturnValue(mockPath);
+    (jest.mocked(uuid) as jest.MockedFunction<typeof uuid>).mockReturnValue(mockUuid);
+    (jest.mocked(moment) as jest.MockedFunction<typeof moment>).mockReturnValue(mockMoment);
     
     // 创建推送通知服务实例
     pushService = new PushNotificationService({

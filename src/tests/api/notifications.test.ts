@@ -196,15 +196,18 @@ const mockJwt = {
   sign: jest.fn()
 };
 
+// 模块类型定义
+type MockedModule<T> = T & { [K in keyof T]: jest.MockedFunction<T[K]> };
+
 // 设置 Mock
-(supabaseClient as any) = mockSupabaseClient;
-(cacheService as any) = mockCacheService;
-(auditService as any) = mockAuditService;
-(analyticsService as any) = mockAnalyticsService;
-(emailService as any) = mockEmailService;
-(smsService as any) = mockSmsService;
-(envConfig as any) = mockEnvConfig;
-(jwt as any) = mockJwt;
+jest.mocked(supabaseClient).mockReturnValue(mockSupabaseClient);
+jest.mocked(cacheService).mockReturnValue(mockCacheService);
+jest.mocked(auditService).mockReturnValue(mockAuditService);
+jest.mocked(analyticsService).mockReturnValue(mockAnalyticsService);
+jest.mocked(emailService).mockReturnValue(mockEmailService);
+jest.mocked(smsService).mockReturnValue(mockSmsService);
+jest.mocked(envConfig).mockReturnValue(mockEnvConfig);
+jest.mocked(jwt).mockReturnValue(mockJwt);
 
 // 测试数据
 const testNotification: Notification = {
@@ -872,4 +875,30 @@ describe('Notifications API', () => {
         type: 'achievement',
         channel: 'push',
         subject: '恭喜解锁新成就：{{achievementName}}',
-        content: '您已成功解锁
+        content: '您已成功解锁新成就：{{achievementName}}！继续努力，解锁更多成就吧！',
+        variables: ['achievementName']
+      };
+      
+      mockSupabaseClient.insert.mockResolvedValue({
+        data: [{ id: 'template-456', ...templateData }],
+        error: null
+      });
+      
+      const response = await request(app)
+        .post('/api/notifications/templates')
+        .set('Authorization', 'Bearer admin-token-123')
+        .send(templateData)
+        .expect(201);
+      
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          success: true,
+          data: expect.objectContaining({
+            id: 'template-456',
+            name: '成就解锁通知'
+          })
+        })
+      );
+    });
+  });
+});

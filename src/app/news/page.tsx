@@ -14,7 +14,7 @@ export default function NewsPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // 加载虚拟新闻数据
+  // 加载新闻数据
   const loadNews = async () => {
     try {
       setLoading(true);
@@ -66,8 +66,8 @@ export default function NewsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">虚拟新闻资讯</h1>
-              <p className="mt-2 text-gray-600">AI生成的虚拟行业动态和资讯信息</p>
+              <h1 className="text-3xl font-bold text-gray-900">新闻资讯</h1>
+        <p className="mt-2 text-gray-600">AI生成的行业动态和资讯信息</p>
             </div>
             <button
               onClick={refreshNews}
@@ -161,7 +161,6 @@ export default function NewsPage() {
             ))}
           </div>
         )}
-        </div>
 
         {/* 空状态 */}
         {!loading && filteredNews.length === 0 && (

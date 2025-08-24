@@ -13,6 +13,15 @@
 
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { testUtils } from '../setup';
+import { supabase } from '@/utils/supabase';
+import { errorHandler } from '@/utils/errorHandler';
+import { monitoringService } from '@/services/monitoringService';
+import { cloudStorageService } from '@/services/cloudStorageService';
+import { aiService } from '@/services/aiService';
+import fluentFfmpeg from 'fluent-ffmpeg';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import * as crypto from 'node:crypto';
 
 // 模拟依赖
 jest.mock('@/utils/supabase');
@@ -152,15 +161,15 @@ describe('视频服务模块', () => {
     jest.clearAllMocks();
     
     // 设置模拟返回值
-    require('@/utils/supabase').supabase = mockSupabase;
-    require('@/utils/errorHandler').errorHandler = mockErrorHandler;
-    require('@/services/monitoringService').monitoringService = mockMonitoringService;
-    require('@/services/cloudStorageService').cloudStorageService = mockCloudStorageService;
-    require('@/services/aiService').aiService = mockAiService;
-    require('fluent-ffmpeg').default = jest.fn(() => mockFfmpeg);
-    require('node:fs/promises').default = mockFs;
-    require('node:path').default = mockPath;
-    require('node:crypto').default = mockCrypto;
+    jest.mocked(supabase).mockReturnValue(mockSupabase);
+    jest.mocked(errorHandler).mockReturnValue(mockErrorHandler);
+    jest.mocked(monitoringService).mockReturnValue(mockMonitoringService);
+    jest.mocked(cloudStorageService).mockReturnValue(mockCloudStorageService);
+    jest.mocked(aiService).mockReturnValue(mockAiService);
+    jest.mocked(fluentFfmpeg).mockImplementation(() => mockFfmpeg);
+    jest.mocked(fs).mockReturnValue(mockFs);
+    jest.mocked(path).mockReturnValue(mockPath);
+    jest.mocked(crypto).mockReturnValue(mockCrypto);
     
     // 创建视频服务实例
     videoService = new VideoService();

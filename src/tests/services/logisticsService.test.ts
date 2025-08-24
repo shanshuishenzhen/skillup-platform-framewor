@@ -15,6 +15,7 @@
  */
 
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { createClient } from '@supabase/supabase-js';
 import { testUtils } from '../setup';
 
 // 模拟依赖
@@ -247,34 +248,60 @@ import {
 
 describe('物流服务模块', () => {
   let logisticsService: LogisticsService;
-  let mockRedisClient: any;
+  let mockRedisClient: {
+    get: jest.MockedFunction<any>;
+    set: jest.MockedFunction<any>;
+    del: jest.MockedFunction<any>;
+    exists: jest.MockedFunction<any>;
+    expire: jest.MockedFunction<any>;
+    incr: jest.MockedFunction<any>;
+    decr: jest.MockedFunction<any>;
+  };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     // 重置所有模拟
     jest.clearAllMocks();
     
     // 设置模拟返回值
-    require('@/utils/envConfig').envConfig = mockEnvConfig;
-    require('@/utils/errorHandler').errorHandler = mockErrorHandler;
-    require('@/services/monitoringService').monitoringService = mockMonitoringService;
-    require('@/services/userService').userService = mockUserService;
-    require('@/services/orderService').orderService = mockOrderService;
-    require('@/services/notificationService').notificationService = mockNotificationService;
-    require('@/services/smsService').smsService = mockSmsService;
-    require('@/services/emailService').emailService = mockEmailService;
-    require('@supabase/supabase-js').createClient = jest.fn(() => mockSupabase);
-    require('node:crypto').default = mockCrypto;
-    require('node:https').default = mockHttps;
-    require('node:querystring').default = mockQuerystring;
-    require('axios').default = mockAxios;
-    require('xml2js').default = mockXml2js;
-    require('moment').default = mockMoment;
-    require('decimal.js').Decimal = mockDecimal.Decimal;
-    require('uuid').v4 = mockUuid.v4;
+    const envConfigModule = await import('@/utils/envConfig');
+    envConfigModule.envConfig = mockEnvConfig;
+    const errorHandlerModule = await import('@/utils/errorHandler');
+    errorHandlerModule.errorHandler = mockErrorHandler;
+    const monitoringServiceModule = await import('@/services/monitoringService');
+    monitoringServiceModule.monitoringService = mockMonitoringService;
+    const userServiceModule = await import('@/services/userService');
+    userServiceModule.userService = mockUserService;
+    const orderServiceModule = await import('@/services/orderService');
+    orderServiceModule.orderService = mockOrderService;
+    const notificationServiceModule = await import('@/services/notificationService');
+    notificationServiceModule.notificationService = mockNotificationService;
+    const smsServiceModule = await import('@/services/smsService');
+    smsServiceModule.smsService = mockSmsService;
+    const emailServiceModule = await import('@/services/emailService');
+    emailServiceModule.emailService = mockEmailService;
+    const supabaseModule = await import('@supabase/supabase-js');
+    supabaseModule.createClient = jest.fn(() => mockSupabase);
+    const cryptoModule = await import('node:crypto');
+    cryptoModule.default = mockCrypto;
+    const httpsModule = await import('node:https');
+    httpsModule.default = mockHttps;
+    const querystringModule = await import('node:querystring');
+    querystringModule.default = mockQuerystring;
+    const axiosModule = await import('axios');
+    axiosModule.default = mockAxios;
+    const xml2jsModule = await import('xml2js');
+    xml2jsModule.default = mockXml2js;
+    const momentModule = await import('moment');
+    momentModule.default = mockMoment;
+    const decimalModule = await import('decimal.js');
+    decimalModule.Decimal = mockDecimal.Decimal;
+    const uuidModule = await import('uuid');
+    uuidModule.v4 = mockUuid.v4;
     
     // 设置Redis模拟
     mockRedisClient = mockRedis.createClient();
-    require('redis').createClient = mockRedis.createClient;
+    const redisModule = await import('redis');
+    redisModule.createClient = mockRedis.createClient;
     
     // 创建物流服务实例
     logisticsService = new LogisticsService({
@@ -421,7 +448,7 @@ describe('物流服务模块', () => {
     });
 
     it('应该初始化数据库和缓存连接', () => {
-      expect(require('@supabase/supabase-js').createClient).toHaveBeenCalled();
+      expect(jest.mocked(createClient)).toHaveBeenCalled();
       expect(mockRedis.createClient).toHaveBeenCalled();
     });
   });

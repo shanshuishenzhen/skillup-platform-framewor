@@ -95,7 +95,7 @@ interface ComplianceRule {
   conditions: {
     field: string;
     operator: 'eq' | 'ne' | 'gt' | 'lt' | 'contains' | 'regex';
-    value: any;
+    value: string | number | boolean;
   }[];
   actions: string[];
   enabled: boolean;
@@ -183,12 +183,12 @@ const mockEnvConfig = {
 };
 
 // 设置 Mock
-(logger as any) = mockLogger;
-(supabaseClient as any) = mockSupabaseClient;
-(cacheService as any) = mockCacheService;
-(analyticsService as any) = mockAnalyticsService;
-(notificationService as any) = mockNotificationService;
-(envConfig as any) = mockEnvConfig;
+(logger as unknown) = mockLogger;
+(supabaseClient as unknown) = mockSupabaseClient;
+(cacheService as unknown) = mockCacheService;
+(analyticsService as unknown) = mockAnalyticsService;
+(notificationService as unknown) = mockNotificationService;
+(envConfig as unknown) = mockEnvConfig;
 
 // 测试数据
 const testAuditLog: AuditLog = {
@@ -970,7 +970,13 @@ describe('Audit Service', () => {
         userId: undefined // undefined值
       };
       
-      const result = await auditService.log(invalidLog as any);
+      interface InvalidLogData {
+        action: string;
+        resource: unknown;
+        userId: unknown;
+      }
+      
+      const result = await auditService.log(invalidLog as InvalidLogData);
       
       expect(result).toBe(false);
       expect(mockLogger.warn).toHaveBeenCalledWith(
@@ -1052,7 +1058,12 @@ describe('Audit Service', () => {
     });
 
     it('应该处理循环引用对象', async () => {
-      const circularObj: any = { name: 'test' };
+      interface CircularObject {
+        name: string;
+        self?: CircularObject;
+      }
+      
+      const circularObj: CircularObject = { name: 'test' };
       circularObj.self = circularObj;
       
       const result = await auditService.log({

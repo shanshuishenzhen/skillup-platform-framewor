@@ -77,7 +77,7 @@ interface Permission {
 interface PermissionCondition {
   field: string;
   operator: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'nin' | 'contains' | 'startsWith' | 'endsWith';
-  value: any;
+  value: string | number | boolean | string[] | number[];
   logicalOperator?: 'and' | 'or';
 }
 
@@ -106,7 +106,7 @@ interface AccessContext {
   resource: string;
   action: string;
   resourceId?: string;
-  resourceData?: any;
+  resourceData?: Record<string, unknown>;
   organizationId?: string;
   tenantId?: string;
   ipAddress?: string;
@@ -198,12 +198,73 @@ const mockEnvConfig = {
 };
 
 // 设置 Mock
-(supabaseClient as any) = mockSupabaseClient;
-(cacheService as any) = mockCacheService;
-(auditService as any) = mockAuditService;
-(analyticsService as any) = mockAnalyticsService;
-(logger as any) = mockLogger;
-(envConfig as any) = mockEnvConfig;
+interface MockSupabaseClient {
+  from: jest.MockedFunction<(...args: unknown[]) => unknown>;
+  rpc: jest.MockedFunction<(...args: unknown[]) => unknown>;
+}
+interface MockCacheService {
+  get: jest.MockedFunction<(key: string) => Promise<unknown>>;
+  set: jest.MockedFunction<(key: string, value: unknown, ttl?: number) => Promise<boolean>>;
+  del: jest.MockedFunction<(key: string) => Promise<boolean>>;
+  exists: jest.MockedFunction<(key: string) => Promise<boolean>>;
+  hget: jest.MockedFunction<(key: string, field: string) => Promise<unknown>>;
+  hset: jest.MockedFunction<(key: string, field: string, value: unknown) => Promise<boolean>>;
+  hdel: jest.MockedFunction<(key: string, field: string) => Promise<boolean>>;
+  expire: jest.MockedFunction<(key: string, ttl: number) => Promise<boolean>>;
+  incr: jest.MockedFunction<(key: string) => Promise<number>>;
+}
+interface MockAuditService {
+  log: jest.MockedFunction<(event: string, data: Record<string, unknown>) => Promise<void>>;
+  logAccessAttempt: jest.MockedFunction<(userId: string, resource: string, action: string, result: boolean) => Promise<void>>;
+  logPermissionCheck: jest.MockedFunction<(userId: string, permission: string, result: boolean) => Promise<void>>;
+}
+interface MockAnalyticsService {
+  track: jest.MockedFunction<(event: string, properties: Record<string, unknown>) => Promise<void>>;
+  increment: jest.MockedFunction<(metric: string, value?: number) => Promise<void>>;
+  histogram: jest.MockedFunction<(metric: string, value: number) => Promise<void>>;
+  gauge: jest.MockedFunction<(metric: string, value: number) => Promise<void>>;
+}
+interface MockLogger {
+  info: jest.MockedFunction<(message: string, meta?: Record<string, unknown>) => void>;
+  warn: jest.MockedFunction<(message: string, meta?: Record<string, unknown>) => void>;
+  error: jest.MockedFunction<(message: string, meta?: Record<string, unknown>) => void>;
+  debug: jest.MockedFunction<(message: string, meta?: Record<string, unknown>) => void>;
+}
+interface MockEnvConfig {
+  rbac: {
+    enabled: boolean;
+    cacheEnabled: boolean;
+    cacheTTL: number;
+    permissionCacheTTL: number;
+    auditEnabled: boolean;
+    strictMode: boolean;
+    defaultDenyAll: boolean;
+    superAdminRole: string;
+    systemRoles: string[];
+    multiTenant: boolean;
+    inheritanceEnabled: boolean;
+    conditionsEnabled: boolean;
+  };
+  security: {
+    sessionTimeout: number;
+    maxLoginAttempts: number;
+    lockoutDuration: number;
+  };
+}
+
+const mockSupabaseClientTyped = supabaseClient as MockSupabaseClient;
+const mockCacheServiceTyped = cacheService as MockCacheService;
+const mockAuditServiceTyped = auditService as MockAuditService;
+const mockAnalyticsServiceTyped = analyticsService as MockAnalyticsService;
+const mockLoggerTyped = logger as MockLogger;
+const mockEnvConfigTyped = envConfig as MockEnvConfig;
+
+Object.assign(mockSupabaseClientTyped, mockSupabaseClient);
+Object.assign(mockCacheServiceTyped, mockCacheService);
+Object.assign(mockAuditServiceTyped, mockAuditService);
+Object.assign(mockAnalyticsServiceTyped, mockAnalyticsService);
+Object.assign(mockLoggerTyped, mockLogger);
+Object.assign(mockEnvConfigTyped, mockEnvConfig);
 
 // 测试数据
 const adminRole: Role = {

@@ -1482,7 +1482,13 @@ describe('监控服务测试', () => {
         type: 'invalid_type' // 无效类型
       };
       
-      const result = await recordMetric(invalidMetric as any);
+      interface InvalidMetricData {
+        name: string;
+        value: string;
+        type: string;
+      }
+      
+      const result = await recordMetric(invalidMetric as InvalidMetricData);
       
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
@@ -1494,7 +1500,12 @@ describe('监控服务测试', () => {
         threshold: 'invalid' // 无效阈值
       };
       
-      const result = await createAlert(invalidAlert as any);
+      interface InvalidAlertData {
+        name: string;
+        threshold: string;
+      }
+      
+      const result = await createAlert(invalidAlert as InvalidAlertData);
       
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
@@ -1506,7 +1517,12 @@ describe('监控服务测试', () => {
         widgets: 'invalid' // 无效组件列表
       };
       
-      const result = await createDashboard(invalidDashboard as any);
+      interface InvalidDashboardData {
+        name: string;
+        widgets: string;
+      }
+      
+      const result = await createDashboard(invalidDashboard as InvalidDashboardData);
       
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();

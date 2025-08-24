@@ -203,14 +203,14 @@ const mockCrypto = {
 };
 
 // 设置 Mock
-(logger as any) = mockLogger;
-(cacheService as any) = mockCacheService;
-(analyticsService as any) = mockAnalyticsService;
-(auditService as any) = mockAuditService;
-(supabaseClient as any) = mockSupabaseClient;
-(envConfig as any) = mockEnvConfig;
-(axios as any) = mockAxios;
-(crypto as any) = mockCrypto;
+(logger as unknown) = mockLogger;
+(cacheService as unknown) = mockCacheService;
+(analyticsService as unknown) = mockAnalyticsService;
+(auditService as unknown) = mockAuditService;
+(supabaseClient as unknown) = mockSupabaseClient;
+(envConfig as unknown) = mockEnvConfig;
+(axios as unknown) = mockAxios;
+(crypto as unknown) = mockCrypto;
 
 // 测试数据
 const testSmsMessage: SmsMessage = {

@@ -5,6 +5,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { getEnvConfig } from './envConfig';
+import { Request } from 'express';
 
 /**
  * 数据库表类型定义
@@ -26,15 +27,15 @@ export interface Database {
           bio?: string;
           location?: string;
           website?: string;
-          social_links?: Record<string, any>;
-          preferences?: Record<string, any>;
+          social_links?: Record<string, string>;
+          preferences?: Record<string, unknown>;
           role: 'student' | 'instructor' | 'admin';
           status: 'active' | 'inactive' | 'suspended';
           email_verified: boolean;
           created_at: string;
           updated_at: string;
         };
-        Insert: {
+          Insert: {
           id?: string;
           auth_user_id: string;
           email: string;
@@ -47,8 +48,8 @@ export interface Database {
           bio?: string;
           location?: string;
           website?: string;
-          social_links?: Record<string, any>;
-          preferences?: Record<string, any>;
+          social_links?: Record<string, string>;
+          preferences?: Record<string, unknown>;
           role?: 'student' | 'instructor' | 'admin';
           status?: 'active' | 'inactive' | 'suspended';
           email_verified?: boolean;
@@ -68,8 +69,8 @@ export interface Database {
           bio?: string;
           location?: string;
           website?: string;
-          social_links?: Record<string, any>;
-          preferences?: Record<string, any>;
+          social_links?: Record<string, string>;
+          preferences?: Record<string, unknown>;
           role?: 'student' | 'instructor' | 'admin';
           status?: 'active' | 'inactive' | 'suspended';
           email_verified?: boolean;
@@ -82,7 +83,7 @@ export interface Database {
           id: string;
           title: string;
           description: string;
-          content?: Record<string, any>;
+          content?: Record<string, unknown>;
           difficulty: 'beginner' | 'intermediate' | 'advanced';
           duration: number;
           price: number;
@@ -103,7 +104,7 @@ export interface Database {
           id?: string;
           title: string;
           description: string;
-          content?: Record<string, any>;
+          content?: Record<string, unknown>;
           difficulty?: 'beginner' | 'intermediate' | 'advanced';
           duration: number;
           price: number;
@@ -124,7 +125,7 @@ export interface Database {
           id?: string;
           title?: string;
           description?: string;
-          content?: Record<string, any>;
+          content?: Record<string, unknown>;
           difficulty?: 'beginner' | 'intermediate' | 'advanced';
           duration?: number;
           price?: number;
@@ -200,6 +201,76 @@ export function createClient() {
 }
 
 /**
+ * 创建Supabase客户端（带请求上下文）
+ */
+export const createSupabaseClient = () => {
+  return createClient();
+};
+
+/**
+ * 创建Supabase管理员客户端
+ */
+export const createSupabaseAdmin = () => {
+  return createServerClient();
+};
+
+/**
+ * 创建Supabase服务客户端
+ */
+export const createSupabaseService = () => {
+  return createServerClient();
+};
+
+/**
+ * 检查管理员权限
+ */
+export const checkAdminPermission = async (req: Request) => {
+  const user = await getUserFromRequest(req);
+  if (!user) {
+    throw new Error('User not authenticated');
+  }
+  
+  const supabase = createServerClient();
+  const { data: userProfile, error } = await supabase
+    .from('users')
+    .select('role')
+    .eq('auth_user_id', user.id)
+    .single();
+  
+  if (error || userProfile?.role !== 'admin') {
+    throw new Error('Admin permission required');
+  }
+  
+  return true;
+};
+
+/**
+ * 从请求中获取用户信息
+ */
+export const getUserFromRequest = async (req: Request) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+  
+  const token = authHeader.substring(7);
+  const { valid, user } = await validateSession(token);
+  
+  return valid ? user : null;
+};
+
+/**
+ * 验证请求认证
+ */
+export const validateRequestAuth = async (req: Request) => {
+  const user = await getUserFromRequest(req);
+  if (!user) {
+    throw new Error('Authentication required');
+  }
+  return user;
+};
+
+/**
  * 获取当前用户信息
  */
 export async function getCurrentUser() {
@@ -256,12 +327,20 @@ export async function signOut() {
 /**
  * 默认导出
  */
-export default {
+const supabaseUtils = {
   createClient,
   createServerClient,
   createBrowserClient,
+  createSupabaseClient,
+  createSupabaseAdmin,
+  createSupabaseService,
   getCurrentUser,
   validateSession,
   refreshSession,
-  signOut
+  signOut,
+  checkAdminPermission,
+  getUserFromRequest,
+  validateRequestAuth
 };
+
+export default supabaseUtils;

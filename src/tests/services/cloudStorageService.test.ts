@@ -313,39 +313,79 @@ import {
 describe('云存储服务', () => {
   let cloudStorageService: CloudStorageService;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     // 重置所有模拟
     jest.clearAllMocks();
     
     // 设置模拟返回值
-    require('@/utils/envConfig').envConfig = mockEnvConfig;
-    require('@/utils/errorHandler').errorHandler = mockErrorHandler;
-    require('@/services/monitoringService').monitoringService = mockMonitoringService;
-    require('@/services/userService').userService = mockUserService;
+    const envConfigModule = await import('@/utils/envConfig');
+    envConfigModule.envConfig = mockEnvConfig;
+    
+    const errorHandlerModule = await import('@/utils/errorHandler');
+    errorHandlerModule.errorHandler = mockErrorHandler;
+    
+    const monitoringServiceModule = await import('@/services/monitoringService');
+    monitoringServiceModule.monitoringService = mockMonitoringService;
+    
+    const userServiceModule = await import('@/services/userService');
+    userServiceModule.userService = mockUserService;
     
     // 设置Supabase模拟
-    require('@supabase/supabase-js').createClient = jest.fn(() => mockSupabase);
+    const supabaseModule = await import('@supabase/supabase-js');
+    supabaseModule.createClient = jest.fn(() => mockSupabase);
     
     // 设置云存储提供商模拟
-    require('@alicloud/oss').default = jest.fn(() => mockAlicloudOss);
-    require('@aws-sdk/client-s3').S3Client = jest.fn(() => mockAwsS3);
-    require('cos-nodejs-sdk-v5').default = jest.fn(() => mockTencentCos);
+    const alicloudOssModule = await import('@alicloud/oss');
+    alicloudOssModule.default = jest.fn(() => mockAlicloudOss);
+    
+    const awsS3Module = await import('@aws-sdk/client-s3');
+    awsS3Module.S3Client = jest.fn(() => mockAwsS3);
+    
+    const tencentCosModule = await import('cos-nodejs-sdk-v5');
+    tencentCosModule.default = jest.fn(() => mockTencentCos);
     
     // 设置其他依赖模拟
-    require('node:crypto').default = mockCrypto;
-    require('uuid').default = mockUuid;
-    require('moment').default = mockMoment;
-    require('redis').createClient = jest.fn(() => mockRedis);
-    require('lodash').default = mockLodash;
-    require('sharp').default = mockSharp;
-    require('fluent-ffmpeg').default = mockFfmpeg;
-    require('archiver').default = mockArchiver;
-    require('unzipper').default = mockUnzipper;
-    require('mime-types').default = mockMimeTypes;
-    require('file-type').default = mockFileType;
-    require('node:fs/promises').default = mockFs;
-    require('node:path').default = mockPath;
-    require('node:stream').default = mockStream;
+    const cryptoModule = await import('node:crypto');
+    cryptoModule.default = mockCrypto;
+    
+    const uuidModule = await import('uuid');
+    uuidModule.default = mockUuid;
+    
+    const momentModule = await import('moment');
+    momentModule.default = mockMoment;
+    
+    const redisModule = await import('redis');
+    redisModule.createClient = jest.fn(() => mockRedis);
+    
+    const lodashModule = await import('lodash');
+    lodashModule.default = mockLodash;
+    
+    const sharpModule = await import('sharp');
+    sharpModule.default = mockSharp;
+    
+    const ffmpegModule = await import('fluent-ffmpeg');
+    ffmpegModule.default = mockFfmpeg;
+    
+    const archiverModule = await import('archiver');
+    archiverModule.default = mockArchiver;
+    
+    const unzipperModule = await import('unzipper');
+    unzipperModule.default = mockUnzipper;
+    
+    const mimeTypesModule = await import('mime-types');
+    mimeTypesModule.default = mockMimeTypes;
+    
+    const fileTypeModule = await import('file-type');
+    fileTypeModule.default = mockFileType;
+    
+    const fsModule = await import('node:fs/promises');
+    fsModule.default = mockFs;
+    
+    const pathModule = await import('node:path');
+    pathModule.default = mockPath;
+    
+    const streamModule = await import('node:stream');
+    streamModule.default = mockStream;
     
     // 创建云存储服务实例
     cloudStorageService = new CloudStorageService();
@@ -509,7 +549,8 @@ describe('云存储服务', () => {
     it('应该初始化阿里云OSS客户端', async () => {
       await cloudStorageService.initialize();
       
-      expect(require('@alicloud/oss').default).toHaveBeenCalledWith(
+      const alicloudOssModule = await import('@alicloud/oss');
+      expect(alicloudOssModule.default).toHaveBeenCalledWith(
         expect.objectContaining({
           accessKeyId: 'alicloud-access-key',
           accessKeySecret: 'alicloud-secret-key',
@@ -526,7 +567,8 @@ describe('云存储服务', () => {
       
       await cloudStorageService.initialize();
       
-      expect(require('@aws-sdk/client-s3').S3Client).toHaveBeenCalledWith(
+      const awsS3Module = await import('@aws-sdk/client-s3');
+      expect(awsS3Module.S3Client).toHaveBeenCalledWith(
         expect.objectContaining({
           region: 'us-east-1',
           credentials: {
@@ -544,7 +586,8 @@ describe('云存储服务', () => {
       
       await cloudStorageService.initialize();
       
-      expect(require('cos-nodejs-sdk-v5').default).toHaveBeenCalledWith(
+      const tencentCosModule = await import('cos-nodejs-sdk-v5');
+      expect(tencentCosModule.default).toHaveBeenCalledWith(
         expect.objectContaining({
           SecretId: 'tencent-secret-id',
           SecretKey: 'tencent-secret-key'
@@ -985,14 +1028,13 @@ describe('云存储服务', () => {
 
     it('应该优化图片文件', async () => {
       const imageBuffer = Buffer.from('test-image-content');
-      const options = {
+      
+      const result = await optimizeImage(imageBuffer, {
         quality: 80,
         maxWidth: 1920,
         maxHeight: 1080,
         format: 'webp'
-      };
-      
-      const result = await optimizeImage(imageBuffer, options);
+      });
       
       expect(result.success).toBe(true);
       expect(result.buffer).toEqual(Buffer.from('optimized-image'));
@@ -1026,13 +1068,12 @@ describe('云存储服务', () => {
     it('应该优化视频文件', async () => {
       const videoPath = '/tmp/input-video.mp4';
       const outputPath = '/tmp/output-video.mp4';
-      const options = {
+      
+      const result = await optimizeVideo(videoPath, outputPath, {
         maxBitrate: '2M',
         maxResolution: '1080p',
         format: 'mp4'
-      };
-      
-      const result = await optimizeVideo(videoPath, outputPath, options);
+      });
       
       expect(result.success).toBe(true);
       

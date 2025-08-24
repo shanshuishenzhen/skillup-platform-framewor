@@ -5,12 +5,12 @@ export default function AboutPage() {
     {
       year: "2015",
       title: "协会筹备成立",
-      description: "召开第一次会员大会，开始筹备深圳市商业美术设计促进会"
+      description: "鹏虹资讯和融略信息开始筹备技能提升平台项目"
     },
     {
       year: "2016",
       title: "正式成立",
-      description: "深圳市商业美术设计促进会正式成立，承办广东省工业设计师职业技能大赛"
+      description: "鹏虹资讯和融略信息联合开发的技能提升平台正式上线"
     },
     {
       year: "2017",
@@ -50,7 +50,7 @@ export default function AboutPage() {
     {
       year: "2024",
       title: "创新发展",
-      description: "持续创新发展，为深圳设计行业贡献力量"
+      description: "持续创新发展，为技能教育行业贡献力量"
     }
   ]
 
@@ -95,24 +95,29 @@ export default function AboutPage() {
           <div className="flex items-center space-x-4 mb-6">
             <Link href="/" className="text-blue-600 hover:underline">首页</Link>
             <span>/</span>
-            <span className="text-gray-600">关于协会</span>
+            <span className="text-gray-600">关于我们</span>
           </div>
-          <h1 className="text-3xl font-bold mb-4">关于协会</h1>
-          <p className="text-gray-600">了解深圳市商业美术设计促进会</p>
+          <h1 className="text-3xl font-bold mb-4">关于我们</h1>
+          <p className="text-gray-600">了解鹏虹资讯和融略信息联合开发</p>
         </div>
       </div>
 
       {/* 协会介绍 */}
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-16">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl font-bold mb-6">深圳市商业美术设计促进会</h2>
+          <div className="flex items-center justify-center mb-6">
+            <div className="bg-white text-blue-600 px-6 py-3 rounded-lg font-bold text-2xl mr-4 shadow-lg">
+              PH&RL
+            </div>
+            <h2 className="text-3xl font-bold">鹏虹资讯和融略信息联合开发</h2>
+          </div>
           <p className="text-xl mb-8 max-w-4xl mx-auto">
-            深圳市商业美术设计促进会，注册地深圳市龙岗区。是由深圳市从事商业美术设计行业相关的企事业单位自愿组成的地方性、行业性、非营利性的社会组织，
-            现有来自装饰设计、文化传播、广告设计、包装、珠宝、工业等设计行业及相关企业会员单位100多家。
+            鹏虹资讯和融略信息联合开发的技能提升平台，致力于为用户提供专业的技能培训和职业发展服务。
+            平台整合了优质的教育资源和先进的技术手段，为学习者打造个性化的学习体验。
           </p>
           <p className="text-lg text-blue-100 max-w-4xl mx-auto">
-            促进会立足深圳、辐射湾区，以&ldquo;融汇深圳设计、服务中国智造&rdquo;为理念，积极打造创意设计行业连接互动、分享交流、人才培养的平台，
-            赋能深圳设计企业、支撑行业人才培养，引领深圳设计行业高质量发展。
+            我们以&ldquo;技能成就未来、学习改变人生&rdquo;为理念，积极打造技能学习、职业发展、人才培养的综合平台，
+            赋能个人成长、支撑企业发展，引领技能教育行业创新发展。
           </p>
         </div>
       </div>

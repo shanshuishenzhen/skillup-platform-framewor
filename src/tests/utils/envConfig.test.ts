@@ -212,12 +212,12 @@ const mockCrypto = {
 };
 
 // 设置 Mock
-(logger as any) = mockLogger;
-(cacheService as any) = mockCacheService;
-(auditService as any) = mockAuditService;
-(fs as any) = mockFs;
-(path as any) = mockPath;
-(crypto as any) = mockCrypto;
+(logger as unknown) = mockLogger;
+(cacheService as unknown) = mockCacheService;
+(auditService as unknown) = mockAuditService;
+(fs as unknown) = mockFs;
+(path as unknown) = mockPath;
+(crypto as unknown) = mockCrypto;
 
 // 测试数据
 const validConfig: TestEnvConfig = {
@@ -410,7 +410,7 @@ describe('Environment Configuration', () => {
       
       expect(mockLogger.error).toHaveBeenCalledWith(
         'Failed to parse configuration file',
-        expect.any(Object)
+        expect.objectContaining({})
       );
     });
 
@@ -438,7 +438,7 @@ describe('Environment Configuration', () => {
     });
 
     it('应该检测无效配置', () => {
-      const result = validateConfig(invalidConfig as any);
+      const result = validateConfig(invalidConfig as unknown);
       
       expect(result.isValid).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
@@ -468,7 +468,7 @@ describe('Environment Configuration', () => {
         }
       };
       
-      const result = validateConfig(incompleteConfig as any);
+      const result = validateConfig(incompleteConfig as unknown);
       
       expect(result.isValid).toBe(false);
       expect(result.errors).toEqual(
@@ -499,7 +499,7 @@ describe('Environment Configuration', () => {
         }
       };
       
-      const result = validateConfig(wrongTypeConfig as any);
+      const result = validateConfig(wrongTypeConfig as unknown);
       
       expect(result.isValid).toBe(false);
       expect(result.errors).toEqual(
@@ -580,7 +580,7 @@ describe('Environment Configuration', () => {
       
       expect(mockCacheService.set).toHaveBeenCalledWith(
         'config:current',
-        expect.any(Object),
+        expect.objectContaining({}),
         expect.any(Number)
       );
     });
@@ -623,7 +623,7 @@ describe('Environment Configuration', () => {
       watchConfig(callback);
       
       expect(mockFs.watchFile).toHaveBeenCalledWith(
-        expect.any(String),
+        expect.stringContaining('.json'),
         expect.any(Function)
       );
     });
@@ -675,7 +675,7 @@ describe('Environment Configuration', () => {
       
       expect(mockLogger.error).toHaveBeenCalledWith(
         'Failed to reload configuration',
-        expect.any(Object)
+        expect.objectContaining({})
       );
       expect(callback).not.toHaveBeenCalled();
     });
@@ -765,7 +765,7 @@ describe('Environment Configuration', () => {
       
       expect(mockCrypto.createCipher).toHaveBeenCalledWith(
         'aes-256-cbc',
-        expect.any(String)
+        expect.stringContaining('config')
       );
       expect(encrypted.database.password).toBe('encrypted_data');
       expect(encrypted.auth.jwtSecret).toBe('encrypted_data');
@@ -790,7 +790,7 @@ describe('Environment Configuration', () => {
       
       expect(mockCrypto.createDecipher).toHaveBeenCalledWith(
         'aes-256-cbc',
-        expect.any(String)
+        expect.stringContaining('config')
       );
       expect(decrypted.database.password).toBe('decrypted_data');
     });
@@ -937,7 +937,7 @@ describe('Environment Configuration', () => {
     });
 
     it('应该处理循环引用', () => {
-      const circularConfig: any = { ...validConfig };
+      const circularConfig: Record<string, unknown> = { ...validConfig };
       circularConfig.self = circularConfig;
       
       const sanitized = sanitizeConfig(circularConfig);

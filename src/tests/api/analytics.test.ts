@@ -268,14 +268,14 @@ const mockJwt = {
 };
 
 // 设置 Mock
-(supabaseClient as any) = mockSupabaseClient;
-(cacheService as any) = mockCacheService;
-(auditService as any) = mockAuditService;
-(analyticsService as any) = mockAnalyticsService;
-(learningProgressService as any) = mockLearningProgressService;
-(aiService as any) = mockAiService;
-(envConfig as any) = mockEnvConfig;
-(jwt as any) = mockJwt;
+(supabaseClient as jest.Mocked<typeof supabaseClient>) = mockSupabaseClient;
+(cacheService as jest.Mocked<typeof cacheService>) = mockCacheService;
+(auditService as jest.Mocked<typeof auditService>) = mockAuditService;
+(analyticsService as jest.Mocked<typeof analyticsService>) = mockAnalyticsService;
+(learningProgressService as jest.Mocked<typeof learningProgressService>) = mockLearningProgressService;
+(aiService as jest.Mocked<typeof aiService>) = mockAiService;
+(envConfig as jest.Mocked<typeof envConfig>) = mockEnvConfig;
+(jwt as jest.Mocked<typeof jwt>) = mockJwt;
 
 // 测试数据
 const testLearningStats: LearningStats = {

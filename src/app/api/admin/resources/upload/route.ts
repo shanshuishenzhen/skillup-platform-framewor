@@ -144,9 +144,29 @@ async function uploadFileToStorage(file: File, filename: string, fileType: strin
 }
 
 /**
+ * 文件信息接口
+ */
+interface FileInfo {
+  title: string;
+  description?: string;
+  fileType: string;
+  fileName: string;
+  originalName: string;
+  fileSize: number;
+  fileUrl: string;
+  mimeType: string;
+  category?: string;
+  tags?: string[];
+  courseId?: string;
+  lessonId?: string;
+  isPublic: boolean;
+  allowDownload: boolean;
+}
+
+/**
  * 保存文件信息到数据库
  */
-async function saveFileInfo(fileInfo: any): Promise<string> {
+async function saveFileInfo(fileInfo: FileInfo): Promise<string> {
   try {
     const { data, error } = await supabase
       .from('learning_resources')

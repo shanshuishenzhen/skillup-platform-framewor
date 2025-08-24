@@ -101,18 +101,29 @@ import {
 describe('人脸认证服务模块', () => {
   let faceAuthService: FaceAuthService;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     // 重置所有模拟
     jest.clearAllMocks();
     
     // 设置模拟返回值
-    require('@/services/baiduFaceService').baiduFaceService = mockBaiduFaceService;
-    require('@/services/faceRecognitionService').faceRecognitionService = mockFaceRecognitionService;
-    require('@/utils/supabase').getSupabaseClient = jest.fn().mockReturnValue(mockSupabase);
-    require('@/services/monitoringService').monitoringService = mockMonitoringService;
-    require('@/services/cloudStorageService').cloudStorageService = mockCloudStorageService;
-    require('canvas').createCanvas = mockCanvas.createCanvas;
-    require('canvas').loadImage = mockCanvas.loadImage;
+    const baiduFaceServiceModule = await import('@/services/baiduFaceService');
+    baiduFaceServiceModule.baiduFaceService = mockBaiduFaceService;
+    
+    const faceRecognitionServiceModule = await import('@/services/faceRecognitionService');
+    faceRecognitionServiceModule.faceRecognitionService = mockFaceRecognitionService;
+    
+    const supabaseModule = await import('@/utils/supabase');
+    supabaseModule.getSupabaseClient = jest.fn().mockReturnValue(mockSupabase);
+    
+    const monitoringServiceModule = await import('@/services/monitoringService');
+    monitoringServiceModule.monitoringService = mockMonitoringService;
+    
+    const cloudStorageServiceModule = await import('@/services/cloudStorageService');
+    cloudStorageServiceModule.cloudStorageService = mockCloudStorageService;
+    
+    const canvasModule = await import('canvas');
+    canvasModule.createCanvas = mockCanvas.createCanvas;
+    canvasModule.loadImage = mockCanvas.loadImage;
     
     // 创建人脸认证服务实例
     faceAuthService = new FaceAuthService({
@@ -142,8 +153,10 @@ describe('人脸认证服务模块', () => {
         confidenceThreshold: 1.5 // 无效值
       })).toThrow('Invalid confidence threshold');
       
+      type FaceProvider = 'baidu' | 'tencent' | 'aliyun';
+      
       expect(() => new FaceAuthService({
-        provider: 'invalid' as any
+        provider: 'invalid' as FaceProvider
       })).toThrow('Unsupported face recognition provider');
     });
 
@@ -413,8 +426,14 @@ describe('人脸认证服务模块', () => {
         }
       );
       
+      interface MockMediaStream extends Partial<MediaStream> {
+        getTracks: () => MediaStreamTrack[];
+        getVideoTracks: () => MediaStreamTrack[];
+        active: boolean;
+      }
+      
       const sessionId = await faceAuthService.startLivenessDetection(
-        mockStream as any,
+        mockStream as MockMediaStream,
         mockFrameCallback
       );
       

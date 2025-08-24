@@ -52,7 +52,7 @@ jest.mock('../../utils/validator', () => ({
 
 // 模拟 multer
 const mockMulter = {
-  single: jest.fn(() => (req: any, res: any, next: any) => {
+  single: jest.fn(() => (req: Express.Request, res: Express.Response, next: Express.NextFunction) => {
     req.file = {
       fieldname: 'file',
       originalname: 'test.jpg',
@@ -65,7 +65,7 @@ const mockMulter = {
     };
     next();
   }),
-  array: jest.fn(() => (req: any, res: any, next: any) => {
+  array: jest.fn(() => (req: Express.Request, res: Express.Response, next: Express.NextFunction) => {
     req.files = [
       {
         fieldname: 'files',
@@ -357,7 +357,7 @@ describe('文件上传服务测试', () => {
     });
 
     it('应该成功从URL上传文件', async () => {
-      const url = 'https://example.com/test.jpg';
+      const testUrl = 'https://example.com/test.jpg';
       
       // 模拟HTTP请求
       global.fetch = jest.fn(() => Promise.resolve({
@@ -372,7 +372,7 @@ describe('文件上传服务测试', () => {
         arrayBuffer: () => Promise.resolve(new ArrayBuffer(1024))
       })) as jest.Mock;
       
-      const result = await uploadFromUrl(url);
+      const result = await uploadFromUrl(testUrl);
       
       expect(result).toHaveProperty('filename');
       expect(result).toHaveProperty('url');
@@ -474,14 +474,13 @@ describe('文件上传服务测试', () => {
 
     it('应该成功处理图片', async () => {
       const imageBuffer = Buffer.from('image content');
-      const options = {
+      
+      const result = await processImage(imageBuffer, {
         width: 800,
         height: 600,
         quality: 80,
         format: 'jpeg'
-      };
-      
-      const result = await processImage(imageBuffer, options);
+      });
       
       expect(result).toHaveProperty('buffer');
       expect(result).toHaveProperty('metadata');
@@ -490,12 +489,11 @@ describe('文件上传服务测试', () => {
 
     it('应该成功压缩文件', async () => {
       const fileBuffer = Buffer.from('file content');
-      const options = {
+      
+      const result = await compressFile(fileBuffer, 'image/jpeg', {
         quality: 0.8,
         progressive: true
-      };
-      
-      const result = await compressFile(fileBuffer, 'image/jpeg', options);
+      });
       
       expect(result).toHaveProperty('buffer');
       expect(result).toHaveProperty('originalSize');
@@ -505,13 +503,12 @@ describe('文件上传服务测试', () => {
 
     it('应该成功生成缩略图', async () => {
       const imageBuffer = Buffer.from('image content');
-      const options = {
+      
+      const result = await generateThumbnail(imageBuffer, {
         width: 200,
         height: 200,
         fit: 'cover'
-      };
-      
-      const result = await generateThumbnail(imageBuffer, options);
+      });
       
       expect(result).toHaveProperty('buffer');
       expect(result).toHaveProperty('width');
@@ -546,12 +543,11 @@ describe('文件上传服务测试', () => {
     it('应该成功上传文件到云存储', async () => {
       const fileBuffer = Buffer.from('test content');
       const filename = 'test.jpg';
-      const options = {
+      
+      const result = await uploadToCloud(fileBuffer, filename, {
         contentType: 'image/jpeg',
         public: true
-      };
-      
-      const result = await uploadToCloud(fileBuffer, filename, options);
+      });
       
       expect(result).toHaveProperty('url');
       expect(result).toHaveProperty('key');
@@ -724,12 +720,11 @@ describe('文件上传服务测试', () => {
 
     it('应该成功生成安全URL', async () => {
       const filename = 'test.jpg';
-      const options = {
+      
+      const secureUrl = await generateSecureUrl(filename, {
         expiresIn: 3600,
         permissions: ['read']
-      };
-      
-      const secureUrl = await generateSecureUrl(filename, options);
+      });
       
       expect(secureUrl).toHaveProperty('url');
       expect(secureUrl).toHaveProperty('token');
@@ -840,13 +835,12 @@ describe('文件上传服务测试', () => {
     });
 
     it('应该获取上传历史', async () => {
-      const options = {
+      
+      const history = await getUploadHistory({
         startDate: new Date('2024-01-01'),
         endDate: new Date('2024-12-31'),
         limit: 100
-      };
-      
-      const history = await getUploadHistory(options);
+      });
       
       expect(Array.isArray(history)).toBe(true);
       expect(history.length).toBeLessThanOrEqual(100);

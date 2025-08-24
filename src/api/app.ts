@@ -173,7 +173,7 @@ app.use((req, res) => {
 });
 
 // 错误处理中间件
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: Error & { status?: number }, req: express.Request, res: express.Response, next: express.NextFunction) => {
   logger.error('Express error:', { error: err.message, stack: err.stack });
   
   res.status(err.status || 500).json({

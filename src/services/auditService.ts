@@ -46,8 +46,8 @@ export interface AuditLog {
   sessionId?: string;
   ipAddress?: string;
   userAgent?: string;
-  details?: Record<string, any>;
-  metadata?: Record<string, any>;
+  details?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
   success?: boolean;
   errorMessage?: string;
   duration?: number;
@@ -57,7 +57,7 @@ export interface AuditLog {
 export interface AuditEvent {
   type: string;
   source: string;
-  data: Record<string, any>;
+  data: Record<string, unknown>;
   timestamp: Date;
   severity: AuditLevel;
 }
@@ -74,7 +74,7 @@ export interface AuditQuery {
   offset?: number;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
-  filters?: Record<string, any>;
+  filters?: Record<string, unknown>;
 }
 
 export interface AuditMetrics {
@@ -110,7 +110,7 @@ export interface ExportOptions {
   format: 'json' | 'csv' | 'xml';
   startDate: Date;
   endDate: Date;
-  filters?: Record<string, any>;
+  filters?: Record<string, unknown>;
   includeMetadata?: boolean;
 }
 
@@ -288,7 +288,7 @@ export class AuditService {
     severity: AuditLevel;
     userId?: string;
     ipAddress?: string;
-    details: Record<string, any>;
+    details: Record<string, unknown>;
   }): Promise<void> {
     await this.log({
       action: 'security_event',
@@ -670,7 +670,12 @@ export class AuditService {
   /**
    * 生成建议
    */
-  private generateRecommendations(violations: any[]): string[] {
+  private generateRecommendations(violations: Array<{
+    standard: string;
+    rule: string;
+    violations: number;
+    severity: string;
+  }>): string[] {
     const recommendations: string[] = [];
 
     if (violations.length > 0) {

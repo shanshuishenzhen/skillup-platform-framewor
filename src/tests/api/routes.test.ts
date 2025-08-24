@@ -9,6 +9,8 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import request from 'supertest';
 import express from 'express';
+import bcrypt from 'bcrypt';
+import jsonwebtoken from 'jsonwebtoken';
 
 // 模拟依赖
 jest.mock('../../config/envConfig', () => ({
@@ -309,7 +311,7 @@ describe('API路由测试', () => {
         }]);
         
         // 模拟密码不匹配
-        const bcrypt = require('bcryptjs');
+        const bcrypt = jest.mocked(require('bcrypt'));
         bcrypt.compare.mockResolvedValueOnce(false);
         
         const response = await request(app)
@@ -898,7 +900,7 @@ describe('API路由测试', () => {
     
     beforeEach(() => {
       // 模拟管理员JWT验证
-      const jwt = require('jsonwebtoken');
+      const jwt = jest.mocked(require('jsonwebtoken'));
       jwt.verify.mockReturnValue({
         userId: 'admin-123',
         email: 'admin@example.com',
@@ -1035,7 +1037,7 @@ describe('API路由测试', () => {
     
     it('应该验证管理员权限', async () => {
       // 模拟普通用户JWT
-      const jwt = require('jsonwebtoken');
+      const jwt = jest.mocked(require('jsonwebtoken'));
       jwt.verify.mockReturnValue({
         userId: 'user-123',
         email: 'user@example.com',

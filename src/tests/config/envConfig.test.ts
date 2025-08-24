@@ -39,17 +39,22 @@ jest.mock('events');
 
 // 类型定义
 interface MockLogger {
-  info: jest.MockedFunction<any>;
-  warn: jest.MockedFunction<any>;
-  error: jest.MockedFunction<any>;
-  debug: jest.MockedFunction<any>;
+  info: jest.MockedFunction<(...args: unknown[]) => void>;
+  warn: jest.MockedFunction<(...args: unknown[]) => void>;
+  error: jest.MockedFunction<(...args: unknown[]) => void>;
+  debug: jest.MockedFunction<(...args: unknown[]) => void>;
 }
 
 interface MockFs {
-  readFile: jest.MockedFunction<any>;
-  writeFile: jest.MockedFunction<any>;
-  access: jest.MockedFunction<any>;
-  watch: jest.MockedFunction<any>;
+  readFile: jest.MockedFunction<(path: string) => Promise<string>>;
+  writeFile: jest.MockedFunction<(path: string, data: string) => Promise<void>>;
+  access: jest.MockedFunction<(path: string) => Promise<void>>;
+  watch: jest.MockedFunction<(path: string, options?: unknown) => unknown>;
+}
+
+interface MockWatcher {
+  on: jest.MockedFunction<(event: string, listener: (...args: unknown[]) => void) => void>;
+  close: jest.MockedFunction<() => void>;
 }
 
 // Mock 实例
@@ -82,9 +87,9 @@ const mockEventEmitter = {
 } as jest.Mocked<EventEmitter>;
 
 // 设置 Mock
-(logger as any) = mockLogger;
-(fs as any) = mockFs;
-(path as any) = mockPath;
+(logger as unknown as MockLogger) = mockLogger;
+(fs as unknown as MockFs) = mockFs;
+(path as unknown as jest.Mocked<typeof path>) = mockPath;
 
 // 测试环境变量
 const originalEnv = process.env;
@@ -450,7 +455,7 @@ BAIDU_SECRET_KEY=baidu_secret_key
         close: jest.fn()
       };
       
-      mockFs.watch.mockReturnValue(mockWatcher as any);
+      mockFs.watch.mockReturnValue(mockWatcher);
       
       const callback = jest.fn();
       watchConfig('.env', callback);
@@ -465,7 +470,7 @@ BAIDU_SECRET_KEY=baidu_secret_key
         close: jest.fn()
       };
       
-      mockFs.watch.mockReturnValue(mockWatcher as any);
+      mockFs.watch.mockReturnValue(mockWatcher);
       
       watchConfig('.env', jest.fn());
       unwatchConfig();

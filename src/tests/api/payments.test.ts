@@ -37,6 +37,9 @@ jest.mock('../../services/smsService');
 jest.mock('../../utils/logger');
 jest.mock('crypto');
 
+// 模块类型定义
+type MockedModule<T> = T & { [K in keyof T]: jest.MockedFunction<T[K]> };
+
 // 类型定义
 interface TestUser {
   id: string;
@@ -67,7 +70,7 @@ interface TestPaymentOrder {
   paymentProvider: 'alipay' | 'wechat' | 'stripe' | 'paypal';
   transactionId?: string;
   providerOrderId?: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
   paidAt?: Date;
@@ -100,7 +103,7 @@ interface TestPaymentMethod {
   expiryYear?: number;
   isDefault: boolean;
   isActive: boolean;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -199,16 +202,16 @@ const mockCrypto = {
 };
 
 // 设置 Mock
-(supabase as any) = mockSupabase;
-(jwtService as any) = mockJwtService;
-(cacheService as any) = mockCacheService;
-(auditService as any) = mockAuditService;
-(analyticsService as any) = mockAnalyticsService;
-(paymentService as any) = mockPaymentService;
-(emailService as any) = mockEmailService;
-(smsService as any) = mockSmsService;
-(logger as any) = mockLogger;
-(crypto as any) = mockCrypto;
+jest.mocked(supabase).mockReturnValue(mockSupabase);
+jest.mocked(jwtService).mockReturnValue(mockJwtService);
+jest.mocked(cacheService).mockReturnValue(mockCacheService);
+jest.mocked(auditService).mockReturnValue(mockAuditService);
+jest.mocked(analyticsService).mockReturnValue(mockAnalyticsService);
+jest.mocked(paymentService).mockReturnValue(mockPaymentService);
+jest.mocked(emailService).mockReturnValue(mockEmailService);
+jest.mocked(smsService).mockReturnValue(mockSmsService);
+jest.mocked(logger).mockReturnValue(mockLogger);
+jest.mocked(crypto).mockReturnValue(mockCrypto);
 
 // 测试数据
 const testUser: TestUser = {

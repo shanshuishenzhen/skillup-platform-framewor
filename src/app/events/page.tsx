@@ -10,15 +10,15 @@ import { useState, useEffect } from 'react';
 import { aiDataGeneratorService, VirtualEvent } from '@/services/aiDataGeneratorService';
 
 /**
- * 虚拟活动页面组件
- * 展示AI生成的虚拟活动信息，包括会议、培训、研讨会等
+ * 活动页面组件
+ * 展示AI生成的活动信息，包括会议、培训、研讨会等
  */
 export default function EventsPage() {
   const [events, setEvents] = useState<VirtualEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
   /**
-   * 加载虚拟活动数据
+   * 加载活动数据
    */
   const loadEvents = async () => {
     setLoading(true);
@@ -26,7 +26,7 @@ export default function EventsPage() {
       const virtualEvents = await aiDataGeneratorService.generateEvents(6);
       setEvents(virtualEvents);
     } catch (error) {
-      console.error('加载虚拟活动数据失败:', error);
+      console.error('加载活动数据失败:', error);
     } finally {
       setLoading(false);
     }
@@ -73,10 +73,10 @@ export default function EventsPage() {
         <div className="container mx-auto px-4 py-12">
           <div className="max-w-3xl mx-auto text-center">
             <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-              虚拟活动展示
+              活动展示
             </h1>
             <p className="text-xl text-gray-600 leading-relaxed mb-6">
-              AI生成的虚拟活动信息，展示多样化的会议、培训和研讨会内容
+              AI生成的活动信息，展示多样化的会议、培训和研讨会内容
             </p>
             <Button 
               onClick={loadEvents}
@@ -91,7 +91,7 @@ export default function EventsPage() {
               ) : (
                 <>
                   <RefreshCw className="w-4 h-4 mr-2" />
-                  刷新虚拟数据
+                  刷新数据
                 </>
               )}
             </Button>
@@ -168,13 +168,13 @@ export default function EventsPage() {
               {loading ? (
                 <div className="text-center py-12">
                   <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-500" />
-                  <p className="text-gray-600">正在生成虚拟活动数据...</p>
+                  <p className="text-gray-600">正在生成活动数据...</p>
                 </div>
               ) : events.length === 0 ? (
                 <div className="text-center py-12">
                   <Calendar className="w-16 h-16 mx-auto mb-4 text-gray-400" />
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">暂无活动信息</h3>
-                  <p className="text-gray-600 mb-4">点击下方按钮重新生成虚拟活动数据</p>
+                  <p className="text-gray-600 mb-4">点击下方按钮重新生成活动数据</p>
                   <Button onClick={loadEvents} className="bg-blue-600 hover:bg-blue-700">
                     <RefreshCw className="w-4 h-4 mr-2" />
                     重新加载
@@ -388,10 +388,10 @@ export default function EventsPage() {
                 </CardContent>
               </Card>
 
-              {/* 虚拟数据统计 */}
+              {/* 数据统计 */}
               <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-indigo-50">
                 <CardHeader>
-                  <CardTitle className="text-lg">虚拟数据统计</CardTitle>
+                  <CardTitle className="text-lg">数据统计</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
@@ -400,7 +400,7 @@ export default function EventsPage() {
                       <span className="text-lg font-bold text-blue-600">{events.length}场</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">虚拟参与</span>
+                      <span className="text-sm text-gray-600">参与</span>
                       <span className="text-lg font-bold text-green-600">{events.reduce((sum, event) => sum + event.participants, 0)}人</span>
                     </div>
                     <div className="flex items-center justify-between">
@@ -411,11 +411,11 @@ export default function EventsPage() {
                 </CardContent>
               </Card>
 
-              {/* 虚拟数据说明 */}
+              {/* 数据说明 */}
               <Card className="border-0 shadow-lg bg-gradient-to-br from-purple-50 to-pink-50">
                 <CardHeader>
-                  <CardTitle className="text-lg">虚拟数据说明</CardTitle>
-                  <p className="text-sm text-gray-600">本页面展示的所有活动信息均为AI生成的虚拟数据</p>
+                  <CardTitle className="text-lg">数据说明</CardTitle>
+                  <p className="text-sm text-gray-600">本页面展示的所有活动信息均为AI生成的数据</p>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
@@ -424,7 +424,7 @@ export default function EventsPage() {
                         <div className="w-2 h-2 bg-purple-500 rounded-full mt-2 flex-shrink-0"></div>
                         <div>
                           <p className="text-sm font-medium text-gray-700">数据来源</p>
-                          <p className="text-xs text-gray-600">AI智能生成的虚拟活动信息</p>
+                          <p className="text-xs text-gray-600">AI智能生成的活动信息</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-2">
@@ -455,14 +455,13 @@ export default function EventsPage() {
                       ) : (
                         <>
                           <RefreshCw className="w-4 h-4 mr-2" />
-                          刷新虚拟数据
+                          刷新数据
                         </>
                       )}
                     </Button>
                   </div>
                 </CardContent>
               </Card>
-            </div>
           </div>
         </div>
       </section>

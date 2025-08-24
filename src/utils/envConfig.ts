@@ -14,7 +14,7 @@ interface ValidationRule {
   min?: number;
   max?: number;
   pattern?: RegExp;
-  validator?: (value: any) => boolean | string;
+  validator?: (value: unknown) => boolean | string;
 }
 
 /**
@@ -31,8 +31,8 @@ interface ValidationRules {
  */
 interface ConfigChangeEvent {
   key: string;
-  oldValue: any;
-  newValue: any;
+  oldValue: unknown;
+  newValue: unknown;
   timestamp: Date;
 }
 
@@ -68,6 +68,7 @@ interface EnvConfig {
     encryptionKey: string;
     apiSecretKey: string;
     sessionSecret: string;
+    jwtSecret: string;
     jwtExpiresIn: string;
     jwtRefreshExpiresIn: string;
   };
@@ -151,7 +152,7 @@ class EnvConfigManager extends EventEmitter {
   private config: EnvConfig | null = null;
   private isValidated = false;
   private hotReloadEnabled = false;
-  private envFileWatcher: any = null;
+  private envFileWatcher: ReturnType<typeof watch> | null = null;
   private lastConfigHash: string = '';
   private validationRules: ValidationRules = {};
   
@@ -309,7 +310,7 @@ class EnvConfigManager extends EventEmitter {
    * @param rule 验证规则
    * @returns string | null 错误信息或null
    */
-  private validateEnvVar(key: string, value: any, rule: ValidationRule): string | null {
+  private validateEnvVar(key: string, value: unknown, rule: ValidationRule): string | null {
     // 检查必需性
     if (rule.required && (!value || value === '')) {
       return `环境变量 ${key} 是必需的`;
@@ -580,6 +581,7 @@ class EnvConfigManager extends EventEmitter {
           encryptionKey: this.getEnvVar('ENCRYPTION_KEY'),
           apiSecretKey: this.getEnvVar('API_SECRET_KEY'),
           sessionSecret: this.getEnvVar('SESSION_SECRET'),
+          jwtSecret: this.getEnvVar('JWT_SECRET', 'your-secret-key'),
           jwtExpiresIn: this.getEnvVar('JWT_EXPIRES_IN', '24h'),
           jwtRefreshExpiresIn: this.getEnvVar('JWT_REFRESH_EXPIRES_IN', '7d')
         },
@@ -908,7 +910,7 @@ export function getSafeEnvVar(key: string): string {
  * @param event 事件名称
  * @param listener 事件监听器
  */
-export function onConfigChange(event: 'configChanged' | 'configLoaded' | 'configError', listener: (...args: any[]) => void): void {
+export function onConfigChange(event: 'configChanged' | 'configLoaded' | 'configError', listener: (...args: unknown[]) => void): void {
   envConfigManager.on(event, listener);
 }
 
@@ -917,7 +919,7 @@ export function onConfigChange(event: 'configChanged' | 'configLoaded' | 'config
  * @param event 事件名称
  * @param listener 事件监听器
  */
-export function offConfigChange(event: 'configChanged' | 'configLoaded' | 'configError', listener: (...args: any[]) => void): void {
+export function offConfigChange(event: 'configChanged' | 'configLoaded' | 'configError', listener: (...args: unknown[]) => void): void {
   envConfigManager.off(event, listener);
 }
 

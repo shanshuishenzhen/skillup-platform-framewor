@@ -15,7 +15,7 @@ export default function TalentsPage() {
       const virtualTalents = await aiDataGeneratorService.generateTalents(8)
       setTalents(virtualTalents)
     } catch (error) {
-      console.error('生成虚拟人才数据失败:', error)
+      console.error('生成人才数据失败:', error)
     } finally {
       setLoading(false)
     }
@@ -45,9 +45,9 @@ export default function TalentsPage() {
       {/* 人才库介绍 */}
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-12">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-2xl font-bold mb-4">虚拟人才展示</h2>
+          <h2 className="text-2xl font-bold mb-4">人才展示</h2>
           <p className="text-blue-100 max-w-3xl mx-auto mb-6">
-            AI生成的虚拟人才信息，展示多样化的专业技能和项目经验
+            AI生成的人才信息，展示多样化的专业技能和项目经验
           </p>
           <button
             onClick={loadTalents}
@@ -67,7 +67,7 @@ export default function TalentsPage() {
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                刷新虚拟数据
+                刷新数据
               </>
             )}
           </button>
@@ -110,7 +110,7 @@ export default function TalentsPage() {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-            <p className="text-gray-600">正在生成虚拟人才数据...</p>
+            <p className="text-gray-600">正在生成人才数据...</p>
           </div>
         ) : talents.length === 0 ? (
           <div className="text-center py-12">
@@ -191,29 +191,29 @@ export default function TalentsPage() {
           </div>
         </div>
 
-        {/* 虚拟数据说明 */}
+        {/* 数据说明 */}
         <div className="mt-16 bg-white rounded-lg p-8 shadow-sm">
-          <h2 className="text-2xl font-bold mb-8 text-center">虚拟数据说明</h2>
+          <h2 className="text-2xl font-bold mb-8 text-center">数据说明</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="text-center">
               <div className="text-4xl mb-4">🤖</div>
-              <h3 className="font-semibold mb-2">AI生成</h3>
-              <p className="text-gray-600 text-sm">所有数据均由AI算法生成</p>
+              <h3 className="font-semibold mb-2">专业技能</h3>
+              <p className="text-gray-600 text-sm">AI生成的专业技能标签</p>
             </div>
             <div className="text-center">
               <div className="text-4xl mb-4">🔄</div>
-              <h3 className="font-semibold mb-2">实时更新</h3>
-              <p className="text-gray-600 text-sm">每次刷新生成新的虚拟数据</p>
+              <h3 className="font-semibold mb-2">工作经验</h3>
+              <p className="text-gray-600 text-sm">模拟真实的工作经历</p>
             </div>
             <div className="text-center">
               <div className="text-4xl mb-4">📊</div>
-              <h3 className="font-semibold mb-2">展示功能</h3>
-              <p className="text-gray-600 text-sm">仅用于演示页面效果</p>
+              <h3 className="font-semibold mb-2">项目案例</h3>
+              <p className="text-gray-600 text-sm">AI创建的项目案例</p>
             </div>
             <div className="text-center">
               <div className="text-4xl mb-4">⚠️</div>
-              <h3 className="font-semibold mb-2">非真实数据</h3>
-              <p className="text-gray-600 text-sm">不代表真实的人才信息</p>
+              <h3 className="font-semibold mb-2">评价体系</h3>
+              <p className="text-gray-600 text-sm">智能生成的评价体系</p>
             </div>
           </div>
         </div>

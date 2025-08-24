@@ -68,7 +68,7 @@ interface CacheMetrics {
   connectionCount: number;
 }
 
-interface CacheEntry<T = any> {
+interface CacheEntry<T = unknown> {
   key: string;
   value: T;
   ttl?: number;
@@ -194,11 +194,12 @@ const mockRedisClient = {
 };
 
 // 设置 Mock
-(logger as any) = mockLogger;
-(analyticsService as any) = mockAnalyticsService;
-(auditService as any) = mockAuditService;
-(envConfig as any) = mockEnvConfig;
-(Redis as jest.MockedClass<typeof Redis>).mockImplementation(() => mockRedisClient as any);
+const mockLoggerTyped = logger as jest.Mocked<typeof logger>;
+const mockAnalyticsServiceTyped = analyticsService as jest.Mocked<typeof analyticsService>;
+const mockAuditServiceTyped = auditService as jest.Mocked<typeof auditService>;
+const mockEnvConfigTyped = envConfig as jest.Mocked<typeof envConfig>;
+const mockRedisTyped = Redis as jest.MockedClass<typeof Redis>;
+mockRedisTyped.mockImplementation(() => mockRedisClient as typeof Redis.prototype);
 
 // 测试数据
 const testCacheEntry = {

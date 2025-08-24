@@ -361,7 +361,7 @@ describe('API监控服务测试', () => {
         url: 'invalid-url' // 无效URL
       };
       
-      const result = await recordApiRequest(invalidRequest as any);
+      const result = await recordApiRequest(invalidRequest as { method: string; url: string; timestamp: string });
       
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
@@ -1167,7 +1167,7 @@ describe('API监控服务测试', () => {
         timestamp: 'invalid' // 无效时间戳
       };
       
-      const result = await recordApiRequest(invalidRequest as any);
+      const result = await recordApiRequest(invalidRequest as { method: string; url: string; timestamp: string });
       
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
@@ -1180,7 +1180,7 @@ describe('API监控服务测试', () => {
         threshold: 'invalid' // 无效阈值
       };
       
-      const result = await createApiAlert(invalidAlert as any);
+      const result = await createApiAlert(invalidAlert as { name: string; endpoint: string; threshold: string });
       
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
@@ -1193,7 +1193,7 @@ describe('API监控服务测试', () => {
         timeRange: 'invalid' // 无效时间范围
       };
       
-      const result = await generateApiReport(invalidConfig as any);
+      const result = await generateApiReport(invalidConfig as { endpoints: string[]; metrics: string[]; timeRange: string });
       
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();

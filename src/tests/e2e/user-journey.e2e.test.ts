@@ -8,9 +8,18 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, jest } from '@jest/globals';
 import request from 'supertest';
-import puppeteer, { Browser, Page } from 'puppeteer';
+import puppeteer, { Browser, Page, ElementHandle } from 'puppeteer';
 import mysql from 'mysql2/promise';
 import Redis from 'ioredis';
+
+/**
+ * 文件上传参数接口
+ */
+interface FileUploadOptions {
+  name: string;
+  mimeType: string;
+  buffer: Buffer;
+}
 
 // 导入应用
 import app from '../../app';
@@ -363,7 +372,7 @@ describe('端到端测试 - 用户完整体验流程', () => {
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
     
     // 创建截图目录
-    const fs = require('fs');
+    const fs = await import('fs');
     if (!fs.existsSync('screenshots')) {
       fs.mkdirSync('screenshots');
     }
@@ -791,7 +800,7 @@ describe('端到端测试 - 用户完整体验流程', () => {
           name: 'avatar.jpg',
           mimeType: 'image/jpeg',
           buffer: buffer
-        } as any);
+        } as { name: string; mimeType: string; buffer: Buffer });
       }
       
       // 3. 等待上传完成

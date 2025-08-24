@@ -29,6 +29,40 @@ jest.mock('jsonwebtoken');
 jest.mock('fs');
 jest.mock('sharp');
 
+// 类型定义
+interface MockSupabaseQuery {
+  select: jest.MockedFunction<(columns?: string) => MockSupabaseQuery>;
+  eq: jest.MockedFunction<(column: string, value: unknown) => MockSupabaseQuery>;
+  limit: jest.MockedFunction<(count: number) => MockSupabaseQuery>;
+  range: jest.MockedFunction<(from: number, to: number) => MockSupabaseQuery>;
+  single: jest.MockedFunction<() => Promise<{ data: unknown; error: unknown }>>;
+  mockResolvedValue: jest.MockedFunction<(value: unknown) => MockSupabaseQuery>;
+}
+
+interface MockSupabaseStorage {
+  upload: jest.MockedFunction<(path: string, file: File | Buffer, options?: Record<string, unknown>) => Promise<{ data: { path?: string; id?: string; fullPath?: string } | null; error: unknown }>>;
+  download: jest.MockedFunction<(path: string) => Promise<{ data: Blob | null; error: unknown }>>;
+  remove: jest.MockedFunction<(paths: string | string[]) => Promise<{ data: { path?: string }[] | null; error: unknown }>>;
+  getPublicUrl: jest.MockedFunction<(path: string) => { data: { publicUrl: string } }>;
+  createSignedUrl: jest.MockedFunction<(path: string, expiresIn: number) => Promise<{ data: { signedUrl?: string } | null; error: unknown }>>;
+}
+
+interface MockFileStats {
+  size: number;
+  isFile: () => boolean;
+  isDirectory: () => boolean;
+}
+
+interface MockSharpInstance {
+  resize: jest.MockedFunction<(width?: number, height?: number, options?: Record<string, unknown>) => MockSharpInstance>;
+  jpeg: jest.MockedFunction<(options?: Record<string, unknown>) => MockSharpInstance>;
+  png: jest.MockedFunction<(options?: Record<string, unknown>) => MockSharpInstance>;
+  webp: jest.MockedFunction<(options?: Record<string, unknown>) => MockSharpInstance>;
+  toBuffer: jest.MockedFunction<() => Promise<Buffer>>;
+  toFile: jest.MockedFunction<(output: string, options?: Record<string, unknown>) => Promise<void>>;
+  metadata: jest.MockedFunction<() => Promise<{ width: number; height: number; format: string; size: number }>>;
+}
+
 // Mock 对象
 const mockSupabase = supabase as jest.Mocked<typeof supabase>;
 const mockCacheService = cacheService as jest.Mocked<typeof cacheService>;
@@ -226,7 +260,7 @@ describe('Uploads API', () => {
       range: jest.fn().mockReturnThis(),
       single: jest.fn().mockResolvedValue({ data: testFile, error: null }),
       mockResolvedValue: jest.fn().mockResolvedValue({ data: [testFile], error: null })
-    } as any);
+    });
     
     // 设置Supabase存储
     mockSupabase.storage = {
@@ -251,7 +285,7 @@ describe('Uploads API', () => {
           error: null
         })
       })
-    } as any;
+    });
     
     // 设置缓存服务
     mockCacheService.get.mockResolvedValue(null);
@@ -268,7 +302,7 @@ describe('Uploads API', () => {
       size: 1024 * 1024 * 2,
       isFile: () => true,
       isDirectory: () => false
-    } as any);
+    });
     
     // 设置图片处理
     const mockSharpInstance = {
@@ -286,7 +320,7 @@ describe('Uploads API', () => {
       })
     };
     
-    mockSharp.mockReturnValue(mockSharpInstance as any);
+    mockSharp.mockReturnValue(mockSharpInstance);
     
     // 设置审计和分析服务
     mockAuditService.log.mockResolvedValue(undefined);

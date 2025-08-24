@@ -349,7 +349,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           accessToken: expect.any(String),
           refreshToken: expect.any(String)
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -366,7 +366,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           type: 'INVALID_EMAIL',
           message: 'Invalid email format'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -383,7 +383,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           type: 'WEAK_PASSWORD',
           message: 'Password does not meet requirements'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -400,7 +400,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           type: 'EMAIL_EXISTS',
           message: 'Email already exists'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -430,7 +430,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           userId: 'user-456',
           email: 'newuser@example.com'
-        }),
+        }) as Record<string, unknown>,
         mockEnvConfig.auth.jwtSecret,
         { expiresIn: mockEnvConfig.auth.jwtExpiresIn }
       );
@@ -450,7 +450,7 @@ describe('认证服务测试', () => {
           token: expect.any(String),
           refreshToken: expect.any(String),
           expiresAt: expect.any(String)
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -482,7 +482,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           userId: 'user-456',
           email: 'newuser@example.com'
-        })
+        }) as Record<string, unknown>
       );
     });
   });
@@ -503,7 +503,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           accessToken: expect.any(String),
           refreshToken: expect.any(String)
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -520,7 +520,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           type: 'INVALID_CREDENTIALS',
           message: 'Invalid email or password'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -554,7 +554,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           type: 'ACCOUNT_DISABLED',
           message: 'Account is disabled'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -575,7 +575,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           type: 'ACCOUNT_LOCKED',
           message: 'Account is temporarily locked'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -605,7 +605,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           type: 'TOO_MANY_ATTEMPTS',
           message: 'Too many login attempts'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -626,7 +626,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           type: 'TWO_FACTOR_REQUIRED',
           message: 'Two-factor authentication required'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -643,7 +643,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           userId: 'user-123',
           email: 'test@example.com'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -690,7 +690,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           type: 'INVALID_TOKEN',
           message: 'Invalid or expired token'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -715,7 +715,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           userId: 'user-123',
           sessionId: 'session-123'
-        })
+        }) as Record<string, unknown>
       );
     });
   });
@@ -740,7 +740,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           accessToken: expect.any(String),
           refreshToken: expect.any(String)
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -757,7 +757,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           type: 'INVALID_REFRESH_TOKEN',
           message: 'Invalid or expired refresh token'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -778,7 +778,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           type: 'TOKEN_EXPIRED',
           message: 'Refresh token has expired'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -802,7 +802,7 @@ describe('认证服务测试', () => {
           refreshToken: expect.any(String),
           expiresAt: expect.any(String),
           lastUsedAt: expect.any(String)
-        })
+        }) as Record<string, unknown>
       );
     });
   });
@@ -816,7 +816,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           userId: 'user-123',
           email: 'test@example.com'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -832,7 +832,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           type: 'INVALID_TOKEN',
           message: 'Invalid or expired token'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -846,7 +846,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           type: 'TOKEN_BLACKLISTED',
           message: 'Token has been revoked'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -866,7 +866,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           type: 'SESSION_INACTIVE',
           message: 'Session is no longer active'
-        })
+        }) as Record<string, unknown>
       );
     });
   });
@@ -882,7 +882,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           resetToken: expect.any(String),
           resetUrl: expect.any(String)
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -920,7 +920,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           type: 'RESET_TOO_FREQUENT',
           message: 'Password reset requested too frequently'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -932,7 +932,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           email: 'test@example.com',
           userId: 'user-123'
-        })
+        }) as Record<string, unknown>
       );
     });
   });
@@ -966,7 +966,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           type: 'INVALID_CURRENT_PASSWORD',
           message: 'Current password is incorrect'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -983,7 +983,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           type: 'WEAK_PASSWORD',
           message: 'New password does not meet requirements'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -1016,7 +1016,7 @@ describe('认证服务测试', () => {
         'password_changed',
         expect.objectContaining({
           userId: 'user-123'
-        })
+        }) as Record<string, unknown>
       );
     });
   });
@@ -1063,7 +1063,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           type: 'INVALID_TWO_FACTOR_CODE',
           message: 'Invalid two-factor authentication code'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -1086,8 +1086,8 @@ describe('认证服务测试', () => {
             userId: 'user-123',
             code: expect.any(String),
             isUsed: false
-          })
-        ])
+          }) as Record<string, unknown>
+        ]) as unknown[]
       );
     });
   });
@@ -1135,7 +1135,7 @@ describe('认证服务测试', () => {
         'account_locked',
         expect.objectContaining({
           reason: 'security_violation'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -1147,7 +1147,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           userId: 'user-123',
           reason: 'security_violation'
-        })
+        }) as Record<string, unknown>
       );
     });
   });
@@ -1162,7 +1162,7 @@ describe('认证服务测试', () => {
           id: 'session-123',
           userId: 'user-123',
           isActive: true
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -1179,7 +1179,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           type: 'INVALID_SESSION',
           message: 'Session not found or expired'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -1289,7 +1289,7 @@ describe('认证服务测试', () => {
           accessToken: expect.any(String),
           refreshToken: expect.any(String),
           expiresIn: expect.any(Number)
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -1301,7 +1301,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           userId: 'user-123',
           email: 'test@example.com'
-        })
+        }) as Record<string, unknown>
       );
     });
   });
@@ -1373,7 +1373,7 @@ describe('认证服务测试', () => {
       expect(result.error).toEqual(
         expect.objectContaining({
           type: 'DATABASE_ERROR'
-        })
+        }) as Record<string, unknown>
       );
       expect(mockErrorHandler.handleError).toHaveBeenCalled();
     });
@@ -1402,7 +1402,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           type: 'TOKEN_GENERATION_ERROR',
           message: 'Failed to generate authentication tokens'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -1440,7 +1440,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           type: 'PASSWORD_HASH_ERROR',
           message: 'Failed to process password'
-        })
+        }) as Record<string, unknown>
       );
     });
 
@@ -1467,7 +1467,7 @@ describe('认证服务测试', () => {
         expect.objectContaining({
           type: 'TWO_FACTOR_ERROR',
           message: 'Failed to enable two-factor authentication'
-        })
+        }) as Record<string, unknown>
       );
     });
   });

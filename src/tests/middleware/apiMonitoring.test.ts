@@ -238,22 +238,22 @@ const mockPerformance = {
 };
 
 // 设置 Mock
-(analyticsService as any) = mockAnalyticsService;
-(cacheService as any) = mockCacheService;
-(auditService as any) = mockAuditService;
-(notificationService as any) = mockNotificationService;
-(supabaseClient as any) = mockSupabaseClient;
-(logger as any) = mockLogger;
-(envConfig as any) = { monitoring: mockEnvConfig };
-(performance as any) = mockPerformance;
+(analyticsService as unknown) = mockAnalyticsService;
+(cacheService as unknown) = mockCacheService;
+(auditService as unknown) = mockAuditService;
+(notificationService as unknown) = mockNotificationService;
+(supabaseClient as unknown) = mockSupabaseClient;
+(logger as unknown) = mockLogger;
+(envConfig as unknown) = { monitoring: mockEnvConfig };
+(performance as unknown) = mockPerformance;
 
 // Mock Express 对象
 const createMockRequest = (options: {
   method?: string;
   url?: string;
   headers?: Record<string, string>;
-  body?: any;
-  user?: any;
+  body?: Record<string, unknown>;
+  user?: { id: string; [key: string]: unknown };
   ip?: string;
   sessionID?: string;
 } = {}): Partial<Request> => ({
@@ -361,7 +361,7 @@ describe('API Monitoring Middleware', () => {
       
       // 模拟响应结束
       res.statusCode = 200;
-      (res as any).emit('finish');
+      (res as unknown as { emit: (event: string) => void }).emit('finish');
       
       expect(next).toHaveBeenCalledWith();
       
@@ -410,7 +410,12 @@ describe('API Monitoring Middleware', () => {
       await middleware(req, res, next);
       
       res.statusCode = 201;
-      (res as any).emit('finish');
+      interface MockResponse extends Partial<Response> {
+        emit: (event: string) => void;
+        statusCode: number;
+      }
+      
+      (res as MockResponse).emit('finish');
       
       expect(mockAnalyticsService.track).toHaveBeenCalledWith(
         'api_request',
@@ -435,7 +440,10 @@ describe('API Monitoring Middleware', () => {
       expect(next).toHaveBeenCalledWith();
       
       res.statusCode = 200;
-      (res as any).emit('finish');
+      interface MockResponse {
+        emit: (event: string) => void;
+      }
+      (res as MockResponse).emit('finish');
       
       // 验证没有记录指标
       expect(mockAnalyticsService.track).not.toHaveBeenCalled();
@@ -447,7 +455,10 @@ describe('API Monitoring Middleware', () => {
         ...mockEnvConfig,
         sampleRate: 0.5
       };
-      (envConfig as any) = { monitoring: configWithSampling };
+      interface MockEnvConfig {
+        monitoring: MonitoringConfig;
+      }
+      (envConfig as MockEnvConfig) = { monitoring: configWithSampling };
       
       // Mock Math.random 返回0.6（大于0.5，应该跳过）
       jest.spyOn(Math, 'random').mockReturnValue(0.6);
@@ -465,7 +476,7 @@ describe('API Monitoring Middleware', () => {
       expect(next).toHaveBeenCalledWith();
       
       res.statusCode = 200;
-      (res as any).emit('finish');
+      (res as MockResponse).emit('finish');
       
       // 验证没有记录指标（被采样跳过）
       expect(mockAnalyticsService.track).not.toHaveBeenCalled();
@@ -491,7 +502,7 @@ describe('API Monitoring Middleware', () => {
       await middleware(req, res, next);
       
       res.statusCode = 200;
-      (res as any).emit('finish');
+      (res as MockResponse).emit('finish');
       
       // 验证内存使用记录
       expect(mockAnalyticsService.gauge).toHaveBeenCalledWith(
@@ -516,7 +527,7 @@ describe('API Monitoring Middleware', () => {
       await middleware(req, res, next);
       
       res.statusCode = 200;
-      (res as any).emit('finish');
+      (res as MockResponse).emit('finish');
       
       // 验证CPU使用记录
       expect(mockAnalyticsService.gauge).toHaveBeenCalledWith(
@@ -546,7 +557,7 @@ describe('API Monitoring Middleware', () => {
       await middleware(req, res, next);
       
       res.statusCode = 200;
-      (res as any).emit('finish');
+      (res as MockResponse).emit('finish');
       
       // 验证响应时间记录
       expect(mockAnalyticsService.histogram).toHaveBeenCalledWith(
@@ -578,7 +589,7 @@ describe('API Monitoring Middleware', () => {
       await middleware(req, res, next);
       
       res.statusCode = 200;
-      (res as any).emit('finish');
+      (res as MockResponse).emit('finish');
       
       // 验证指标聚合
       expect(mockCacheService.hset).toHaveBeenCalledWith(
@@ -605,7 +616,7 @@ describe('API Monitoring Middleware', () => {
       await middleware(req, res, next);
       
       res.statusCode = 404;
-      (res as any).emit('finish');
+      (res as MockResponse).emit('finish');
       
       // 验证错误记录
       expect(mockAnalyticsService.increment).toHaveBeenCalledWith(
@@ -632,7 +643,7 @@ describe('API Monitoring Middleware', () => {
       await middleware(req, res, next);
       
       res.statusCode = 500;
-      (res as any).emit('finish');
+      (res as MockResponse).emit('finish');
       
       // 验证服务器错误记录
       expect(mockAnalyticsService.increment).toHaveBeenCalledWith(
@@ -675,7 +686,7 @@ describe('API Monitoring Middleware', () => {
       await middleware(req, res, next);
       
       res.statusCode = 500;
-      (res as any).emit('finish');
+      (res as MockResponse).emit('finish');
       
       // 验证错误率计算
       expect(mockAnalyticsService.gauge).toHaveBeenCalledWith(
@@ -712,7 +723,7 @@ describe('API Monitoring Middleware', () => {
       await middleware(req, res, next);
       
       res.statusCode = 200;
-      (res as any).emit('finish');
+      (res as MockResponse).emit('finish');
       
       // 验证用户行为记录
       expect(mockAnalyticsService.track).toHaveBeenCalledWith(
@@ -746,7 +757,7 @@ describe('API Monitoring Middleware', () => {
       await middleware(req, res, next);
       
       res.statusCode = 200;
-      (res as any).emit('finish');
+      (res as MockResponse).emit('finish');
       
       // 验证移动设备检测
       expect(mockAnalyticsService.track).toHaveBeenCalledWith(
@@ -776,7 +787,7 @@ describe('API Monitoring Middleware', () => {
       await middleware(req, res, next);
       
       res.statusCode = 200;
-      (res as any).emit('finish');
+      (res as MockResponse).emit('finish');
       
       // 验证会话持续时间记录
       expect(mockAnalyticsService.histogram).toHaveBeenCalledWith(
@@ -819,7 +830,7 @@ describe('API Monitoring Middleware', () => {
           rules: [alertRule]
         }
       };
-      (envConfig as any) = { monitoring: configWithAlert };
+      (envConfig as MockEnvConfig) = { monitoring: configWithAlert };
       
       // Mock 长响应时间
       let callCount = 0;
@@ -839,7 +850,7 @@ describe('API Monitoring Middleware', () => {
       await middleware(req, res, next);
       
       res.statusCode = 200;
-      (res as any).emit('finish');
+      (res as MockResponse).emit('finish');
       
       // 验证告警触发
       expect(mockNotificationService.sendAlert).toHaveBeenCalledWith(
@@ -877,7 +888,7 @@ describe('API Monitoring Middleware', () => {
           rules: [alertRule]
         }
       };
-      (envConfig as any) = { monitoring: configWithAlert };
+      (envConfig as MockEnvConfig) = { monitoring: configWithAlert };
       
       // Mock 高错误率
       mockCacheService.hget.mockResolvedValue(JSON.stringify({
@@ -896,7 +907,7 @@ describe('API Monitoring Middleware', () => {
       await middleware(req, res, next);
       
       res.statusCode = 500;
-      (res as any).emit('finish');
+      (res as MockResponse).emit('finish');
       
       // 验证错误率告警
       expect(mockNotificationService.sendAlert).toHaveBeenCalledWith(
@@ -947,7 +958,7 @@ describe('API Monitoring Middleware', () => {
           rules: [alertRule]
         }
       };
-      (envConfig as any) = { monitoring: configWithAlert };
+      (envConfig as MockEnvConfig) = { monitoring: configWithAlert };
       
       const req = createMockRequest({
         method: 'GET',
@@ -960,7 +971,7 @@ describe('API Monitoring Middleware', () => {
       await middleware(req, res, next);
       
       res.statusCode = 200;
-      (res as any).emit('finish');
+      (res as MockResponse).emit('finish');
       
       // 验证告警被冷却期阻止
       expect(mockNotificationService.sendAlert).not.toHaveBeenCalled();
@@ -998,7 +1009,7 @@ describe('API Monitoring Middleware', () => {
         await middleware(req, res, next);
         
         res.statusCode = request.statusCode;
-        (res as any).emit('finish');
+        (res as MockResponse).emit('finish');
       }
       
       // 验证聚合指标存储
@@ -1025,7 +1036,7 @@ describe('API Monitoring Middleware', () => {
       await middleware(req, res, next);
       
       res.statusCode = 200;
-      (res as any).emit('finish');
+      (res as MockResponse).emit('finish');
       
       // 验证百分位数计算
       expect(mockAnalyticsService.gauge).toHaveBeenCalledWith(
@@ -1062,7 +1073,7 @@ describe('API Monitoring Middleware', () => {
       await middleware(req, res, next);
       
       res.statusCode = 200;
-      (res as any).emit('finish');
+      (res as MockResponse).emit('finish');
       
       // 验证吞吐量计算 (51 requests / 5 minutes = 10.2 requests per minute)
       expect(mockAnalyticsService.gauge).toHaveBeenCalledWith(
@@ -1094,7 +1105,7 @@ describe('API Monitoring Middleware', () => {
       await middleware(req, res, next);
       
       res.statusCode = 200;
-      (res as any).emit('finish');
+      (res as MockResponse).emit('finish');
       
       const processingTime = Date.now() - startTime;
       
@@ -1115,7 +1126,7 @@ describe('API Monitoring Middleware', () => {
       await middleware(req1, res1, next1);
       
       res1.statusCode = 200;
-      (res1 as any).emit('finish');
+      (res1 as MockResponse).emit('finish');
       
       // 第二次请求
       const req2 = createMockRequest({ method, url: endpoint }) as Request;
@@ -1125,7 +1136,7 @@ describe('API Monitoring Middleware', () => {
       await middleware(req2, res2, next2);
       
       res2.statusCode = 200;
-      (res2 as any).emit('finish');
+      (res2 as MockResponse).emit('finish');
       
       // 验证缓存使用
       expect(mockCacheService.hget).toHaveBeenCalledWith(
@@ -1153,7 +1164,7 @@ describe('API Monitoring Middleware', () => {
         await middleware(req, res, next);
         
         res.statusCode = 200;
-        (res as any).emit('finish');
+        (res as MockResponse).emit('finish');
       }
       
       const finalMemory = process.memoryUsage().heapUsed;
@@ -1184,7 +1195,7 @@ describe('API Monitoring Middleware', () => {
       expect(next).toHaveBeenCalledWith();
       
       res.statusCode = 200;
-      (res as any).emit('finish');
+      (res as MockResponse).emit('finish');
       
       // 验证降级处理
       expect(mockLogger.warn).toHaveBeenCalledWith(
@@ -1212,7 +1223,7 @@ describe('API Monitoring Middleware', () => {
       expect(next).toHaveBeenCalledWith();
       
       res.statusCode = 200;
-      (res as any).emit('finish');
+      (res as MockResponse).emit('finish');
       
       // 验证错误处理
       expect(mockLogger.error).toHaveBeenCalledWith(
@@ -1247,7 +1258,7 @@ describe('API Monitoring Middleware', () => {
           rules: [alertRule]
         }
       };
-      (envConfig as any) = { monitoring: configWithAlert };
+      (envConfig as MockEnvConfig) = { monitoring: configWithAlert };
       
       // Mock 长响应时间
       let callCount = 0;
@@ -1267,7 +1278,7 @@ describe('API Monitoring Middleware', () => {
       await middleware(req, res, next);
       
       res.statusCode = 200;
-      (res as any).emit('finish');
+      (res as MockResponse).emit('finish');
       
       // 验证告警错误处理
       expect(mockLogger.error).toHaveBeenCalledWith(
@@ -1278,7 +1289,7 @@ describe('API Monitoring Middleware', () => {
 
     it('应该处理监控配置错误', async () => {
       // 设置无效配置
-      (envConfig as any) = { monitoring: null };
+      (envConfig as MockEnvConfig) = { monitoring: null };
       
       const req = createMockRequest({
         method: 'GET',
@@ -1293,7 +1304,7 @@ describe('API Monitoring Middleware', () => {
       expect(next).toHaveBeenCalledWith();
       
       res.statusCode = 200;
-      (res as any).emit('finish');
+      (res as MockResponse).emit('finish');
       
       // 验证配置错误处理
       expect(mockLogger.warn).toHaveBeenCalledWith(

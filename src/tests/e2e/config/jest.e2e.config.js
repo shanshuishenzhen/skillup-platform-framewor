@@ -3,9 +3,9 @@
  * 专门用于端到端测试的 Jest 配置文件
  */
 
-const path = require('path');
+import path from 'path';
 
-module.exports = {
+export default {
   // 显示名称
   displayName: 'E2E Tests',
   

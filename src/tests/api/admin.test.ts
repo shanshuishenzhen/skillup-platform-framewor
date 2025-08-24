@@ -190,6 +190,26 @@ const testSystemStats = {
   }
 };
 
+// Mock 接口定义
+interface MockSupabaseQuery {
+  select: jest.MockedFunction<any>;
+  eq: jest.MockedFunction<any>;
+  neq: jest.MockedFunction<any>;
+  gt: jest.MockedFunction<any>;
+  gte: jest.MockedFunction<any>;
+  lt: jest.MockedFunction<any>;
+  lte: jest.MockedFunction<any>;
+  like: jest.MockedFunction<any>;
+  ilike: jest.MockedFunction<any>;
+  in: jest.MockedFunction<any>;
+  is: jest.MockedFunction<any>;
+  order: jest.MockedFunction<any>;
+  limit: jest.MockedFunction<any>;
+  range: jest.MockedFunction<any>;
+  single: jest.MockedFunction<any>;
+  mockResolvedValue: jest.MockedFunction<any>;
+}
+
 const adminJwtToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiYWRtaW4tMTIzIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNzA1MzE0MDAwLCJleHAiOjE3MDU0MDA0MDB9.signature';
 const userJwtToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoidXNlci0xMjMiLCJyb2xlIjoic3R1ZGVudCIsImlhdCI6MTcwNTMxNDAwMCwiZXhwIjoxNzA1NDAwNDAwfQ.signature';
 const instructorJwtToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiaW5zdHJ1Y3Rvci0xMjMiLCJyb2xlIjoiaW5zdHJ1Y3RvciIsImlhdCI6MTcwNTMxNDAwMCwiZXhwIjoxNzA1NDAwNDAwfQ.signature';
@@ -247,7 +267,7 @@ describe('Admin API', () => {
       range: jest.fn().mockReturnThis(),
       single: jest.fn().mockResolvedValue({ data: testAdmin, error: null }),
       mockResolvedValue: jest.fn().mockResolvedValue({ data: [testUser], error: null })
-    } as any);
+    } as MockSupabaseQuery);
     
     // 设置缓存服务
     mockCacheService.get.mockResolvedValue(null);

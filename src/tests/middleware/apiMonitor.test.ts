@@ -17,6 +17,19 @@
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { Request, Response, NextFunction } from 'express';
 import { testUtils } from '../setup';
+import { envConfig } from '@/utils/envConfig';
+import { errorHandler } from '@/utils/errorHandler';
+import { monitoringService } from '@/services/monitoringService';
+import { userService } from '@/services/userService';
+import { createClient } from '@supabase/supabase-js';
+import * as crypto from 'node:crypto';
+import * as uuid from 'uuid';
+import * as moment from 'moment';
+import * as redis from 'redis';
+import * as lodash from 'lodash';
+import * as rateLimiterFlexible from 'rate-limiter-flexible';
+import * as geoipLite from 'geoip-lite';
+import * as useragent from 'useragent';
 
 // 模拟依赖
 jest.mock('@/utils/envConfig');
@@ -184,23 +197,23 @@ describe('API监控中间件', () => {
     jest.clearAllMocks();
     
     // 设置模拟返回值
-    require('@/utils/envConfig').envConfig = mockEnvConfig;
-    require('@/utils/errorHandler').errorHandler = mockErrorHandler;
-    require('@/services/monitoringService').monitoringService = mockMonitoringService;
-    require('@/services/userService').userService = mockUserService;
+    jest.mocked(envConfig).mockReturnValue(mockEnvConfig);
+    jest.mocked(errorHandler).mockReturnValue(mockErrorHandler);
+    jest.mocked(monitoringService).mockReturnValue(mockMonitoringService);
+    jest.mocked(userService).mockReturnValue(mockUserService);
     
     // 设置Supabase模拟
-    require('@supabase/supabase-js').createClient = jest.fn(() => mockSupabase);
+    jest.mocked(createClient).mockReturnValue(mockSupabase);
     
     // 设置其他依赖模拟
-    require('node:crypto').default = mockCrypto;
-    require('uuid').default = mockUuid;
-    require('moment').default = mockMoment;
-    require('redis').createClient = jest.fn(() => mockRedis);
-    require('lodash').default = mockLodash;
-    require('rate-limiter-flexible').default = mockRateLimiter;
-    require('geoip-lite').default = mockGeoip;
-    require('useragent').default = mockUseragent;
+    jest.mocked(crypto).mockReturnValue(mockCrypto);
+    jest.mocked(uuid).mockReturnValue(mockUuid);
+    jest.mocked(moment).mockReturnValue(mockMoment);
+    jest.mocked(redis.createClient).mockReturnValue(mockRedis);
+    jest.mocked(lodash).mockReturnValue(mockLodash);
+    jest.mocked(rateLimiterFlexible).mockReturnValue(mockRateLimiter);
+    jest.mocked(geoipLite).mockReturnValue(mockGeoip);
+    jest.mocked(useragent).mockReturnValue(mockUseragent);
     
     // 创建API监控实例
     apiMonitor = new ApiMonitor();
@@ -358,7 +371,20 @@ describe('API监控中间件', () => {
         }
       });
       
-      await middleware(mockReq as Request, mockRes as Response, mockNext);
+      interface MockRequest extends Partial<Request> {
+        path: string;
+        method: string;
+        headers: Record<string, string>;
+        ip: string;
+        user?: { id: string };
+      }
+      
+      interface MockResponse extends Partial<Response> {
+        statusCode: number;
+        on: jest.Mock;
+      }
+      
+      await middleware(mockReq as MockRequest, mockRes as MockResponse, mockNext);
       
       // 触发响应结束
       endCallback();
@@ -371,7 +397,8 @@ describe('API监控中间件', () => {
           statusCode: 200,
           duration: expect.any(Number),
           userAgent: expect.any(String),
-          ip: '192.168.1.100'
+          ip: '192.168.1.100',
+          timestamp: expect.any(Date)
         })
       );
     });

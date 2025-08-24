@@ -253,15 +253,20 @@ const mockJwt = {
   sign: jest.fn()
 };
 
+// Mock 类型定义
+interface MockedModule<T> {
+  [K in keyof T]: T[K] extends (...args: any[]) => any ? jest.MockedFunction<T[K]> : T[K];
+}
+
 // 设置 Mock
-(supabaseClient as any) = mockSupabaseClient;
-(cacheService as any) = mockCacheService;
-(auditService as any) = mockAuditService;
-(analyticsService as any) = mockAnalyticsService;
-(learningProgressService as any) = mockLearningProgressService;
-(aiService as any) = mockAiService;
-(envConfig as any) = mockEnvConfig;
-(jwt as any) = mockJwt;
+jest.mocked(supabaseClient).mockReturnValue(mockSupabaseClient);
+jest.mocked(cacheService).mockReturnValue(mockCacheService);
+jest.mocked(auditService).mockReturnValue(mockAuditService);
+jest.mocked(analyticsService).mockReturnValue(mockAnalyticsService);
+jest.mocked(learningProgressService).mockReturnValue(mockLearningProgressService);
+jest.mocked(aiService).mockReturnValue(mockAiService);
+jest.mocked(envConfig).mockReturnValue(mockEnvConfig);
+jest.mocked(jwt).mockReturnValue(mockJwt);
 
 // 测试数据
 const testCourseProgress: CourseProgress = {

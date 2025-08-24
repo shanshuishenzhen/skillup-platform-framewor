@@ -15,6 +15,8 @@
  */
 
 import { jest } from '@jest/globals';
+import { envConfig } from '@/utils/envConfig';
+import { createClient } from '@supabase/supabase-js';
 import type {
   InventoryService,
   InventoryItem,
@@ -1205,8 +1207,8 @@ describe('库存服务便捷函数', () => {
     jest.clearAllMocks();
     
     // 设置模拟
-    require('@/utils/envConfig').envConfig = mockEnvConfig;
-    require('@supabase/supabase-js').createClient = jest.fn(() => mockSupabase);
+    jest.mocked(envConfig).mockReturnValue(mockEnvConfig);
+    jest.mocked(createClient).mockReturnValue(mockSupabase);
     
     mockSupabase.from().select().eq().single.mockResolvedValue({
       data: {
