@@ -10,6 +10,16 @@ export enum UserRole {
   PAID_STUDENT = '付费学员',
 }
 
+export enum QuestionType {
+  SINGLE_CHOICE = 'single_choice', // 单选题
+  MULTIPLE_CHOICE = 'multiple_choice', // 多选题
+}
+
+export enum ExamAttemptStatus {
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed',
+}
+
 export enum UserStatus {
   ACTIVE = 'active',
   LOCKED = 'locked', // For security lockouts
@@ -95,4 +105,66 @@ export interface LearningRecord {
   last_watched_timestamp: number; // e.g., 123 (seconds into the video)
   last_learn_time: Date;
   completed_at: Date | null;
+}
+
+// --- Exam System Schemas ---
+
+/**
+ * 5. exams table
+ * Stores information about each exam.
+ */
+export interface Exam {
+  id: string;
+  course_id: string; // Foreign key to courses.id to link an exam to a course
+  title: string;
+  description: string;
+  created_at: Date;
+}
+
+/**
+ * 6. questions table
+ * Stores the questions for all exams.
+ */
+export interface Question {
+  id: string;
+  exam_id: string; // Foreign key to exams.id
+  question_text: string;
+  question_type: QuestionType;
+  order: number; // To determine the order of questions in an exam
+}
+
+/**
+ * 7. choices table
+ * Stores the answer choices for each question.
+ */
+export interface Choice {
+  id: string;
+  question_id: string; // Foreign key to questions.id
+  choice_text: string;
+  is_correct: boolean; // True if this is a correct answer
+}
+
+/**
+ * 8. exam_attempts table
+ * Records each attempt a user makes on an exam.
+ */
+export interface ExamAttempt {
+  id: string;
+  user_id: string; // Foreign key to users.id
+  exam_id: string; // Foreign key to exams.id
+  status: ExamAttemptStatus;
+  score: number | null; // The final score, null if in progress
+  started_at: Date;
+  completed_at: Date | null;
+}
+
+/**
+ * 9. user_answers table
+ * Stores the specific answer(s) a user selected for a question in an attempt.
+ */
+export interface UserAnswer {
+  id: string;
+  exam_attempt_id: string; // Foreign key to exam_attempts.id
+  question_id: string; // Foreign key to questions.id
+  choice_id: string; // Foreign key to choices.id
 }
