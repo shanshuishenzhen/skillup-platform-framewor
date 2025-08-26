@@ -10,6 +10,7 @@ const Header = () => {
         </Link>
         <div className="hidden md:flex items-center space-x-6">
           <Link href="/courses" className="text-gray-600 hover:text-primary transition-colors">课程</Link>
+          <Link href="/exams" className="text-gray-600 hover:text-primary transition-colors">考试</Link>
           <Link href="#pricing" className="text-gray-600 hover:text-primary transition-colors">定价</Link>
           <Link href="#about" className="text-gray-600 hover:text-primary transition-colors">关于我们</Link>
         </div>
