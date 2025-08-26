@@ -134,12 +134,12 @@ export default function LoginPage() {
         
         // 登录成功
         if (isAdminLogin) {
-          // 使用管理员登录函数
-          await adminLogin(result.user, result.token);
+          // 使用管理员登录函数，传递refresh token
+          await adminLogin(result.user, result.token, result.refreshToken);
           router.push('/admin');
         } else {
-          // 使用普通用户登录函数
-          await login(result.user, result.token);
+          // 使用普通用户登录函数，传递refresh token
+          await login(result.user, result.token, result.refreshToken);
           // 根据用户类型和人脸验证状态跳转
           const returnUrl = searchParams.get('returnUrl');
           if (result.user.userType === 'premium' && !result.user.faceVerified) {

@@ -212,6 +212,7 @@ export function logout(): void {
   
   localStorage.removeItem('user');
   localStorage.removeItem('token');
+  localStorage.removeItem('refreshToken');
   
   // 可以在这里添加其他登出逻辑，如清除其他缓存数据
 }

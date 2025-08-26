@@ -14,8 +14,11 @@ import {
   ChevronRight,
   X,
   Check,
-  AlertCircle
+  AlertCircle,
+  Phone,
+  Mail
 } from 'lucide-react';
+import { handleApiAuthError } from '@/utils/authErrorHandler';
 import UserEditDialog from './UserEditDialog';
 import UserImport from './UserImport';
 
@@ -66,6 +69,7 @@ function UserList({ onUserSelect }: UserListProps) {
   // 状态管理
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState<FilterConditions>({});
   const [currentPage, setCurrentPage] = useState(1);
@@ -86,29 +90,51 @@ function UserList({ onUserSelect }: UserListProps) {
   const [showBatchDialog, setShowBatchDialog] = useState(false);
   const [batchOperation, setBatchOperation] = useState<string>('');
   const [batchData, setBatchData] = useState<BatchData>({});
+  
+  // 全选状态管理
+  const [isSelectAllMode, setIsSelectAllMode] = useState(false); // 是否为全选所有用户模式
+  const [allUserIds, setAllUserIds] = useState<string[]>([]); // 所有用户的ID列表
+  const [showSelectAllOptions, setShowSelectAllOptions] = useState(false); // 是否显示全选选项
 
-  // 统一的认证错误处理
-  const handleAuthError = () => {
-    alert('登录已过期，请重新登录');
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    window.location.href = '/login';
-  };
-
-  // 统一的API请求错误处理
+  // 简化的API错误处理（移除重复的权限检查）
   const handleApiError = (response: Response, operation: string) => {
     if (response.status === 401 || response.status === 403) {
-      handleAuthError();
+      // 权限问题由AdminGuard统一处理，这里只记录日志
+      console.warn(`${operation}: 权限验证失败，可能需要重新登录`);
+      alert('权限验证失败，请刷新页面重试。');
+    } else if (response.status >= 500) {
+      console.error(`${operation}失败: 服务器错误`, response.status);
+      alert(`${operation}失败：服务器暂时不可用，请稍后重试。`);
     } else {
       console.error(`${operation}失败:`, response.statusText);
-      alert(`${operation}失败，请稍后重试`);
+      alert(`${operation}失败，请检查网络连接或联系管理员。`);
     }
   };
 
-  // 获取用户列表
+  // 获取用户列表（增强版 - 添加详细错误处理和日志）
   const fetchUsers = async () => {
     try {
       setLoading(true);
+      setError(null);
+      
+      console.log('开始获取用户列表...', {
+        currentPage,
+        pageSize,
+        searchTerm,
+        filters,
+        sortBy,
+        sortOrder
+      });
+      
+      // 获取token（AdminGuard已确保token有效）
+      const token = localStorage.getItem('token');
+      if (!token) {
+        const errorMsg = '未找到认证token，请重新登录';
+        console.error(errorMsg);
+        setError(errorMsg);
+        return;
+      }
+      
       const params = new URLSearchParams({
         page: currentPage.toString(),
         limit: pageSize.toString(),
@@ -118,7 +144,84 @@ function UserList({ onUserSelect }: UserListProps) {
         ...Object.fromEntries(Object.entries(filters).filter(([_, v]) => v))
       });
       
+      console.log('发送API请求:', `/api/admin/users?${params}`);
+      
+      const response = await fetch(`/api/admin/users?${params}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('API响应状态:', response.status, response.statusText);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('API响应数据:', data);
+        
+        const usersList = data.data?.users || [];
+        const totalCount = data.data?.pagination?.total || 0;
+        
+        setUsers(usersList);
+        setTotal(totalCount);
+        
+        console.log(`成功获取用户列表: ${usersList.length} 条记录，总计 ${totalCount} 条`);
+        
+        if (usersList.length === 0 && totalCount === 0) {
+          console.log('用户列表为空');
+        }
+      } else {
+        const errorText = await response.text();
+        console.error('API请求失败:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorText
+        });
+        
+        // 使用统一的认证错误处理
+        const handled = await handleApiAuthError(response, '获取用户列表');
+        if (!handled) {
+          if (response.status === 401 || response.status === 403) {
+            setError('权限验证失败，请刷新页面重试');
+          } else if (response.status >= 500) {
+            setError('服务器暂时不可用，请稍后重试');
+          } else {
+            setError(`获取用户列表失败: ${response.statusText}`);
+          }
+        }
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : '未知错误';
+      console.error('获取用户列表异常:', error);
+      setError(`网络连接失败: ${errorMsg}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 重试获取用户列表
+  const retryFetchUsers = () => {
+    console.log('用户点击重试按钮');
+    fetchUsers();
+  };
+
+  // 获取所有用户ID（用于跨页面全选）
+  const fetchAllUserIds = async () => {
+    try {
       const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('未找到认证token');
+        return [];
+      }
+      
+      const params = new URLSearchParams({
+        ids_only: 'true', // 特殊参数，只返回所有用户ID
+        ...(searchTerm && { search: searchTerm }),
+        ...Object.fromEntries(Object.entries(filters).filter(([_, v]) => v))
+      });
+      
+      console.log('获取所有用户ID:', `/api/admin/users?${params}`);
+      
       const response = await fetch(`/api/admin/users?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -128,15 +231,18 @@ function UserList({ onUserSelect }: UserListProps) {
       
       if (response.ok) {
         const data = await response.json();
-        setUsers(data.data?.users || []);
-        setTotal(data.data?.pagination?.total || 0);
+        const userIds = data.data?.user_ids || [];
+        console.log(`获取到 ${userIds.length} 个用户ID`);
+        setAllUserIds(userIds);
+        return userIds;
       } else {
-        handleApiError(response, '获取用户列表');
+        console.error('获取所有用户ID失败:', response.status);
+        await handleApiAuthError(response, '获取所有用户ID');
+        return [];
       }
     } catch (error) {
-      console.error('获取用户列表失败:', error);
-    } finally {
-      setLoading(false);
+      console.error('获取所有用户ID异常:', error);
+      return [];
     }
   };
 
@@ -150,6 +256,47 @@ function UserList({ onUserSelect }: UserListProps) {
   const handleFilter = (newFilters: FilterConditions) => {
     setFilters(newFilters);
     setCurrentPage(1);
+  };
+
+  // 全选所有用户（跨页面）
+  const selectAllUsers = async () => {
+    console.log('开始全选所有用户');
+    const userIds = await fetchAllUserIds();
+    if (userIds.length > 0) {
+      setSelectedUsers(userIds);
+      setIsSelectAllMode(true);
+      setShowSelectAllOptions(false);
+      console.log(`已选择所有 ${userIds.length} 个用户`);
+    }
+  };
+
+  // 仅选择当前页用户
+  const selectCurrentPageUsers = () => {
+    console.log('选择当前页用户');
+    const currentPageUserIds = users.map(user => user.id);
+    setSelectedUsers(currentPageUserIds);
+    setIsSelectAllMode(false);
+    setShowSelectAllOptions(false);
+    console.log(`已选择当前页 ${currentPageUserIds.length} 个用户`);
+  };
+
+  // 取消所有选择
+  const clearAllSelections = () => {
+    console.log('取消所有选择');
+    setSelectedUsers([]);
+    setIsSelectAllMode(false);
+    setShowSelectAllOptions(false);
+  };
+
+  // 处理全选复选框点击
+  const handleSelectAllClick = () => {
+    if (selectedUsers.length === 0) {
+      // 当前没有选择任何用户，显示选择选项
+      setShowSelectAllOptions(true);
+    } else {
+      // 当前有选择的用户，取消所有选择
+      clearAllSelections();
+    }
   };
 
   // 格式化用户角色
@@ -222,10 +369,15 @@ function UserList({ onUserSelect }: UserListProps) {
     setIsEditDialogOpen(false);
   };
 
-  // 保存用户信息
+  // 保存用户信息（使用统一认证错误处理）
   const saveUserInfo = async (userData: Partial<User>) => {
     try {
       const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('未找到认证token');
+        return;
+      }
+      
       const response = await fetch(`/api/admin/users/${editingUser?.id}`, {
         method: 'PUT',
         headers: {
@@ -239,19 +391,25 @@ function UserList({ onUserSelect }: UserListProps) {
         await fetchUsers();
         closeEditDialog();
       } else {
-        handleApiError(response, '保存用户信息');
+        await handleApiAuthError(response, '保存用户信息');
       }
     } catch (error) {
       console.error('保存用户信息失败:', error);
+      alert('网络连接失败，请检查网络连接后重试。');
     }
   };
 
-  // 删除用户
+  // 删除用户（使用统一认证错误处理）
   const deleteUser = async (userId: string) => {
     if (!confirm('确定要删除这个用户吗？')) return;
     
     try {
       const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('未找到认证token');
+        return;
+      }
+      
       const response = await fetch(`/api/admin/users/${userId}`, {
         method: 'DELETE',
         headers: {
@@ -263,17 +421,39 @@ function UserList({ onUserSelect }: UserListProps) {
       if (response.ok) {
         await fetchUsers();
       } else {
-        handleApiError(response, '删除用户');
+        await handleApiAuthError(response, '删除用户');
       }
     } catch (error) {
       console.error('删除用户失败:', error);
+      alert('网络连接失败，请检查网络连接后重试。');
     }
   };
 
-  // 批量操作用户
+  // 批量操作用户（使用统一认证错误处理）
   const batchUpdateUsers = async (userIds: string[], updateData: Partial<User>) => {
+    console.log('🚀 开始批量更新用户:', { userIds: userIds.length, updateData });
+    
+    if (!userIds || userIds.length === 0) {
+      alert('请先选择要操作的用户');
+      return;
+    }
+    
+    // 性能优化：对于大量用户的批量操作，显示确认对话框
+    if (userIds.length > 100) {
+      const confirmed = confirm(`您即将对 ${userIds.length} 个用户执行批量操作，这可能需要一些时间。确定要继续吗？`);
+      if (!confirmed) return;
+    }
+    
     try {
       const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('未找到认证token');
+        alert('认证失败，请重新登录');
+        return;
+      }
+      
+      console.log('📡 发送批量更新请求到 /api/admin/users/batch');
+      
       const response = await fetch('/api/admin/users/batch', {
         method: 'PUT',
         headers: {
@@ -286,23 +466,99 @@ function UserList({ onUserSelect }: UserListProps) {
         }),
       });
       
+      console.log('📥 收到响应，状态码:', response.status);
+      
       if (response.ok) {
-        await fetchUsers();
+        const result = await response.json();
+        console.log('📊 批量更新结果:', result);
+        
+        // 显示成功提示
+        const statusText = updateData.status === 'active' ? '激活' : 
+                          updateData.status === 'inactive' ? '停用' : 
+                          updateData.status === 'suspended' ? '暂停' : '更新';
+        const message = `成功${statusText}了 ${userIds.length} 个用户`;
+        console.log('✅ 批量更新成功:', message);
+        alert(message);
+        
+        // 清空选择状态
         setSelectedUsers([]);
+        setIsSelectAllMode(false);
+        setAllUserIds([]);
+        
+        // 刷新当前页数据
+        await fetchUsers();
       } else {
-        handleApiError(response, '批量更新用户');
+        const errorData = await response.text();
+        console.error('❌ 批量更新失败:', errorData);
+        await handleApiAuthError(response, '批量更新用户');
       }
     } catch (error) {
-      console.error('批量更新用户失败:', error);
+      console.error('💥 批量更新异常:', error);
+      alert('网络错误，请检查连接后重试');
     }
   };
 
-  // 批量删除用户
+  // 直接批量激活用户
+  const batchActivateUsers = async () => {
+    console.log('🟢 批量激活用户按钮被点击，选中用户:', selectedUsers);
+    
+    if (selectedUsers.length === 0) {
+      alert('请先选择要激活的用户');
+      return;
+    }
+    
+    if (!confirm(`确定要激活选中的 ${selectedUsers.length} 个用户吗？`)) return;
+    
+    console.log('🚀 开始执行批量激活操作');
+    await batchUpdateUsers(selectedUsers, { status: 'active' });
+  };
+
+  // 直接批量停用用户
+  const batchDeactivateUsers = async () => {
+    console.log('🔴 批量停用用户按钮被点击，选中用户:', selectedUsers);
+    
+    if (selectedUsers.length === 0) {
+      alert('请先选择要停用的用户');
+      return;
+    }
+    
+    if (!confirm(`确定要停用选中的 ${selectedUsers.length} 个用户吗？`)) return;
+    
+    console.log('🚀 开始执行批量停用操作');
+    await batchUpdateUsers(selectedUsers, { status: 'inactive' });
+  };
+
+  // 直接批量暂停用户
+  const batchSuspendUsers = async () => {
+    console.log('🟡 批量暂停用户按钮被点击，选中用户:', selectedUsers);
+    
+    if (selectedUsers.length === 0) {
+      alert('请先选择要暂停的用户');
+      return;
+    }
+    
+    if (!confirm(`确定要暂停选中的 ${selectedUsers.length} 个用户吗？`)) return;
+    
+    console.log('🚀 开始执行批量暂停操作');
+    await batchUpdateUsers(selectedUsers, { status: 'suspended' });
+  };
+
+  // 批量删除用户（使用统一认证错误处理）
   const batchDeleteUsers = async (userIds: string[]) => {
-    if (!confirm(`确定要删除选中的 ${userIds.length} 个用户吗？`)) return;
+    // 性能优化：对于大量用户的删除操作，显示额外警告
+    const confirmMessage = userIds.length > 100 
+      ? `您即将删除 ${userIds.length} 个用户，这是一个不可逆的操作且可能需要一些时间。确定要继续吗？`
+      : `确定要删除选中的 ${userIds.length} 个用户吗？`;
+    
+    if (!confirm(confirmMessage)) return;
     
     try {
       const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('未找到认证token');
+        return;
+      }
+      
       const response = await fetch('/api/admin/users/batch', {
         method: 'DELETE',
         headers: {
@@ -313,13 +569,21 @@ function UserList({ onUserSelect }: UserListProps) {
       });
       
       if (response.ok) {
-        await fetchUsers();
+        // 清空选择状态
         setSelectedUsers([]);
+        setIsSelectAllMode(false);
+        setAllUserIds([]);
+        
+        // 刷新当前页数据
+        await fetchUsers();
+        
+        alert(`成功删除了 ${userIds.length} 个用户`);
       } else {
-        handleApiError(response, '批量删除用户');
+        await handleApiAuthError(response, '批量删除用户');
       }
     } catch (error) {
       console.error('批量删除用户失败:', error);
+      alert('网络连接失败，请检查网络连接后重试。');
     }
   };
 
@@ -340,15 +604,20 @@ function UserList({ onUserSelect }: UserListProps) {
     setShowBatchDialog(false);
   };
 
-  // 导出用户数据
+  // 导出用户数据（使用统一认证错误处理）
   const exportUsers = async () => {
     try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('未找到认证token');
+        return;
+      }
+      
       const params = new URLSearchParams({
         ...(searchTerm && { search: searchTerm }),
         ...Object.fromEntries(Object.entries(filters).filter(([_, v]) => v))
       });
       
-      const token = localStorage.getItem('token');
       const response = await fetch(`/api/admin/users/export?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -367,10 +636,11 @@ function UserList({ onUserSelect }: UserListProps) {
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
       } else {
-        handleApiError(response, '导出用户数据');
+        await handleApiAuthError(response, '导出用户数据');
       }
     } catch (error) {
       console.error('导出用户数据失败:', error);
+      alert('网络连接失败，请检查网络连接后重试。');
     }
   };
 
@@ -508,19 +778,19 @@ function UserList({ onUserSelect }: UserListProps) {
             </div>
             <div className="flex items-center space-x-2">
               <button
-                onClick={() => openBatchDialog('update_status')}
+                onClick={batchActivateUsers}
                 className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
               >
                 激活
               </button>
               <button
-                onClick={() => openBatchDialog('update_status')}
+                onClick={batchDeactivateUsers}
                 className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
               >
                 停用
               </button>
               <button
-                onClick={() => openBatchDialog('update_status')}
+                onClick={batchSuspendUsers}
                 className="px-3 py-1 text-sm bg-yellow-600 text-white rounded hover:bg-yellow-700"
               >
                 暂停
@@ -560,25 +830,105 @@ function UserList({ onUserSelect }: UserListProps) {
           <div className="flex items-center justify-center h-64">
             <div className="text-gray-500">加载中...</div>
           </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center h-64 p-8">
+            <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">获取用户列表失败</h3>
+            <p className="text-gray-500 text-center mb-4">{error}</p>
+            <button
+              onClick={retryFetchUsers}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              重试
+            </button>
+          </div>
+        ) : users.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-64 p-8">
+            <div className="text-gray-400 mb-4">
+              <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">暂无用户数据</h3>
+            <p className="text-gray-500 text-center mb-4">
+              {searchTerm || Object.keys(filters).length > 0 
+                ? '没有找到符合条件的用户，请尝试调整搜索条件或筛选器' 
+                : '系统中还没有用户数据，请先添加用户'}
+            </p>
+            <div className="flex space-x-3">
+              {(searchTerm || Object.keys(filters).length > 0) && (
+                <button
+                  onClick={() => {
+                    setSearchTerm('');
+                    setFilters({});
+                    setCurrentPage(1);
+                  }}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+                >
+                  清除筛选
+                </button>
+              )}
+              <button
+                onClick={retryFetchUsers}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                刷新
+              </button>
+            </div>
+          </div>
         ) : (
           <>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left">
-                      <input
-                        type="checkbox"
-                        checked={selectedUsers.length === users.length && users.length > 0}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedUsers(users.map(user => user.id));
-                          } else {
-                            setSelectedUsers([]);
-                          }
-                        }}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
+                    <th className="px-6 py-3 text-left relative">
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedUsers.length > 0}
+                          ref={(el) => {
+                            if (el) {
+                              el.indeterminate = selectedUsers.length > 0 && selectedUsers.length < (isSelectAllMode ? allUserIds.length : users.length);
+                            }
+                          }}
+                          onChange={handleSelectAllClick}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        {selectedUsers.length > 0 && (
+                          <span className="ml-2 text-xs text-gray-600">
+                            已选择 {selectedUsers.length} 个用户
+                            {isSelectAllMode ? ` (全部 ${allUserIds.length} 个)` : ` (当前页)`}
+                          </span>
+                        )}
+                      </div>
+                      
+                      {/* 全选选项弹出框 */}
+                      {showSelectAllOptions && (
+                        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 min-w-48">
+                          <div className="py-1">
+                            <button
+                              onClick={selectCurrentPageUsers}
+                              className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            >
+                              选择当前页 ({users.length} 个用户)
+                            </button>
+                            <button
+                              onClick={selectAllUsers}
+                              className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            >
+                              选择所有用户 ({allUserIds.length > 0 ? allUserIds.length : '...'} 个用户)
+                            </button>
+                            <div className="border-t border-gray-100"></div>
+                            <button
+                              onClick={() => setShowSelectAllOptions(false)}
+                              className="block w-full text-left px-4 py-2 text-sm text-gray-500 hover:bg-gray-100"
+                            >
+                              取消
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       用户信息
@@ -620,8 +970,16 @@ function UserList({ onUserSelect }: UserListProps) {
                       <td className="px-6 py-4">
                         <div>
                           <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                          <div className="text-sm text-gray-500">{user.email}</div>
-                          <div className="text-sm text-gray-500">{user.phone}</div>
+                          <div className="text-sm font-medium text-blue-600 flex items-center">
+                            <Phone className="h-3 w-3 mr-1" />
+                            {user.phone || '未设置手机号'}
+                          </div>
+                          {user.email && (
+                            <div className="text-sm text-gray-400">
+                              <Mail className="h-3 w-3 mr-1 inline" />
+                              {user.email}
+                            </div>
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4">

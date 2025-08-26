@@ -626,17 +626,13 @@ describe('Admin API', () => {
         
         expect(response.body).toEqual({
           success: true,
-          message: 'Password reset email sent successfully'
+          message: 'Password reset SMS sent successfully'
         });
         
-        expect(mockEmailService.sendEmail).toHaveBeenCalledWith(
-          expect.objectContaining({
-            to: 'user@example.com',
-            template: 'password_reset',
-            data: expect.objectContaining({
-              reset_token: expect.any(String)
-            })
-          })
+        expect(mockSmsService.sendVerificationCode).toHaveBeenCalledWith(
+          '13800138000',
+          expect.any(String),
+          'reset_password'
         );
       });
     });

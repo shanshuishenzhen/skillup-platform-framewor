@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { ErrorHandler } from '@/utils/errorHandler';
+import { verifyAdminAccess } from '@/middleware/rbac';
 
 // 初始化 Supabase 客户端
 const supabase = createClient(
@@ -36,18 +37,7 @@ const UserUpdateSchema = z.object({
 
 type UserUpdate = z.infer<typeof UserUpdateSchema>;
 
-/**
- * 检查管理员权限
- */
-async function checkAdminPermission(request: NextRequest): Promise<boolean> {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader) {
-    return false;
-  }
-  
-  // TODO: 实现JWT token验证和权限检查
-  return true;
-}
+
 
 /**
  * GET /api/admin/users/[userId]
@@ -59,10 +49,11 @@ export async function GET(
 ) {
   try {
     // 检查管理员权限
-    if (!(await checkAdminPermission(request))) {
+    const rbacResult = await verifyAdminAccess(request);
+    if (!rbacResult.success) {
       return NextResponse.json(
-        { success: false, error: '权限不足' },
-        { status: 403 }
+        { success: false, error: rbacResult.error },
+        { status: rbacResult.statusCode }
       );
     }
 
@@ -167,10 +158,11 @@ export async function PUT(
 ) {
   try {
     // 检查管理员权限
-    if (!(await checkAdminPermission(request))) {
+    const rbacResult = await verifyAdminAccess(request);
+    if (!rbacResult.success) {
       return NextResponse.json(
-        { success: false, error: '权限不足' },
-        { status: 403 }
+        { success: false, error: rbacResult.error },
+        { status: rbacResult.statusCode }
       );
     }
 
@@ -268,10 +260,11 @@ export async function DELETE(
 ) {
   try {
     // 检查管理员权限
-    if (!(await checkAdminPermission(request))) {
+    const rbacResult = await verifyAdminAccess(request);
+    if (!rbacResult.success) {
       return NextResponse.json(
-        { success: false, error: '权限不足' },
-        { status: 403 }
+        { success: false, error: rbacResult.error },
+        { status: rbacResult.statusCode }
       );
     }
 

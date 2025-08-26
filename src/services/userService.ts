@@ -32,6 +32,7 @@ export interface LoginResult {
   success: boolean;
   user?: User;
   token?: string;
+  refreshToken?: string;
   requiresFaceVerification?: boolean;
   message?: string;
 }
@@ -44,6 +45,9 @@ export interface RegisterResult {
 
 // JWT密钥 - 实际项目中应该从环境变量获取
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
+const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
 
 /**
  * 获取重试配置
@@ -66,17 +70,45 @@ function getRetryConfig(): RetryConfig {
 }
 
 /**
- * 生成JWT token
+ * 生成JWT token对
+ * @param userId 用户ID
+ * @param userType 用户类型
+ * @param role 用户角色
+ * @returns 包含access token和refresh token的对象
+ */
+function generateTokens(userId: string, userType: string, role: string = 'user'): { token: string; refreshToken: string } {
+  const accessToken = jwt.sign(
+    { 
+      userId, 
+      userType, 
+      role,
+      type: 'access'
+    },
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRES_IN }
+  );
+  
+  const refreshToken = jwt.sign(
+    { 
+      userId,
+      type: 'refresh'
+    },
+    JWT_REFRESH_SECRET,
+    { expiresIn: JWT_REFRESH_EXPIRES_IN }
+  );
+  
+  return { token: accessToken, refreshToken };
+}
+
+/**
+ * 生成JWT token (向后兼容)
  * @param userId 用户ID
  * @param userType 用户类型
  * @returns JWT token
  */
 function generateToken(userId: string, userType: string): string {
-  return jwt.sign(
-    { userId, userType },
-    JWT_SECRET,
-    { expiresIn: '7d' }
-  );
+  const tokens = generateTokens(userId, userType);
+  return tokens.token;
 }
 
 /**
@@ -255,8 +287,8 @@ export async function loginUser(
       );
     }
 
-    // 生成JWT token
-    const token = generateToken(user.id, user.user_type);
+    // 生成JWT token对
+    const { token, refreshToken } = generateTokens(user.id, user.user_type, user.role || 'user');
 
     const userData: User = {
       id: user.id,
@@ -276,6 +308,7 @@ export async function loginUser(
       success: true,
       user: userData,
       token,
+      refreshToken,
       requiresFaceVerification,
       message: requiresFaceVerification ? '请进行人脸识别验证' : '登录成功'
     };
@@ -330,8 +363,8 @@ export async function loginUserWithSms(
       };
     }
 
-    // 生成JWT token
-    const token = generateToken(user.id, user.user_type);
+    // 生成JWT token对
+    const { token, refreshToken } = generateTokens(user.id, user.user_type, user.role || 'user');
 
     const userData: User = {
       id: user.id,
@@ -351,6 +384,7 @@ export async function loginUserWithSms(
       success: true,
       user: userData,
       token,
+      refreshToken,
       requiresFaceVerification,
       message: requiresFaceVerification ? '请进行人脸识别验证' : '登录成功'
     };

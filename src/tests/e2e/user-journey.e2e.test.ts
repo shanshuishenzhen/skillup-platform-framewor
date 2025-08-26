@@ -130,8 +130,11 @@ const selectors = {
   },
   // 登录页面
   login: {
-    emailInput: '[data-testid="login-email"]',
+    phoneInput: '[data-testid="login-phone"]',
     passwordInput: '[data-testid="login-password"]',
+    smsCodeInput: '[data-testid="login-sms-code"]',
+    sendSmsBtn: '[data-testid="send-sms-btn"]',
+    loginTypeToggle: '[data-testid="login-type-toggle"]',
     submitBtn: '[data-testid="login-submit"]',
     registerLink: '[data-testid="login-register-link"]',
     forgotPasswordLink: '[data-testid="forgot-password-link"]'
@@ -449,13 +452,13 @@ describe('端到端测试 - 用户完整体验流程', () => {
       const errorText = await page.textContent(selectors.common.errorMessage);
       expect(errorText).toContain('必填');
       
-      // 4. 测试邮箱格式验证
-      await page.type(selectors.register.emailInput, 'invalid-email');
+      // 4. 测试手机号格式验证
+      await page.type(selectors.register.phoneInput, 'invalid-phone');
       await page.click(selectors.register.submitBtn);
       
       await page.waitForSelector(selectors.common.errorMessage);
-      const emailErrorText = await page.textContent(selectors.common.errorMessage);
-      expect(emailErrorText).toContain('邮箱格式');
+      const phoneErrorText = await page.textContent(selectors.common.errorMessage);
+      expect(phoneErrorText).toContain('手机号格式');
       
       await E2EHelpers.takeScreenshot(page, 'registration-validation-errors');
     }, e2eConfig.timeout);
@@ -479,11 +482,11 @@ describe('端到端测试 - 用户完整体验流程', () => {
       
       // 1. 点击登录按钮
       await page.click(selectors.nav.loginBtn);
-      await page.waitForSelector(selectors.login.emailInput);
+      await page.waitForSelector(selectors.login.phoneInput);
       
       // 2. 填写登录表单
       await E2EHelpers.fillForm(page, {
-        [selectors.login.emailInput]: user.email,
+        [selectors.login.phoneInput]: user.phone,
         [selectors.login.passwordInput]: user.password
       });
       
@@ -504,11 +507,11 @@ describe('端到端测试 - 用户完整体验流程', () => {
     it('应该处理登录错误', async () => {
       // 1. 导航到登录页面
       await page.click(selectors.nav.loginBtn);
-      await page.waitForSelector(selectors.login.emailInput);
+      await page.waitForSelector(selectors.login.phoneInput);
       
       // 2. 使用错误的凭据
       await E2EHelpers.fillForm(page, {
-        [selectors.login.emailInput]: 'wrong@email.com',
+        [selectors.login.phoneInput]: '13800000000',
         [selectors.login.passwordInput]: 'wrongpassword'
       });
       
@@ -518,7 +521,7 @@ describe('端到端测试 - 用户完整体验流程', () => {
       // 4. 验证错误消息
       await page.waitForSelector(selectors.common.errorMessage);
       const errorText = await page.textContent(selectors.common.errorMessage);
-      expect(errorText).toContain('邮箱或密码错误');
+      expect(errorText).toContain('手机号或密码错误');
       
       await E2EHelpers.takeScreenshot(page, 'login-error');
     }, e2eConfig.timeout);

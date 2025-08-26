@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>权限验证调试工具</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .header {
+            text-align: center;
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .section h3 {
+            margin-top: 0;
+            color: #007bff;
+        }
+        .button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        .button:hover {
+            background-color: #0056b3;
+        }
+        .button.danger {
+            background-color: #dc3545;
+        }
+        .button.danger:hover {
+            background-color: #c82333;
+        }
+        .button.success {
+            background-color: #28a745;
+        }
+        .button.success:hover {
+            background-color: #218838;
+        }
+        .result {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .input-group {
+            margin: 10px 0;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 权限验证调试工具</h1>
+            <p>用于诊断管理员权限验证问题</p>
+        </div>
+
+        <!-- 当前状态 -->
+        <div class="section">
+            <h3>📊 当前状态</h3>
+            <button class="button" onclick="checkCurrentStatus()">检查当前状态</button>
+            <div id="currentStatus" class="result"></div>
+        </div>
+
+        <!-- 登录测试 -->
+        <div class="section">
+            <h3>🔐 登录测试</h3>
+            <div class="input-group">
+                <label for="phone">手机号:</label>
+                <input type="text" id="phone" value="13823738278" placeholder="请输入手机号">
+            </div>
+            <div class="input-group">
+                <label for="password">密码:</label>
+                <input type="password" id="password" value="123456" placeholder="请输入密码">
+            </div>
+            <button class="button success" onclick="testLogin()">测试登录</button>
+            <button class="button danger" onclick="clearAuth()">清除认证信息</button>
+            <div id="loginResult" class="result"></div>
+        </div>
+
+        <!-- 权限检查 -->
+        <div class="section">
+            <h3>🛡️ 权限检查</h3>
+            <button class="button" onclick="testPermissionCheck()">测试权限检查API</button>
+            <button class="button" onclick="simulateAdminGuard()">模拟AdminGuard检查</button>
+            <div id="permissionResult" class="result"></div>
+        </div>
+
+        <!-- localStorage调试 -->
+        <div class="section">
+            <h3>💾 localStorage调试</h3>
+            <button class="button" onclick="showLocalStorage()">显示localStorage</button>
+            <button class="button" onclick="decodeToken()">解析Token</button>
+            <button class="button danger" onclick="clearLocalStorage()">清空localStorage</button>
+            <div id="localStorageResult" class="result"></div>
+        </div>
+
+        <!-- 网络请求调试 -->
+        <div class="section">
+            <h3>🌐 网络请求调试</h3>
+            <button class="button" onclick="testApiConnectivity()">测试API连通性</button>
+            <button class="button" onclick="testCorsHeaders()">测试CORS头部</button>
+            <div id="networkResult" class="result"></div>
+        </div>
+
+        <!-- 页面跳转测试 -->
+        <div class="section">
+            <h3>🔄 页面跳转测试</h3>
+            <button class="button" onclick="testAdminPageAccess()">测试管理员页面访问</button>
+            <button class="button" onclick="testLoginPageRedirect()">测试登录页重定向</button>
+            <div id="redirectResult" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        // 工具函数：格式化输出
+        function formatOutput(data) {
+            if (typeof data === 'object') {
+                return JSON.stringify(data, null, 2);
+            }
+            return String(data);
+        }
+
+        // 工具函数：显示结果
+        function showResult(elementId, content, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = content;
+            element.className = `result ${type}`;
+        }
+
+        // 工具函数：添加状态消息
+        function addStatus(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const statusDiv = document.createElement('div');
+            statusDiv.className = `status ${type}`;
+            statusDiv.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            element.appendChild(statusDiv);
+        }
+
+        // 检查当前状态
+        async function checkCurrentStatus() {
+            const resultElement = document.getElementById('currentStatus');
+            resultElement.innerHTML = '';
+            
+            addStatus('currentStatus', '开始检查当前状态...', 'info');
+            
+            // 检查localStorage
+            const token = localStorage.getItem('auth_token');
+            if (token) {
+                addStatus('currentStatus', '✅ 找到auth_token', 'success');
+                try {
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    addStatus('currentStatus', `👤 用户: ${payload.phone} (${payload.role})`, 'info');
+                    
+                    const expTime = new Date(payload.exp * 1000);
+                    const now = new Date();
+                    if (expTime > now) {
+                        addStatus('currentStatus', `⏰ Token有效期至: ${expTime.toLocaleString()}`, 'success');
+                    } else {
+                        addStatus('currentStatus', `⏰ Token已过期: ${expTime.toLocaleString()}`, 'error');
+                    }
+                } catch (e) {
+                    addStatus('currentStatus', '❌ Token格式无效', 'error');
+                }
+            } else {
+                addStatus('currentStatus', '❌ 未找到auth_token', 'error');
+            }
+            
+            // 检查当前页面
+            addStatus('currentStatus', `📍 当前页面: ${window.location.pathname}`, 'info');
+            
+            // 检查用户代理
+            addStatus('currentStatus', `🌐 浏览器: ${navigator.userAgent.split(' ').slice(-2).join(' ')}`, 'info');
+        }
+
+        // 测试登录
+        async function testLogin() {
+            const phone = document.getElementById('phone').value;
+            const password = document.getElementById('password').value;
+            const resultElement = document.getElementById('loginResult');
+            resultElement.innerHTML = '';
+            
+            addStatus('loginResult', '开始测试登录...', 'info');
+            
+            try {
+                const response = await fetch('/api/admin/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ phone, password })
+                });
+                
+                addStatus('loginResult', `📡 响应状态: ${response.status}`, 'info');
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addStatus('loginResult', '✅ 登录成功', 'success');
+                    
+                    if (data.token) {
+                        localStorage.setItem('auth_token', data.token);
+                        addStatus('loginResult', '💾 Token已保存到localStorage', 'success');
+                        addStatus('loginResult', `👤 用户信息: ${data.user.real_name} (${data.user.role})`, 'info');
+                    }
+                } else {
+                    const errorData = await response.json();
+                    addStatus('loginResult', `❌ 登录失败: ${errorData.error}`, 'error');
+                }
+            } catch (error) {
+                addStatus('loginResult', `💥 请求异常: ${error.message}`, 'error');
+            }
+        }
+
+        // 清除认证信息
+        function clearAuth() {
+            localStorage.removeItem('auth_token');
+            addStatus('loginResult', '🧹 已清除认证信息', 'warning');
+        }
+
+        // 测试权限检查
+        async function testPermissionCheck() {
+            const resultElement = document.getElementById('permissionResult');
+            resultElement.innerHTML = '';
+            
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                addStatus('permissionResult', '❌ 没有找到auth_token，请先登录', 'error');
+                return;
+            }
+            
+            addStatus('permissionResult', '开始测试权限检查API...', 'info');
+            
+            try {
+                const response = await fetch('/api/admin/check-permission', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                addStatus('permissionResult', `📡 响应状态: ${response.status}`, 'info');
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addStatus('permissionResult', '✅ 权限检查通过', 'success');
+                    addStatus('permissionResult', `🔐 权限信息: ${formatOutput(data)}`, 'info');
+                } else {
+                    const errorData = await response.json();
+                    addStatus('permissionResult', `❌ 权限检查失败: ${formatOutput(errorData)}`, 'error');
+                }
+            } catch (error) {
+                addStatus('permissionResult', `💥 请求异常: ${error.message}`, 'error');
+            }
+        }
+
+        // 模拟AdminGuard检查
+        async function simulateAdminGuard() {
+            const resultElement = document.getElementById('permissionResult');
+            
+            addStatus('permissionResult', '开始模拟AdminGuard检查流程...', 'info');
+            
+            // 1. 检查登录状态
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                addStatus('permissionResult', '❌ 用户未登录，应该重定向到登录页', 'error');
+                return;
+            }
+            
+            addStatus('permissionResult', '✅ 用户已登录', 'success');
+            
+            // 2. 检查token有效性
+            try {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                const now = Math.floor(Date.now() / 1000);
+                if (payload.exp < now) {
+                    addStatus('permissionResult', '❌ Token已过期，应该重定向到登录页', 'error');
+                    return;
+                }
+                addStatus('permissionResult', '✅ Token有效', 'success');
+            } catch (e) {
+                addStatus('permissionResult', '❌ Token格式无效', 'error');
+                return;
+            }
+            
+            // 3. 调用权限检查API
+            await testPermissionCheck();
+        }
+
+        // 显示localStorage
+        function showLocalStorage() {
+            const resultElement = document.getElementById('localStorageResult');
+            resultElement.innerHTML = '';
+            
+            addStatus('localStorageResult', 'localStorage内容:', 'info');
+            
+            const keys = Object.keys(localStorage);
+            if (keys.length === 0) {
+                addStatus('localStorageResult', '📭 localStorage为空', 'warning');
+            } else {
+                keys.forEach(key => {
+                    const value = localStorage.getItem(key);
+                    if (key === 'auth_token' && value) {
+                        addStatus('localStorageResult', `🔑 ${key}: ${value.substring(0, 50)}...`, 'info');
+                    } else {
+                        addStatus('localStorageResult', `📄 ${key}: ${value}`, 'info');
+                    }
+                });
+            }
+        }
+
+        // 解析Token
+        function decodeToken() {
+            const resultElement = document.getElementById('localStorageResult');
+            
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                addStatus('localStorageResult', '❌ 没有找到auth_token', 'error');
+                return;
+            }
+            
+            try {
+                const parts = token.split('.');
+                if (parts.length !== 3) {
+                    addStatus('localStorageResult', '❌ Token格式无效', 'error');
+                    return;
+                }
+                
+                const header = JSON.parse(atob(parts[0]));
+                const payload = JSON.parse(atob(parts[1]));
+                
+                addStatus('localStorageResult', '🔍 Token解析结果:', 'info');
+                addStatus('localStorageResult', `Header: ${formatOutput(header)}`, 'info');
+                addStatus('localStorageResult', `Payload: ${formatOutput(payload)}`, 'info');
+                
+                const expTime = new Date(payload.exp * 1000);
+                const now = new Date();
+                if (expTime > now) {
+                    addStatus('localStorageResult', `⏰ Token有效期至: ${expTime.toLocaleString()}`, 'success');
+                } else {
+                    addStatus('localStorageResult', `⏰ Token已过期: ${expTime.toLocaleString()}`, 'error');
+                }
+            } catch (error) {
+                addStatus('localStorageResult', `❌ Token解析失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 清空localStorage
+        function clearLocalStorage() {
+            localStorage.clear();
+            addStatus('localStorageResult', '🧹 已清空localStorage', 'warning');
+        }
+
+        // 测试API连通性
+        async function testApiConnectivity() {
+            const resultElement = document.getElementById('networkResult');
+            resultElement.innerHTML = '';
+            
+            const apis = [
+                { name: '登录API', url: '/api/admin/auth/login', method: 'POST' },
+                { name: '权限检查API', url: '/api/admin/check-permission', method: 'GET' },
+                { name: '用户列表API', url: '/api/admin/users', method: 'GET' }
+            ];
+            
+            for (const api of apis) {
+                try {
+                    addStatus('networkResult', `测试 ${api.name}...`, 'info');
+                    
+                    const options = {
+                        method: api.method,
+                        headers: { 'Content-Type': 'application/json' }
+                    };
+                    
+                    if (api.method === 'POST') {
+                        options.body = JSON.stringify({ phone: 'test', password: 'test' });
+                    } else {
+                        const token = localStorage.getItem('auth_token');
+                        if (token) {
+                            options.headers['Authorization'] = `Bearer ${token}`;
+                        }
+                    }
+                    
+                    const response = await fetch(api.url, options);
+                    addStatus('networkResult', `✅ ${api.name} 响应: ${response.status}`, 'success');
+                } catch (error) {
+                    addStatus('networkResult', `❌ ${api.name} 错误: ${error.message}`, 'error');
+                }
+            }
+        }
+
+        // 测试CORS头部
+        async function testCorsHeaders() {
+            const resultElement = document.getElementById('networkResult');
+            
+            addStatus('networkResult', '测试CORS头部...', 'info');
+            
+            try {
+                const response = await fetch('/api/admin/check-permission', {
+                    method: 'OPTIONS'
+                });
+                
+                addStatus('networkResult', `OPTIONS响应状态: ${response.status}`, 'info');
+                
+                const corsHeaders = [
+                    'Access-Control-Allow-Origin',
+                    'Access-Control-Allow-Methods',
+                    'Access-Control-Allow-Headers'
+                ];
+                
+                corsHeaders.forEach(header => {
+                    const value = response.headers.get(header);
+                    if (value) {
+                        addStatus('networkResult', `✅ ${header}: ${value}`, 'success');
+                    } else {
+                        addStatus('networkResult', `❌ 缺少 ${header}`, 'warning');
+                    }
+                });
+            } catch (error) {
+                addStatus('networkResult', `❌ CORS测试失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 测试管理员页面访问
+        function testAdminPageAccess() {
+            const resultElement = document.getElementById('redirectResult');
+            resultElement.innerHTML = '';
+            
+            addStatus('redirectResult', '准备访问管理员页面...', 'info');
+            
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                addStatus('redirectResult', '❌ 没有auth_token，访问将被拒绝', 'error');
+            } else {
+                addStatus('redirectResult', '✅ 有auth_token，准备跳转', 'success');
+            }
+            
+            setTimeout(() => {
+                window.location.href = '/admin';
+            }, 2000);
+        }
+
+        // 测试登录页重定向
+        function testLoginPageRedirect() {
+            const resultElement = document.getElementById('redirectResult');
+            resultElement.innerHTML = '';
+            
+            addStatus('redirectResult', '清除认证信息并跳转到管理员页面...', 'info');
+            localStorage.removeItem('auth_token');
+            
+            setTimeout(() => {
+                window.location.href = '/admin';
+            }, 2000);
+        }
+
+        // 页面加载时自动检查状态
+        window.addEventListener('load', () => {
+            checkCurrentStatus();
+        });
+    </script>
+</body>
+</html>

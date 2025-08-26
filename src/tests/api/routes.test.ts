@@ -107,6 +107,16 @@ jest.mock('../../services/emailService', () => ({
   emailService: mockEmail
 }));
 
+// 模拟短信服务
+const mockSmsService = {
+  sendVerificationCode: jest.fn(() => Promise.resolve(true)),
+  verifyCode: jest.fn(() => Promise.resolve(true))
+};
+
+jest.mock('../../services/smsService', () => ({
+  smsService: mockSmsService
+}));
+
 // 模拟支付服务
 const mockPayment = {
   createPayment: jest.fn(() => Promise.resolve({
@@ -335,15 +345,15 @@ describe('API路由测试', () => {
     });
     
     describe('POST /api/auth/forgot-password', () => {
-      it('应该发送重置密码邮件', async () => {
+      it('应该发送重置密码短信', async () => {
         const requestData = {
-          email: 'test@example.com'
+          phone: '13800138000'
         };
         
         // 模拟找到用户
         mockDatabase.query.mockResolvedValueOnce([{
           id: 1,
-          email: 'test@example.com',
+          phone: '13800138000',
           name: '测试用户'
         }]);
         
@@ -353,7 +363,7 @@ describe('API路由测试', () => {
           .expect(200);
         
         expect(response.body).toHaveProperty('success', true);
-        expect(mockEmail.sendTemplateEmail).toHaveBeenCalled();
+        expect(mockSmsService.sendVerificationCode).toHaveBeenCalled();
       });
     });
     

@@ -24,6 +24,7 @@ import {
   updateUserInfo,
   PERMISSION_LEVELS
 } from '@/lib/auth';
+import { autoRefreshToken, isJWTTokenValid } from '@/utils/jwt';
 
 /**
  * 认证状态接口
@@ -90,8 +91,9 @@ export function useAuth() {
    * 用户登录
    * @param userData 用户信息
    * @param token 认证token
+   * @param refreshToken 刷新token（可选）
    */
-  const login = useCallback((userData: Partial<User>, token: string) => {
+  const login = useCallback((userData: Partial<User>, token: string, refreshToken?: string) => {
     if (typeof window === 'undefined') return;
     
     const user: User = {
@@ -105,6 +107,9 @@ export function useAuth() {
     
     localStorage.setItem('user', JSON.stringify(user));
     localStorage.setItem('token', token);
+    if (refreshToken) {
+      localStorage.setItem('refreshToken', refreshToken);
+    }
     updateAuthState();
   }, [updateAuthState]);
 
@@ -112,8 +117,9 @@ export function useAuth() {
    * 管理员登录
    * @param adminData 管理员信息
    * @param token 认证token
+   * @param refreshToken 刷新token（可选）
    */
-  const adminLogin = useCallback((adminData: Partial<User>, token: string) => {
+  const adminLogin = useCallback((adminData: Partial<User>, token: string, refreshToken?: string) => {
     if (typeof window === 'undefined') return;
     
     // 为管理员用户添加特殊标识，保留role字段
@@ -130,6 +136,9 @@ export function useAuth() {
     
     localStorage.setItem('user', JSON.stringify(adminUser));
     localStorage.setItem('token', token);
+    if (refreshToken) {
+      localStorage.setItem('refreshToken', refreshToken);
+    }
     updateAuthState();
   }, [updateAuthState]);
 
@@ -225,13 +234,53 @@ export function useAuth() {
     return authState.user.phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
   }, [authState.user]);
 
-  // 组件挂载时初始化认证状态
+  // 初始化认证状态和token自动刷新
   useEffect(() => {
-    updateAuthState();
-  }, [updateAuthState]);
-
-  // 监听localStorage变化（用于多标签页同步）
-  useEffect(() => {
+    const initAuth = async () => {
+      const storedToken = getAuthToken();
+      const storedUser = getCurrentUser();
+      
+      if (storedToken && storedUser) {
+        try {
+          // 检查token有效性并尝试自动刷新
+          if (isJWTTokenValid(storedToken)) {
+            const validToken = await autoRefreshToken(storedToken);
+            
+            if (validToken) {
+              updateAuthState();
+            } else {
+              // Token刷新失败，清除认证状态
+              console.log('Token刷新失败，清除认证状态');
+              authLogout();
+              updateAuthState();
+            }
+          } else {
+            // Token无效，清除认证状态
+            console.log('Token无效，清除认证状态');
+            authLogout();
+            updateAuthState();
+          }
+        } catch (error) {
+          console.error('初始化认证状态失败:', error);
+          authLogout();
+          updateAuthState();
+        }
+      } else {
+        updateAuthState();
+      }
+    };
+    
+    initAuth();
+    
+    // 设置定期检查token的定时器（每5分钟检查一次）
+    const tokenCheckInterval = setInterval(async () => {
+      const currentToken = getAuthToken();
+      if (currentToken && isJWTTokenValid(currentToken)) {
+        await autoRefreshToken(currentToken);
+      }
+    }, 5 * 60 * 1000); // 5分钟
+    
+    // 监听localStorage变化（用于多标签页同步）
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'user' || e.key === 'token') {
         updateAuthState();
@@ -239,7 +288,11 @@ export function useAuth() {
     };
 
     window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(tokenCheckInterval);
+    };
   }, [updateAuthState]);
 
   return {

@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理员权限验证测试</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1, h2 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .success {
+            color: #28a745;
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+        .error {
+            color: #dc3545;
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+        .warning {
+            color: #856404;
+            background-color: #fff3cd;
+            border-color: #ffeaa7;
+        }
+        .info {
+            color: #0c5460;
+            background-color: #d1ecf1;
+            border-color: #bee5eb;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .json-display {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-success { background-color: #28a745; }
+        .status-error { background-color: #dc3545; }
+        .status-warning { background-color: #ffc107; }
+        .status-info { background-color: #17a2b8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 管理员权限验证测试工具</h1>
+        <p>此工具用于诊断管理员API权限验证问题，帮助排查用户列表无法显示的原因。</p>
+        
+        <div class="test-section">
+            <h2>🎯 测试控制</h2>
+            <button onclick="runAllTests()">🚀 运行所有测试</button>
+            <button onclick="testTokenValidation()">🔑 测试Token验证</button>
+            <button onclick="testAdminUsersAPI()">👥 测试用户列表API</button>
+            <button onclick="testCheckPermissionAPI()">✅测试权限检查API</button>
+            <button onclick="clearResults()">🗑️清除结果</button>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        /**
+         * 显示测试结果
+         * @param {string} title - 测试标题
+         * @param {string} content - 测试内容
+         * @param {string} type - 结果类型 (success, error, warning, info)
+         */
+        function displayResult(title, content, type = 'info') {
+            const resultsDiv = document.getElementById('results');
+            const statusClass = `status-${type}`;
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-section ${type}`;
+            resultDiv.innerHTML = `
+                <h3><span class="status-indicator ${statusClass}"></span>${title}</h3>
+                <div class="json-display">${content}</div>
+            `;
+            resultsDiv.appendChild(resultDiv);
+        }
+
+        /**
+         * 清除所有测试结果
+         */
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        /**
+         * 从localStorage获取JWT token
+         * @returns {string|null} JWT token或null
+         */
+        function getTokenFromStorage() {
+            return localStorage.getItem('token') || localStorage.getItem('authToken') || localStorage.getItem('jwt');
+        }
+
+        /**
+         * 解析JWT token payload
+         * @param {string} token - JWT token
+         * @returns {object|null} 解析后的payload或null
+         */
+        function parseJWTToken(token) {
+            try {
+                if (!token) return null;
+                
+                // 移除Bearer前缀
+                const cleanToken = token.replace(/^Bearer\s+/i, '').trim();
+                
+                // 分割token
+                const parts = cleanToken.split('.');
+                if (parts.length !== 3) {
+                    throw new Error('Invalid JWT format');
+                }
+                
+                // 解码payload
+                const payload = parts[1];
+                const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+                return JSON.parse(decoded);
+            } catch (error) {
+                console.error('JWT解析错误:', error);
+                return null;
+            }
+        }
+
+        /**
+         * 检查token是否过期
+         * @param {object} payload - JWT payload
+         * @returns {boolean} 是否过期
+         */
+        function isTokenExpired(payload) {
+            if (!payload || !payload.exp) return true;
+            const now = Math.floor(Date.now() / 1000);
+            return payload.exp < now;
+        }
+
+        /**
+         * 测试Token验证
+         */
+        async function testTokenValidation() {
+            displayResult('🔍 开始Token验证测试', '正在检查localStorage中的token...', 'info');
+            
+            const token = getTokenFromStorage();
+            
+            if (!token) {
+                displayResult('❌ Token验证失败', '未在localStorage中找到token\n请确保已登录并且token已保存', 'error');
+                return false;
+            }
+            
+            displayResult('✅ Token存在', `Token长度: ${token.length}\nToken前缀: ${token.substring(0, 20)}...`, 'success');
+            
+            const payload = parseJWTToken(token);
+            
+            if (!payload) {
+                displayResult('❌ Token解析失败', 'JWT token格式无效或解析出错', 'error');
+                return false;
+            }
+            
+            const isExpired = isTokenExpired(payload);
+            const hasRole = payload.role;
+            const isAdmin = payload.role === 'admin' || payload.role === 'super_admin';
+            
+            const tokenInfo = {
+                用户ID: payload.sub || payload.user_id || payload.id,
+                角色: payload.role,
+                用户类型: payload.user_type,
+                手机号: payload.phone,
+                邮箱: payload.email,
+                签发时间: payload.iat ? new Date(payload.iat * 1000).toLocaleString() : '未知',
+                过期时间: payload.exp ? new Date(payload.exp * 1000).toLocaleString() : '未知',
+                是否过期: isExpired,
+                是否管理员: isAdmin,
+                完整payload: payload
+            };
+            
+            displayResult('📋 Token信息详情', JSON.stringify(tokenInfo, null, 2), 'info');
+            
+            if (isExpired) {
+                displayResult('⚠️ Token已过期', '需要重新登录获取新的token', 'warning');
+                return false;
+            }
+            
+            if (!isAdmin) {
+                displayResult('❌ 权限不足', `当前角色: ${payload.role}\n需要角色: admin 或 super_admin`, 'error');
+                return false;
+            }
+            
+            displayResult('✅ Token验证通过', 'Token有效且具有管理员权限', 'success');
+            return true;
+        }
+
+        /**
+         * 测试管理员用户列表API
+         */
+        async function testAdminUsersAPI() {
+            displayResult('🔍 开始用户列表API测试', '正在测试 /api/admin/users 接口...', 'info');
+            
+            const token = getTokenFromStorage();
+            
+            if (!token) {
+                displayResult('❌ API测试失败', '未找到token，无法进行API测试', 'error');
+                return false;
+            }
+            
+            try {
+                const response = await fetch('/api/admin/users?page=1&limit=10', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const responseText = await response.text();
+                let responseData;
+                
+                try {
+                    responseData = JSON.parse(responseText);
+                } catch (e) {
+                    responseData = { raw_response: responseText };
+                }
+                
+                const apiResult = {
+                    状态码: response.status,
+                    状态文本: response.statusText,
+                    响应头: Object.fromEntries(response.headers.entries()),
+                    响应数据: responseData
+                };
+                
+                if (response.ok) {
+                    displayResult('✅ 用户列表API测试成功', JSON.stringify(apiResult, null, 2), 'success');
+                    return true;
+                } else {
+                    let errorType = 'error';
+                    let errorMessage = '用户列表API请求失败';
+                    
+                    switch (response.status) {
+                        case 401:
+                            errorMessage = '认证失败 - Token无效或已过期';
+                            break;
+                        case 403:
+                            errorMessage = '权限不足 - 当前用户没有管理员权限';
+                            break;
+                        case 500:
+                            errorMessage = '服务器内部错误';
+                            break;
+                        default:
+                            errorMessage = `请求失败 - HTTP ${response.status}`;
+                    }
+                    
+                    displayResult(`❌ ${errorMessage}`, JSON.stringify(apiResult, null, 2), errorType);
+                    return false;
+                }
+            } catch (error) {
+                displayResult('❌ 网络错误', `请求失败: ${error.message}\n请检查网络连接和服务器状态`, 'error');
+                return false;
+            }
+        }
+
+        /**
+         * 测试权限检查API
+         */
+        async function testCheckPermissionAPI() {
+            displayResult('🔍 开始权限检查API测试', '正在测试 /api/admin/check-permission 接口...', 'info');
+            
+            const token = getTokenFromStorage();
+            
+            if (!token) {
+                displayResult('❌ API测试失败', '未找到token，无法进行API测试', 'error');
+                return false;
+            }
+            
+            try {
+                const response = await fetch('/api/admin/check-permission', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const responseText = await response.text();
+                let responseData;
+                
+                try {
+                    responseData = JSON.parse(responseText);
+                } catch (e) {
+                    responseData = { raw_response: responseText };
+                }
+                
+                const apiResult = {
+                    状态码: response.status,
+                    状态文本: response.statusText,
+                    响应头: Object.fromEntries(response.headers.entries()),
+                    响应数据: responseData
+                };
+                
+                if (response.ok) {
+                    displayResult('✅ 权限检查API测试成功', JSON.stringify(apiResult, null, 2), 'success');
+                    return true;
+                } else {
+                    displayResult('❌ 权限检查API测试失败', JSON.stringify(apiResult, null, 2), 'error');
+                    return false;
+                }
+            } catch (error) {
+                displayResult('❌ 网络错误', `请求失败: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        /**
+         * 运行所有测试
+         */
+        async function runAllTests() {
+            clearResults();
+            displayResult('🚀 开始完整权限验证测试', '正在执行所有测试项目...', 'info');
+            
+            const tokenValid = await testTokenValidation();
+            
+            if (!tokenValid) {
+                displayResult('🛑 测试中止', 'Token验证失败，无法继续API测试\n\n解决建议:\n1. 检查是否已正确登录\n2. 确认token是否保存在localStorage中\n3. 检查token是否已过期\n4. 确认用户角色是否为admin', 'error');
+                return;
+            }
+            
+            await testCheckPermissionAPI();
+            await testAdminUsersAPI();
+            
+            displayResult('🎉 测试完成', '所有测试项目已执行完毕，请查看上方结果', 'info');
+        }
+
+        // 页面加载完成后自动显示当前状态
+        window.addEventListener('load', function() {
+            displayResult('📱 测试工具已就绪', '点击上方按钮开始测试管理员权限验证', 'info');
+        });
+    </script>
+</body>
+</html>

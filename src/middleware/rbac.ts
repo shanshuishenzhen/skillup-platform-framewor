@@ -76,15 +76,70 @@ export function extractTokenFromRequest(req: NextRequest): string | null {
 export async function verifyJWTToken(token: string): Promise<JWTPayload | null> {
   try {
     const config = getEnvConfig();
-    const decoded = jwt.verify(token, config.security.jwtSecret) as JWTPayload;
+    const decoded = jwt.verify(token, config.security.jwtSecret) as any;
+    
+    console.log('🔍 RBAC verifyJWTToken: 开始验证JWT令牌');
+    console.log('📊 原始解码结果:', {
+      userId: decoded.userId,
+      phone: decoded.phone,
+      role: decoded.role,
+      roleType: typeof decoded.role,
+      exp: decoded.exp,
+      iat: decoded.iat
+    });
     
     // 验证令牌是否过期
     if (decoded.exp && decoded.exp < Math.floor(Date.now() / 1000)) {
       throw new RBACError('令牌已过期', 401, 'TOKEN_EXPIRED');
     }
 
-    return decoded;
+    // 将字符串角色转换为UserRole枚举
+    let userRole: UserRole;
+    const roleString = decoded.role;
+    
+    console.log('🔄 角色转换过程:', {
+      originalRole: roleString,
+      originalType: typeof roleString
+    });
+    
+    if (typeof roleString === 'string') {
+      switch (roleString.toUpperCase()) {
+        case 'SUPER_ADMIN':
+          userRole = UserRole.SUPER_ADMIN;
+          break;
+        case 'ADMIN':
+          userRole = UserRole.ADMIN;
+          break;
+        case 'USER':
+          userRole = UserRole.USER;
+          break;
+        default:
+          console.warn('⚠️ 未知角色类型，默认设置为USER:', roleString);
+          userRole = UserRole.USER;
+      }
+    } else {
+      // 如果已经是枚举类型，直接使用
+      userRole = roleString as UserRole;
+    }
+    
+    console.log('✅ 角色转换完成:', {
+      convertedRole: userRole,
+      convertedType: typeof userRole,
+      isValidEnum: Object.values(UserRole).includes(userRole)
+    });
+
+    const result: JWTPayload = {
+      userId: decoded.userId,
+      phone: decoded.phone,
+      role: userRole,
+      iat: decoded.iat,
+      exp: decoded.exp
+    };
+    
+    console.log('🎯 最终JWT载荷:', result);
+    return result;
   } catch (error) {
+    console.error('❌ JWT令牌验证失败:', error);
     if (error instanceof jwt.JsonWebTokenError) {
       throw new RBACError('无效的令牌', 401, 'INVALID_TOKEN');
     }
@@ -146,7 +201,27 @@ export async function getUserRoleFromDB(userId: string): Promise<UserRole | null
  * @returns 是否具有权限
  */
 export function hasRequiredRole(userRole: UserRole, requiredRoles: UserRole[]): boolean {
-  return requiredRoles.includes(userRole);
+  console.log('🔍 hasRequiredRole: 开始角色权限检查');
+  console.log('📊 角色匹配参数:', {
+    userRole,
+    userRoleType: typeof userRole,
+    requiredRoles,
+    requiredRolesTypes: requiredRoles.map(r => typeof r)
+  });
+  
+  const hasPermission = requiredRoles.includes(userRole);
+  
+  console.log('🎯 角色匹配结果:', {
+    hasPermission,
+    matchDetails: requiredRoles.map(role => ({
+      requiredRole: role,
+      matches: role === userRole,
+      strictEquals: role === userRole,
+      enumComparison: Object.is(role, userRole)
+    }))
+  });
+  
+  return hasPermission;
 }
 
 /**

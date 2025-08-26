@@ -280,10 +280,10 @@ async function registerUser(userData: TestUser): Promise<TestUser> {
   };
 }
 
-async function loginUser(email: string, password: string): Promise<string> {
+async function loginUser(phone: string, password: string): Promise<string> {
   const response = await request(app)
     .post('/api/auth/login')
-    .send({ email, password })
+    .send({ phone, password })
     .expect(200);
   
   return response.body.data.token;
@@ -396,7 +396,7 @@ describe('API集成测试', () => {
       const loginResponse = await request(app)
         .post('/api/auth/login')
         .send({
-          email: userData.email,
+          phone: userData.phone,
           password: userData.password
         })
         .expect(200);
@@ -413,7 +413,7 @@ describe('API集成测试', () => {
       // 2. 请求密码重置
       const forgotResponse = await request(app)
         .post('/api/auth/forgot-password')
-        .send({ email: user.email })
+        .send({ phone: user.phone })
         .expect(200);
       
       expect(forgotResponse.body.success).toBe(true);

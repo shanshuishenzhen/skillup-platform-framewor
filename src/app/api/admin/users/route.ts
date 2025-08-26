@@ -8,6 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { ErrorHandler } from '@/utils/errorHandler';
+import { verifyAdminAccess } from '@/middleware/rbac';
 
 // 初始化 Supabase 客户端
 const supabase = createClient(
@@ -49,7 +50,8 @@ const UserQuerySchema = z.object({
   import_batch_id: z.string().optional(),
   sync_status: z.enum(['pending', 'synced', 'failed']).optional(),
   sort_by: z.enum(['created_at', 'updated_at', 'name', 'learning_progress']).optional(),
-  sort_order: z.enum(['asc', 'desc']).optional()
+  sort_order: z.enum(['asc', 'desc']).optional(),
+  ids_only: z.string().transform(val => val === 'true').optional()
 });
 
 // 批量操作验证模式
@@ -76,62 +78,7 @@ type ExtendedUser = z.infer<typeof ExtendedUserSchema>;
 type UserQuery = z.infer<typeof UserQuerySchema>;
 type BatchOperation = z.infer<typeof BatchOperationSchema>;
 
-/**
- * 检查管理员权限
- */
-async function checkAdminPermission(request: NextRequest): Promise<{ isValid: boolean; userId?: string; userRole?: string }> {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return { isValid: false };
-  }
-  
-  const token = authHeader.substring(7);
-  
-  try {
-    // 使用Supabase验证JWT token
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-    
-    if (error || !user) {
-      console.error('Token验证失败:', error?.message);
-      return { isValid: false };
-    }
-    
-    // 从数据库获取用户角色信息
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('id, role, status')
-      .eq('id', user.id)
-      .single();
-    
-    if (userError || !userData) {
-      console.error('获取用户信息失败:', userError?.message);
-      return { isValid: false };
-    }
-    
-    // 检查用户状态
-    if (userData.status !== 'active') {
-      console.error('用户状态异常:', userData.status);
-      return { isValid: false };
-    }
-    
-    // 检查是否有管理员权限
-    const allowedRoles = ['admin', 'expert'];
-    if (!allowedRoles.includes(userData.role)) {
-      console.error('权限不足，当前角色:', userData.role);
-      return { isValid: false };
-    }
-    
-    return { 
-      isValid: true, 
-      userId: user.id, 
-      userRole: userData.role 
-    };
-    
-  } catch (error) {
-    console.error('权限验证异常:', error);
-    return { isValid: false };
-  }
-}
+
 
 /**
  * 检查批量操作权限
@@ -233,12 +180,9 @@ function validateBatchOperationData(operation: string, data: any): { isValid: bo
 export async function GET(request: NextRequest) {
   try {
     // 检查管理员权限
-    const permissionResult = await checkAdminPermission(request);
-    if (!permissionResult.isValid) {
-      return NextResponse.json(
-        { error: '权限不足，请重新登录' },
-        { status: 403 }
-      );
+    const rbacResult = await verifyAdminAccess(request);
+    if (!rbacResult.success) {
+      return rbacResult.response;
     }
 
     // 解析查询参数
@@ -257,13 +201,14 @@ export async function GET(request: NextRequest) {
       import_batch_id,
       sync_status,
       sort_by = 'created_at',
-      sort_order = 'desc'
+      sort_order = 'desc',
+      ids_only = false
     } = UserQuerySchema.parse(queryParams);
 
     // 构建查询
     let query = supabase
       .from('users')
-      .select(`
+      .select(ids_only ? 'id' : `
         id,
         name,
         email,
@@ -366,6 +311,24 @@ export async function GET(request: NextRequest) {
     
     const { count } = await countQuery;
 
+    // 如果只需要ID列表，不进行分页，直接返回所有匹配的用户ID
+    if (ids_only) {
+      const { data: users, error } = await query
+        .order(sort_by, { ascending: sort_order === 'asc' });
+
+      if (error) {
+        throw new Error(`查询用户ID失败: ${error.message}`);
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          user_ids: users?.map(user => user.id) || [],
+          total: users?.length || 0
+        }
+      });
+    }
+
     // 应用排序和分页
     const { data: users, error } = await query
       .order(sort_by, { ascending: sort_order === 'asc' })
@@ -457,12 +420,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // 检查管理员权限
-    const permissionResult = await checkAdminPermission(request);
-    if (!permissionResult.isValid) {
-      return NextResponse.json(
-        { error: '权限不足，请重新登录' },
-        { status: 403 }
-      );
+    const rbacResult = await verifyAdminAccess(request);
+    if (!rbacResult.success) {
+      return rbacResult.response;
     }
 
     const body = await request.json();
@@ -564,12 +524,9 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     // 检查管理员权限
-    const permissionResult = await checkAdminPermission(request);
-    if (!permissionResult.isValid) {
-      return NextResponse.json(
-        { error: '权限不足，请重新登录' },
-        { status: 403 }
-      );
+    const rbacResult = await verifyAdminAccess(request);
+    if (!rbacResult.success) {
+      return rbacResult.response;
     }
 
     const body = await request.json();
@@ -577,7 +534,7 @@ export async function PUT(request: NextRequest) {
 
     // 检查批量操作权限
     const batchPermissionResult = await checkBatchOperationPermission(
-      permissionResult.userRole!,
+      rbacResult.user.role,
       operation,
       user_ids
     );
@@ -737,12 +694,12 @@ export async function PUT(request: NextRequest) {
     // 记录批量操作日志
     const logData = {
       operation_type: 'batch_operation',
-      operator_id: permissionResult.userId,
-      operator_role: permissionResult.userRole,
+      operator_id: rbacResult.user.id,
+      operator_role: rbacResult.user.role,
       operation: operation,
       affected_user_count: result?.length || 0,
       affected_user_ids: user_ids,
-      operation_description: operationDescription,
+      operation_description: `批量${operation}操作`,
       operation_data: data,
       ip_address: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       user_agent: request.headers.get('user-agent') || 'unknown',
@@ -786,8 +743,8 @@ export async function PUT(request: NextRequest) {
     try {
       const errorLogData = {
         operation_type: 'batch_operation',
-        operator_id: permissionResult?.userId,
-        operator_role: permissionResult?.userRole,
+        operator_id: rbacResult?.user?.id,
+        operator_role: rbacResult?.user?.role,
         operation: operation || 'unknown',
         affected_user_count: 0,
         affected_user_ids: user_ids || [],

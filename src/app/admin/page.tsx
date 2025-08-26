@@ -9,19 +9,20 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Users, Upload, BookOpen, BarChart3, FileText, Shield } from 'lucide-react';
+import { Users, Upload, BookOpen, BarChart3, FileText, Shield, Bug } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import UserImport from '@/components/admin/UserImport';
 import UserList from '@/components/admin/UserList';
 import UserDetail from '@/components/admin/UserDetail';
 import ResourceUpload from '@/components/admin/ResourceUpload';
 import AdminGuide from '@/components/admin/AdminGuide';
+// import TokenDebugPanel from '@/components/admin/TokenDebugPanel';
 import AdminGuard from '@/components/auth/AdminGuard';
 
 /**
  * 管理功能选项卡类型
  */
-type AdminTab = 'overview' | 'users' | 'user-list' | 'resources' | 'guide';
+type AdminTab = 'overview' | 'users' | 'user-list' | 'resources' | 'guide' | 'debug';
 
 /**
  * 管理员页面组件
@@ -68,6 +69,12 @@ export default function AdminPage() {
       name: '操作指南',
       icon: FileText,
       description: '管理员操作说明'
+    },
+    {
+      id: 'debug' as AdminTab,
+      name: 'Token调试',
+      icon: Bug,
+      description: 'Token调试面板'
     }
   ];
 
@@ -169,6 +176,10 @@ export default function AdminPage() {
       
       case 'guide':
         return <AdminGuide />;
+        
+      case 'debug':
+        return <div className="p-6 bg-white rounded-lg shadow">Token调试面板暂时不可用</div>;
+        // return <TokenDebugPanel />;
         
       default:
         return null;

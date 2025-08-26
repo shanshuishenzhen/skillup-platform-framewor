@@ -54,7 +54,8 @@ export async function POST(request: NextRequest) {
         success: true,
         data: {
           user: result.user,
-          token: result.token
+          token: result.token,
+          refreshToken: result.refreshToken
         },
         message: '登录成功'
       });

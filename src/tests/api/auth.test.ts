@@ -547,16 +547,16 @@ describe('Auth API', () => {
       );
     });
 
-    it('应该要求邮箱验证', async () => {
+    it('应该要求手机号验证', async () => {
       mockSupabaseClient.single.mockResolvedValue({
-        data: { ...testUser, isEmailVerified: false },
+        data: { ...testUser, isPhoneVerified: false },
         error: null
       });
       
       const response = await request(app)
         .post('/api/auth/login')
         .send({
-          email: 'test@skillup.com',
+          phone: '13800138000',
           password: 'SecurePass123!'
         })
         .expect(403);
@@ -564,9 +564,9 @@ describe('Auth API', () => {
       expect(response.body).toEqual(
         expect.objectContaining({
           success: false,
-          message: '请先验证邮箱后再登录',
+          message: '请先验证手机号后再登录',
           data: expect.objectContaining({
-            requireEmailVerification: true
+            requirePhoneVerification: true
           })
         })
       );
@@ -667,41 +667,37 @@ describe('Auth API', () => {
    * 密码重置测试
    */
   describe('POST /api/auth/forgot-password', () => {
-    it('应该发送密码重置邮件', async () => {
+    it('应该发送密码重置短信', async () => {
       const response = await request(app)
         .post('/api/auth/forgot-password')
         .send({
-          email: 'test@skillup.com'
+          phone: '13800138000'
         })
         .expect(200);
       
       expect(response.body).toEqual(
         expect.objectContaining({
           success: true,
-          message: '密码重置邮件已发送'
+          message: '密码重置短信已发送'
         })
       );
       
-      expect(mockEmailService.sendTemplateEmail).toHaveBeenCalledWith(
-        expect.objectContaining({
-          to: 'test@skillup.com',
-          templateId: 'password-reset',
-          templateData: expect.objectContaining({
-            resetLink: expect.stringContaining('reset-password')
-          })
-        })
+      expect(mockSmsService.sendVerificationCode).toHaveBeenCalledWith(
+        '13800138000',
+        expect.any(String),
+        'reset_password'
       );
       
       expect(mockSupabaseClient.insert).toHaveBeenCalledWith(
         expect.objectContaining({
-          email: 'test@skillup.com',
+          phone: '13800138000',
           token: expect.any(String),
           expires_at: expect.any(Date)
         })
       );
     });
 
-    it('应该处理不存在的邮箱', async () => {
+    it('应该处理不存在的手机号', async () => {
       mockSupabaseClient.single.mockResolvedValue({
         data: null,
         error: { message: 'User not found' }
@@ -710,12 +706,12 @@ describe('Auth API', () => {
       const response = await request(app)
         .post('/api/auth/forgot-password')
         .send({
-          email: 'nonexistent@skillup.com'
+          phone: '13900139000'
         })
         .expect(200); // 出于安全考虑，仍返回成功
       
       expect(response.body.success).toBe(true);
-      expect(mockEmailService.sendTemplateEmail).not.toHaveBeenCalled();
+      expect(mockSmsService.sendVerificationCode).not.toHaveBeenCalled();
     });
   });
 
@@ -780,47 +776,48 @@ describe('Auth API', () => {
   });
 
   /**
-   * 邮箱验证测试
+   * 手机号验证测试
    */
-  describe('POST /api/auth/verify-email', () => {
-    it('应该成功验证邮箱', async () => {
+  describe('POST /api/auth/verify-phone', () => {
+    it('应该成功验证手机号', async () => {
       mockSupabaseClient.single.mockResolvedValue({
-        data: testEmailVerification,
+        data: testPhoneVerification,
         error: null
       });
       
       const response = await request(app)
-        .post('/api/auth/verify-email')
+        .post('/api/auth/verify-phone')
         .send({
-          token: 'verify-token-123456'
+          phone: '13800138000',
+          code: '123456'
         })
         .expect(200);
       
       expect(response.body).toEqual(
         expect.objectContaining({
           success: true,
-          message: '邮箱验证成功'
+          message: '手机号验证成功'
         })
       );
       
       expect(mockSupabaseClient.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          is_email_verified: true,
-          email_verified_at: expect.any(Date)
+          is_phone_verified: true,
+          phone_verified_at: expect.any(Date)
         })
       );
     });
 
-    it('应该重新发送验证邮件', async () => {
+    it('应该重新发送验证短信', async () => {
       const response = await request(app)
-        .post('/api/auth/resend-verification')
+        .post('/api/auth/resend-sms')
         .send({
-          email: 'test@skillup.com'
+          phone: '13800138000'
         })
         .expect(200);
       
       expect(response.body.success).toBe(true);
-      expect(mockEmailService.sendTemplateEmail).toHaveBeenCalled();
+      expect(mockSmsService.sendVerificationCode).toHaveBeenCalled();
     });
   });
 

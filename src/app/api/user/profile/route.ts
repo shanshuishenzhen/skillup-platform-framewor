@@ -26,7 +26,7 @@ function verifyToken(token: string): string | null {
  * @param request HTTP请求对象
  * @returns 用户信息
  */
-export async function GET() {
+export async function GET(request: Request) {
   try {
     // 从请求头获取token
     const authHeader = request.headers.get('authorization');
