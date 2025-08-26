@@ -1,4 +1,5 @@
 // /src/services/userService.ts
+import { UserRole } from "@/lib/db/schema";
 
 // TODO: Replace with actual database calls (e.g., using Prisma or another ORM)
 // TODO: Implement password hashing with bcrypt
@@ -18,7 +19,7 @@ export async function registerUser(phone: string, password_raw: string) {
     throw new Error("Phone and password are required.");
   }
   // Pretend to save to DB and return a user object
-  return { id: Date.now().toString(), phone, role: '注册用户' };
+  return { id: Date.now().toString(), phone, role: UserRole.REGISTERED_USER };
 }
 
 /**
@@ -31,13 +32,19 @@ export async function registerUser(phone: string, password_raw: string) {
  */
 export async function loginUser(phone: string, password_raw: string) {
   console.log(`Authenticating user with phone: ${phone}`);
-  // Placeholder logic
+
+  // Simulate an admin user
+  if (phone === "13900139000" && password_raw === "adminpassword") {
+    return { id: '0', phone, role: UserRole.ADMIN, needsFaceScan: false };
+  }
+
   // Simulate a paying user for testing the face scan flow
   if (phone === "13800138000" && password_raw === "password123") {
-    return { id: '1', phone, role: '付费学员', needsFaceScan: true };
+    return { id: '1', phone, role: UserRole.PAID_STUDENT, needsFaceScan: true };
   }
+
   // Simulate a regular registered user
-  return { id: '2', phone, role: '注册用户', needsFaceScan: false };
+  return { id: '2', phone, role: UserRole.REGISTERED_USER, needsFaceScan: false };
 }
 
 /**
