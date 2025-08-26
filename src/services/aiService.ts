@@ -62,18 +62,20 @@ export async function generateFakeCourse(industry: string) {
 /**
  * Verifies a face using a facial recognition AI service.
  * NOTE: This is a mocked implementation.
+ * @param userId The ID of the user to verify.
  * @param base64Image The base64 encoded image data from the user's camera.
  * @returns A promise that resolves to a mock verification result.
  */
-export async function verifyFace(base64Image: string) {
-  console.log("Verifying face with image data (first 50 chars):", base64Image.substring(0, 50) + "...");
+export async function verifyFace(userId: string, base64Image: string) {
+  console.log(`Verifying face for user ${userId} with image data (first 50 chars):`, base64Image.substring(0, 50) + "...");
 
-  // In a real implementation, you would send the base64Image
+  // In a real implementation, you would send the base64Image and userId
   // to an AI service provider like Baidu AI, AWS Rekognition, etc.
+  // The service would look up the user's registered face template and compare.
   // const response = await fetch('https://api.aifaceservice.com/verify', {
   //   method: 'POST',
   //   headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer YOUR_API_KEY' },
-  //   body: JSON.stringify({ image: base64Image })
+  //   body: JSON.stringify({ userId, image: base64Image })
   // });
   // const result = await response.json();
   // return result;
