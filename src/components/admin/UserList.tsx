@@ -1,22 +1,27 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Search, 
-  Filter, 
-  Download, 
-  Upload, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Eye, 
-  ChevronLeft, 
+import {
+  Search,
+  Filter,
+  Download,
+  Upload,
+  Plus,
+  Edit,
+  Trash2,
+  Eye,
+  ChevronLeft,
   ChevronRight,
   X,
   Check,
   AlertCircle,
   Phone,
-  Mail
+  Mail,
+  BookOpen,
+  Award,
+  UserCheck,
+  FileText,
+  Users
 } from 'lucide-react';
 import { handleApiAuthError } from '@/utils/authErrorHandler';
 import UserEditDialog from './UserEditDialog';
@@ -36,7 +41,15 @@ interface User {
   status: 'active' | 'inactive' | 'suspended';
   learning_level?: 'beginner' | 'intermediate' | 'advanced' | 'expert';
   learning_hours?: number;
+  learning_progress?: number;
   certification_status?: 'pending' | 'in_progress' | 'certified' | 'expired' | 'rejected';
+  is_verified?: boolean;
+  // 考试相关字段
+  exam_permissions?: string[];
+  exam_history?: any;
+  exam_registrations_count?: number;
+  exam_completed_count?: number;
+  exam_passed_count?: number;
   created_at: string;
   updated_at: string;
 }
@@ -52,13 +65,29 @@ interface FilterConditions {
 
 // 批量操作数据类型
 interface BatchData {
-  status?: string;
-  role?: string;
+  status?: 'active' | 'inactive' | 'suspended';
+  role?: 'admin' | 'expert' | 'teacher' | 'student' | 'user' | 'examiner' | 'internal_supervisor';
   department?: string;
   position?: string;
   organization?: string;
-  learning_level?: string;
-  certification_status?: string;
+  learning_level?: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  certification_status?: 'pending' | 'in_progress' | 'certified' | 'expired' | 'rejected';
+}
+
+// 用户编辑表单数据接口
+interface UserEditForm {
+  name: string;
+  email: string;
+  phone: string;
+  employee_id: string;
+  department: string;
+  position: string;
+  organization: string;
+  role: 'admin' | 'expert' | 'teacher' | 'student' | 'user' | 'examiner' | 'internal_supervisor';
+  status: 'active' | 'inactive' | 'suspended';
+  learning_level: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  certification_status: 'pending' | 'in_progress' | 'certified' | 'expired' | 'rejected';
+  is_verified: boolean;
 }
 
 interface UserListProps {
@@ -363,6 +392,12 @@ function UserList({ onUserSelect }: UserListProps) {
     setIsEditDialogOpen(true);
   };
 
+  // 打开考试管理
+  const openExamManagement = (user: User) => {
+    // 跳转到考试管理页面，传递用户ID
+    window.open(`/admin/users/${user.id}/exams`, '_blank');
+  };
+
   // 关闭编辑对话框
   const closeEditDialog = () => {
     setEditingUser(null);
@@ -370,7 +405,7 @@ function UserList({ onUserSelect }: UserListProps) {
   };
 
   // 保存用户信息（使用统一认证错误处理）
-  const saveUserInfo = async (userData: Partial<User>) => {
+  const saveUserInfo = async (userId: string, userData: Partial<UserEditForm>) => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -378,7 +413,7 @@ function UserList({ onUserSelect }: UserListProps) {
         return;
       }
       
-      const response = await fetch(`/api/admin/users/${editingUser?.id}`, {
+      const response = await fetch(`/api/admin/users/${userId}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1030,6 +1065,13 @@ function UserList({ onUserSelect }: UserListProps) {
                             <Edit className="h-4 w-4" />
                           </button>
                           <button
+                            onClick={() => openExamManagement(user)}
+                            className="text-purple-600 hover:text-purple-800 transition-colors"
+                            title="考试管理"
+                          >
+                            <BookOpen className="h-4 w-4" />
+                          </button>
+                          <button
                             onClick={() => deleteUser(user.id)}
                             className="text-red-600 hover:text-red-800 transition-colors"
                             title="删除用户"
@@ -1155,7 +1197,7 @@ function UserList({ onUserSelect }: UserListProps) {
                   </label>
                   <select
                     value={batchData.status || ''}
-                    onChange={(e) => setBatchData({ ...batchData, status: e.target.value })}
+                    onChange={(e) => setBatchData({ ...batchData, status: e.target.value as 'active' | 'inactive' | 'suspended' })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">请选择状态</option>
@@ -1173,7 +1215,7 @@ function UserList({ onUserSelect }: UserListProps) {
                   </label>
                   <select
                     value={batchData.role || ''}
-                    onChange={(e) => setBatchData({ ...batchData, role: e.target.value })}
+                    onChange={(e) => setBatchData({ ...batchData, role: e.target.value as 'admin' | 'expert' | 'teacher' | 'student' | 'user' | 'examiner' | 'internal_supervisor' })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">请选择角色</option>
@@ -1234,7 +1276,7 @@ function UserList({ onUserSelect }: UserListProps) {
                   </label>
                   <select
                     value={batchData.learning_level || ''}
-                    onChange={(e) => setBatchData({ ...batchData, learning_level: e.target.value })}
+                    onChange={(e) => setBatchData({ ...batchData, learning_level: e.target.value as 'beginner' | 'intermediate' | 'advanced' | 'expert' })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">请选择学习等级</option>
@@ -1253,7 +1295,7 @@ function UserList({ onUserSelect }: UserListProps) {
                   </label>
                   <select
                     value={batchData.certification_status || ''}
-                    onChange={(e) => setBatchData({ ...batchData, certification_status: e.target.value })}
+                    onChange={(e) => setBatchData({ ...batchData, certification_status: e.target.value as 'pending' | 'in_progress' | 'certified' | 'expired' | 'rejected' })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">请选择认证状态</option>
@@ -1282,7 +1324,7 @@ function UserList({ onUserSelect }: UserListProps) {
                     return !batchData.department;
                   }
                   const field = batchOperation?.split('_')[1];
-                  return field && !batchData[field as keyof BatchData];
+                  return field ? !batchData[field as keyof BatchData] : false;
                 })()}
               >
                 确认操作
@@ -1294,14 +1336,22 @@ function UserList({ onUserSelect }: UserListProps) {
 
       {/* 用户导入对话框 */}
       {showImportDialog && (
-        <UserImport
-          isOpen={showImportDialog}
-          onClose={() => setShowImportDialog(false)}
-          onSuccess={() => {
-            setShowImportDialog(false);
-            fetchUsers();
-          }}
-        />
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h2 className="text-xl font-semibold text-gray-900">用户批量导入</h2>
+              <button
+                onClick={() => setShowImportDialog(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6">
+              <UserImport />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

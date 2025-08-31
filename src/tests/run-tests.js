@@ -11,9 +11,9 @@
  * 5. 监听模式测试
  */
 
-const { spawn } = require('child_process');
-const path = require('path');
-const fs = require('fs');
+import { spawn } from 'child_process';
+import path from 'path';
+import fs from 'fs';
 
 // 颜色输出
 const colors = {
@@ -62,6 +62,16 @@ const testConfigs = {
     name: '端到端测试',
     pattern: 'src/tests/e2e/**/*.test.ts',
     description: '测试完整的用户流程'
+  },
+  exam: {
+    name: '考试系统测试',
+    pattern: 'src/tests/**/*exam*.test.ts',
+    description: '测试考试系统的API和端到端流程'
+  },
+  performance: {
+    name: '性能测试',
+    pattern: 'src/tests/performance/**/*.test.ts',
+    description: '测试系统性能和负载能力'
   },
   all: {
     name: '全部测试',
@@ -125,6 +135,8 @@ function showHelp() {
   console.log('\n示例:');
   console.log(`  ${colors.cyan}node run-tests.js unit${colors.reset}                    # 运行单元测试`);
   console.log(`  ${colors.cyan}node run-tests.js integration --coverage${colors.reset}   # 运行集成测试并生成覆盖率`);
+  console.log(`  ${colors.cyan}node run-tests.js exam${colors.reset}                    # 运行考试系统测试`);
+  console.log(`  ${colors.cyan}node run-tests.js performance${colors.reset}             # 运行性能测试`);
   console.log(`  ${colors.cyan}node run-tests.js all --watch${colors.reset}             # 监听模式运行所有测试`);
   console.log(`  ${colors.cyan}node run-tests.js --coverage${colors.reset}              # 运行所有测试并生成覆盖率`);
 }

@@ -3,7 +3,7 @@
  * 提供统一的Supabase客户端创建和配置管理
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { getEnvConfig } from './envConfig';
 import { Request } from 'express';
 
@@ -153,13 +153,13 @@ export interface Database {
  */
 export function createServerClient() {
   const config = getEnvConfig();
-  const supabaseConfig = config.getSupabase();
+  const supabaseConfig = config.supabase;
   
   if (!supabaseConfig.url || !supabaseConfig.serviceRoleKey) {
     throw new Error('Supabase configuration is missing. Please check your environment variables.');
   }
   
-  return createClient<Database>(supabaseConfig.url, supabaseConfig.serviceRoleKey, {
+  return createSupabaseClient<Database>(supabaseConfig.url, supabaseConfig.serviceRoleKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false
@@ -173,13 +173,13 @@ export function createServerClient() {
  */
 export function createBrowserClient() {
   const config = getEnvConfig();
-  const supabaseConfig = config.getSupabase();
+  const supabaseConfig = config.supabase;
   
   if (!supabaseConfig.url || !supabaseConfig.anonKey) {
     throw new Error('Supabase configuration is missing. Please check your environment variables.');
   }
   
-  return createClient<Database>(supabaseConfig.url, supabaseConfig.anonKey, {
+  return createSupabaseClient<Database>(supabaseConfig.url, supabaseConfig.anonKey, {
     auth: {
       autoRefreshToken: true,
       persistSession: true
@@ -203,7 +203,7 @@ export function createClient() {
 /**
  * 创建Supabase客户端（带请求上下文）
  */
-export const createSupabaseClient = () => {
+export const createSupabaseClientWithContext = () => {
   return createClient();
 };
 
@@ -331,7 +331,7 @@ const supabaseUtils = {
   createClient,
   createServerClient,
   createBrowserClient,
-  createSupabaseClient,
+  createSupabaseClientWithContext,
   createSupabaseAdmin,
   createSupabaseService,
   getCurrentUser,

@@ -13,7 +13,7 @@
 
 import Redis from 'ioredis';
 import { logger } from '../utils/logger';
-import { envConfig } from '../utils/envConfig';
+import { getEnvConfig } from '../utils/envConfig';
 import { analyticsService } from './analyticsService';
 import { auditService } from './auditService';
 
@@ -25,7 +25,6 @@ export interface CacheConfig {
   db: number;
   keyPrefix: string;
   maxRetriesPerRequest: number;
-  retryDelayOnFailover: number;
   enableOfflineQueue: boolean;
   lazyConnect: boolean;
   keepAlive: number;
@@ -74,20 +73,19 @@ export interface CacheEntry<T = unknown> {
  * 缓存服务类
  */
 export class CacheService {
-  private redis: Redis;
+  private redis!: Redis;
   private config: CacheConfig;
   private metrics: CacheMetrics;
   private isConnected: boolean = false;
 
   constructor(config?: Partial<CacheConfig>) {
     this.config = {
-      host: envConfig?.redis?.host || 'localhost',
-      port: envConfig?.redis?.port || 6379,
-      password: envConfig?.redis?.password,
-      db: envConfig?.redis?.db || 0,
-      keyPrefix: envConfig?.redis?.keyPrefix || 'skillup:',
+      host: getEnvConfig()?.redis?.host || 'localhost',
+      port: getEnvConfig()?.redis?.port || 6379,
+      password: getEnvConfig()?.redis?.password,
+      db: getEnvConfig()?.redis?.db || 0,
+      keyPrefix: getEnvConfig()?.redis?.keyPrefix || 'skillup:',
       maxRetriesPerRequest: 3,
-      retryDelayOnFailover: 100,
       enableOfflineQueue: false,
       lazyConnect: true,
       keepAlive: 30000,
@@ -128,7 +126,6 @@ export class CacheService {
       db: this.config.db,
       keyPrefix: this.config.keyPrefix,
       maxRetriesPerRequest: this.config.maxRetriesPerRequest,
-      retryDelayOnFailover: this.config.retryDelayOnFailover,
       enableOfflineQueue: this.config.enableOfflineQueue,
       lazyConnect: this.config.lazyConnect,
       keepAlive: this.config.keepAlive,
@@ -154,7 +151,7 @@ export class CacheService {
     });
 
     this.redis.on('error', (error) => {
-      logger.error('Redis error:', error);
+      logger.error('Redis error:', { error: error instanceof Error ? error.message : String(error) });
       this.metrics.errors++;
       this.isConnected = false;
     });
@@ -184,7 +181,11 @@ export class CacheService {
       this.metrics.totalRequests++;
       this.updateResponseTime(Date.now() - startTime);
       
-      analyticsService.increment('cache.sets');
+      analyticsService.recordMetric({
+        name: 'cache.sets',
+        value: 1,
+        type: 'counter'
+      });
       auditService.logCacheOperation({
         operation: 'set',
         key,
@@ -194,7 +195,7 @@ export class CacheService {
 
       return true;
     } catch (error) {
-      logger.error('Cache set error:', error);
+      logger.error('Cache set error:', { error: error instanceof Error ? error.message : String(error) });
       this.metrics.errors++;
       return false;
     }
@@ -213,16 +214,24 @@ export class CacheService {
 
       if (value === null) {
         this.metrics.misses++;
-        analyticsService.increment('cache.misses');
+        analyticsService.recordMetric({
+          name: 'cache.misses',
+          value: 1,
+          type: 'counter'
+        });
         return null;
       }
 
       this.metrics.hits++;
-      analyticsService.increment('cache.hits');
+      analyticsService.recordMetric({
+        name: 'cache.hits',
+        value: 1,
+        type: 'counter'
+      });
       
       return JSON.parse(value);
     } catch (error) {
-      logger.error('Cache get error:', error);
+      logger.error('Cache get error:', { error: error instanceof Error ? error.message : String(error) });
       this.metrics.errors++;
       return null;
     }
@@ -237,7 +246,11 @@ export class CacheService {
       this.metrics.deletes++;
       this.metrics.totalRequests++;
       
-      analyticsService.increment('cache.deletes');
+      analyticsService.recordMetric({
+        name: 'cache.deletes',
+        value: 1,
+        type: 'counter'
+      });
       auditService.logCacheOperation({
         operation: 'delete',
         key,
@@ -246,7 +259,7 @@ export class CacheService {
 
       return result > 0;
     } catch (error) {
-      logger.error('Cache delete error:', error);
+      logger.error('Cache delete error:', { error: error instanceof Error ? error.message : String(error) });
       this.metrics.errors++;
       return false;
     }
@@ -260,7 +273,7 @@ export class CacheService {
       const result = await this.redis.exists(key);
       return result === 1;
     } catch (error) {
-      logger.error('Cache exists error:', error);
+      logger.error('Cache exists error:', { error: error instanceof Error ? error.message : String(error) });
       return false;
     }
   }
@@ -273,7 +286,7 @@ export class CacheService {
       const result = await this.redis.expire(key, seconds);
       return result === 1;
     } catch (error) {
-      logger.error('Cache expire error:', error);
+      logger.error('Cache expire error:', { error: error instanceof Error ? error.message : String(error) });
       return false;
     }
   }
@@ -285,7 +298,7 @@ export class CacheService {
     try {
       return await this.redis.ttl(key);
     } catch (error) {
-      logger.error('Cache TTL error:', error);
+      logger.error('Cache TTL error:', { error: error instanceof Error ? error.message : String(error) });
       return -1;
     }
   }
@@ -304,7 +317,7 @@ export class CacheService {
       this.metrics.sets += Object.keys(data).length;
       return true;
     } catch (error) {
-      logger.error('Cache mset error:', error);
+      logger.error('Cache mset error:', { error: error instanceof Error ? error.message : String(error) });
       return false;
     }
   }
@@ -317,7 +330,7 @@ export class CacheService {
       const values = await this.redis.mget(...keys);
       return values.map(value => value ? JSON.parse(value) as T : null);
     } catch (error) {
-      logger.error('Cache mget error:', error);
+      logger.error('Cache mget error:', { error: error instanceof Error ? error.message : String(error) });
       return keys.map(() => null);
     }
   }
@@ -345,7 +358,7 @@ export class CacheService {
       
       return keys;
     } catch (error) {
-      logger.error('Cache scan error:', error);
+      logger.error('Cache scan error:', { error: error instanceof Error ? error.message : String(error) });
       return [];
     }
   }
@@ -357,7 +370,7 @@ export class CacheService {
     try {
       return await this.redis.lpush(key, JSON.stringify(value));
     } catch (error) {
-      logger.error('Cache lpush error:', error);
+      logger.error('Cache lpush error:', { error: error instanceof Error ? error.message : String(error) });
       return 0;
     }
   }
@@ -369,7 +382,7 @@ export class CacheService {
     try {
       return await this.redis.rpush(key, JSON.stringify(value));
     } catch (error) {
-      logger.error('Cache rpush error:', error);
+      logger.error('Cache rpush error:', { error: error instanceof Error ? error.message : String(error) });
       return 0;
     }
   }
@@ -382,7 +395,7 @@ export class CacheService {
       const value = await this.redis.lpop(key);
       return value ? JSON.parse(value) as T : null;
     } catch (error) {
-      logger.error('Cache lpop error:', error);
+      logger.error('Cache lpop error:', { error: error instanceof Error ? error.message : String(error) });
       return null;
     }
   }
@@ -395,7 +408,7 @@ export class CacheService {
       const value = await this.redis.rpop(key);
       return value ? JSON.parse(value) as T : null;
     } catch (error) {
-      logger.error('Cache rpop error:', error);
+      logger.error('Cache rpop error:', { error: error instanceof Error ? error.message : String(error) });
       return null;
     }
   }
@@ -408,7 +421,7 @@ export class CacheService {
       const values = await this.redis.lrange(key, start, stop);
       return values.map(value => JSON.parse(value) as T);
     } catch (error) {
-      logger.error('Cache lrange error:', error);
+      logger.error('Cache lrange error:', { error: error instanceof Error ? error.message : String(error) });
       return [];
     }
   }
@@ -437,7 +450,7 @@ export class CacheService {
       
       return true;
     } catch (error) {
-      logger.error('Cache setWithStrategy error:', error);
+      logger.error('Cache setWithStrategy error:', { error: error instanceof Error ? error.message : String(error) });
       return false;
     }
   }
@@ -452,7 +465,7 @@ export class CacheService {
       
       logger.info('Cache warmup completed', { keysWarmed: keys.length });
     } catch (error) {
-      logger.error('Cache warmup error:', error);
+      logger.error('Cache warmup error:', { error: error instanceof Error ? error.message : String(error) });
     }
   }
 
@@ -468,7 +481,7 @@ export class CacheService {
         }
       }
     } catch (error) {
-      logger.error('Cache invalidateByTags error:', error);
+      logger.error('Cache invalidateByTags error:', { error: error instanceof Error ? error.message : String(error) });
     }
   }
 
@@ -496,7 +509,7 @@ export class CacheService {
       
       return { ...this.metrics };
     } catch (error) {
-      logger.error('Cache getStats error:', error);
+      logger.error('Cache getStats error:', { error: error instanceof Error ? error.message : String(error) });
       return { ...this.metrics };
     }
   }
@@ -509,7 +522,7 @@ export class CacheService {
       const result = await this.redis.ping();
       return result === 'PONG';
     } catch (error) {
-      logger.error('Cache health check error:', error);
+      logger.error('Cache health check error:', { error: error instanceof Error ? error.message : String(error) });
       return false;
     }
   }
@@ -531,7 +544,7 @@ export class CacheService {
       await this.redis.quit();
       logger.info('Cache service closed');
     } catch (error) {
-      logger.error('Cache close error:', error);
+      logger.error('Cache close error:', { error: error instanceof Error ? error.message : String(error) });
     }
   }
 }

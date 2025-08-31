@@ -63,8 +63,15 @@ export const tokenAuth = (req: Request, res: Response, next: NextFunction) => {
     }
 
     // 将用户ID添加到请求对象
-    (req as Request & { userId: string }).userId = verification.userId;
-    next();
+    if (verification.userId) {
+      (req as Request & { userId: string }).userId = verification.userId;
+      next();
+    } else {
+      return res.status(401).json({
+        success: false,
+        message: '令牌中缺少用户ID'
+      });
+    }
   } catch {
     return res.status(401).json({
       success: false,
@@ -246,7 +253,7 @@ export const ipWhitelist = (allowedIPs: string[]) => {
 };
 
 // 组合安全中间件
-export const applySecurity = (app: Record<string, unknown>) => {
+export const applySecurity = (app: any) => {
   // 基础安全头
   app.use(helmet(helmetConfig));
   

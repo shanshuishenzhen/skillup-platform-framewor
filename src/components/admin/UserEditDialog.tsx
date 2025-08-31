@@ -17,12 +17,13 @@ interface User {
   department?: string;
   position?: string;
   organization?: string;
-  learning_level: 'beginner' | 'intermediate' | 'advanced';
-  learning_progress: number;
-  learning_hours: number;
-  certification_status: 'none' | 'in_progress' | 'certified' | 'expired';
-  role: 'student' | 'teacher' | 'admin';
-  is_verified: boolean;
+  role: 'admin' | 'expert' | 'teacher' | 'student' | 'user' | 'examiner' | 'internal_supervisor';
+  status?: 'active' | 'inactive' | 'suspended';
+  learning_level?: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  learning_hours?: number;
+  learning_progress?: number;
+  certification_status?: 'pending' | 'in_progress' | 'certified' | 'expired' | 'rejected';
+  is_verified?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -36,9 +37,10 @@ interface UserEditForm {
   department: string;
   position: string;
   organization: string;
-  learning_level: 'beginner' | 'intermediate' | 'advanced';
-  certification_status: 'none' | 'in_progress' | 'certified' | 'expired';
-  role: 'student' | 'teacher' | 'admin';
+  role: 'admin' | 'expert' | 'teacher' | 'student' | 'user' | 'examiner' | 'internal_supervisor';
+  status: 'active' | 'inactive' | 'suspended';
+  learning_level: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  certification_status: 'pending' | 'in_progress' | 'certified' | 'expired' | 'rejected';
   is_verified: boolean;
 }
 
@@ -67,9 +69,10 @@ export default function UserEditDialog({ user, isOpen, onClose, onSave }: UserEd
     department: '',
     position: '',
     organization: '',
-    learning_level: 'beginner',
-    certification_status: 'none',
     role: 'student',
+    status: 'active',
+    learning_level: 'beginner',
+    certification_status: 'pending',
     is_verified: false
   });
 
@@ -92,9 +95,10 @@ export default function UserEditDialog({ user, isOpen, onClose, onSave }: UserEd
         department: user.department || '',
         position: user.position || '',
         organization: user.organization || '',
-        learning_level: user.learning_level || 'beginner',
-        certification_status: user.certification_status || 'none',
         role: user.role || 'student',
+        status: user.status || 'active',
+        learning_level: user.learning_level || 'beginner',
+        certification_status: user.certification_status || 'pending',
         is_verified: user.is_verified || false
       });
       setErrors({});

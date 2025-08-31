@@ -236,13 +236,13 @@ let addToCart: (userId: string, courseId: string, quantity?: number) => Promise<
 
 beforeAll(async () => {
   // 动态导入模块
-  const module = await import('@/services/orderService');
-  orderService = module.orderService;
-  createOrder = module.createOrder;
-  updateOrderStatus = module.updateOrderStatus;
-  cancelOrder = module.cancelOrder;
-  getOrderById = module.getOrderById;
-  addToCart = module.addToCart;
+  const orderServiceModule = await import('@/services/orderService');
+  orderService = orderServiceModule.orderService;
+  createOrder = orderServiceModule.createOrder;
+  updateOrderStatus = orderServiceModule.updateOrderStatus;
+  cancelOrder = orderServiceModule.cancelOrder;
+  getOrderById = orderServiceModule.getOrderById;
+  addToCart = orderServiceModule.addToCart;
 });
 
 describe('订单服务', () => {

@@ -1,6 +1,54 @@
 // /src/services/aiDataGeneratorService.ts
 
-import OpenAI from 'openai';
+// DeepSeek API 客户端 - 使用兼容OpenAI的接口
+interface DeepSeekClient {
+  chat: {
+    completions: {
+      create: (params: any) => Promise<any>;
+    };
+  };
+}
+
+// DeepSeek API 实现
+class DeepSeekAPI implements DeepSeekClient {
+  private apiKey: string;
+  private baseURL: string;
+  private timeout: number;
+  private maxRetries: number;
+
+  constructor(config: { apiKey: string; baseURL?: string; timeout?: number; maxRetries?: number }) {
+    this.apiKey = config.apiKey;
+    this.baseURL = config.baseURL || 'https://api.deepseek.com/v1';
+    this.timeout = config.timeout || 30000;
+    this.maxRetries = config.maxRetries || 3;
+  }
+
+  chat = {
+    completions: {
+      create: async (params: any) => {
+        const response = await fetch(`${this.baseURL}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.apiKey}`
+          },
+          body: JSON.stringify({
+            model: params.model,
+            messages: params.messages,
+            max_tokens: params.max_tokens,
+            temperature: params.temperature
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`DeepSeek API error: ${response.status}`);
+        }
+
+        return await response.json();
+      }
+    }
+  };
+}
 import {
   ErrorType,
   ErrorSeverity,
@@ -9,6 +57,7 @@ import {
   createError,
   RetryConfig
 } from '../utils/errorHandler';
+import type { VirtualTalent } from '../types/virtual';
 
 /**
  * AI数据生成服务配置接口
@@ -130,6 +179,7 @@ export interface VirtualTraining {
     time: string;
     topic: string;
   }[];
+  image: string;
 }
 
 /**
@@ -152,6 +202,28 @@ export interface VirtualBrand {
   };
   achievements: string[];
   services: string[];
+}
+
+/**
+ * 委员会数据接口
+ */
+export interface VirtualCommittee {
+  id: string;
+  name: string;
+  description: string;
+  image: string;
+  memberCount: number;
+  activities: string[];
+  establishedYear: number;
+  category: string;
+  chairman: {
+    name: string;
+    avatar: string;
+    title: string;
+    company: string;
+  };
+  objectives: string[];
+  achievements: string[];
 }
 
 /**
@@ -227,7 +299,7 @@ export interface VirtualEvent {
  * @class AIDataGeneratorService
  */
 class AIDataGeneratorService {
-  private openai: OpenAI | null = null;
+  private deepseek: DeepSeekClient | null = null;
   private config: AIDataGeneratorConfig;
   private isInitialized = false;
   private dataCache = new Map<string, unknown>();
@@ -236,29 +308,29 @@ class AIDataGeneratorService {
 
   constructor() {
     this.config = {
-      apiKey: process.env.OPENAI_API_KEY || '',
-      baseURL: process.env.OPENAI_BASE_URL,
-      timeout: parseInt(process.env.OPENAI_TIMEOUT || '30000'),
-      maxRetries: parseInt(process.env.OPENAI_MAX_RETRIES || '3'),
-      model: process.env.OPENAI_MODEL || 'gpt-3.5-turbo'
+      apiKey: process.env.DEEPSEEK_API_KEY || '',
+      baseURL: process.env.DEEPSEEK_BASE_URL,
+      timeout: parseInt(process.env.DEEPSEEK_TIMEOUT || '30000'),
+      maxRetries: parseInt(process.env.DEEPSEEK_MAX_RETRIES || '3'),
+      model: process.env.DEEPSEEK_MODEL || 'deepseek-chat'
     };
   }
 
   /**
-   * 初始化OpenAI客户端
+   * 初始化DeepSeek客户端
    * @private
    */
   private initialize(): void {
     if (this.isInitialized) return;
 
     if (!this.config.apiKey) {
-      console.warn('OpenAI API密钥未配置，将使用预设的数据');
+      console.warn('DeepSeek API密钥未配置，将使用预设的数据');
       this.isInitialized = true;
       return;
     }
 
     try {
-      this.openai = new OpenAI({
+      this.deepseek = new DeepSeekAPI({
         apiKey: this.config.apiKey,
         baseURL: this.config.baseURL,
         timeout: this.config.timeout,
@@ -266,7 +338,7 @@ class AIDataGeneratorService {
       });
       this.isInitialized = true;
     } catch (error) {
-      console.warn('OpenAI客户端初始化失败，将使用预设的数据:', error);
+      console.warn('DeepSeek客户端初始化失败，将使用预设的数据:', error);
       this.isInitialized = true;
     }
   }
@@ -284,7 +356,8 @@ class AIDataGeneratorService {
       this.cacheExpiry.delete(key);
       return null;
     }
-    return this.dataCache.get(key) || null;
+    const cached = this.dataCache.get(key);
+    return cached ? (cached as T) : null;
   }
 
   /**
@@ -339,12 +412,12 @@ class AIDataGeneratorService {
    * @returns 生成的数据
    */
   private async generateWithAI<T>(prompt: string, fallbackData: T): Promise<T> {
-    if (!this.openai) {
+    if (!this.deepseek) {
       return fallbackData;
     }
 
     try {
-      const response = await this.openai.chat.completions.create({
+      const response = await this.deepseek.chat.completions.create({
         model: this.config.model!,
         messages: [
           {
@@ -443,7 +516,7 @@ class AIDataGeneratorService {
         updatedAt: this.generateRandomDate(30)
       };
 
-      if (this.openai) {
+      if (this.deepseek) {
         const prompt = `生成一个关于"${courseCategory}"的在线课程信息，难度级别为"${level}"。
         
         要求：
@@ -583,11 +656,13 @@ class AIDataGeneratorService {
         category: newsCategory,
         tags: [newsCategory, '趋势分析', '行业洞察'],
         thumbnail: this.generateImageUrl(`${newsCategory} news thumbnail`, 'landscape_16_9'),
-        publishDate: this.generateRandomDate(30),
+        publishedAt: this.generateRandomDate(30),
         readTime: Math.floor(Math.random() * 10) + 3,
         views: Math.floor(Math.random() * 10000) + 100,
         likes: Math.floor(Math.random() * 500) + 10,
-        featured: Math.random() > 0.7
+        comments: Math.floor(Math.random() * 100) + 5,
+        featured: Math.random() > 0.7,
+        status: 'published' as const
       };
 
       news.push(fallbackNews);
@@ -662,7 +737,8 @@ class AIDataGeneratorService {
             time: '09:00-17:00',
             topic: '综合应用与考核'
           }
-        ]
+        ],
+        image: this.generateImageUrl(`${category} training course`, 'landscape_4_3')
       };
 
       trainings.push(fallbackTraining);
@@ -722,6 +798,66 @@ class AIDataGeneratorService {
 
     this.setCachedData(cacheKey, brands);
     return brands;
+  }
+
+  /**
+   * 生成委员会数据
+   * @param count 生成数量
+   * @returns Promise<VirtualCommittee[]> 委员会数组
+   */
+  async generateCommittees(count: number = 8): Promise<VirtualCommittee[]> {
+    this.initialize();
+    
+    const cacheKey = `committees_${count}`;
+    const cached = this.getCachedData<VirtualCommittee[]>(cacheKey);
+    if (cached) return cached;
+
+    const categories = ['技术创新', '产品发展', '教育培训', '标准制定', '行业研究', '质量管理'];
+    const activities = [
+      '技术标准制定', '行业调研', '专业培训', '学术交流', '政策建议',
+      '质量认证', '创新项目评审', '行业报告发布', '专业论坛', '技术咨询'
+    ];
+    
+    const committees: VirtualCommittee[] = [];
+    
+    for (let i = 0; i < count; i++) {
+      const category = categories[Math.floor(Math.random() * categories.length)];
+      const committeeActivities = activities.slice(0, Math.floor(Math.random() * 4) + 3);
+      
+      const fallbackCommittee: VirtualCommittee = {
+        id: this.generateId(),
+        name: `${category}专业委员会`,
+        description: `致力于${category}领域的专业发展，推动行业标准制定和技术创新。`,
+        image: this.generateImageUrl(`professional committee ${category}`, 'landscape_4_3'),
+        memberCount: Math.floor(Math.random() * 50) + 20,
+        activities: committeeActivities,
+        establishedYear: 2020 + Math.floor(Math.random() * 4),
+        category,
+        chairman: {
+          name: `${['张', '李', '王', '刘', '陈'][Math.floor(Math.random() * 5)]}${['主任', '教授', '博士', '专家'][Math.floor(Math.random() * 4)]}`,
+          avatar: this.generateImageUrl('professional chairman portrait', 'square'),
+          title: '委员会主任',
+          company: '行业领先企业'
+        },
+        objectives: [
+          `推动${category}技术发展`,
+          '制定行业标准规范',
+          '促进产学研合作',
+          '培养专业人才'
+        ],
+        achievements: [
+          '发布行业白皮书',
+          '制定技术标准',
+          '举办专业论坛',
+          '推动政策制定'
+        ]
+      };
+
+      committees.push(fallbackCommittee);
+    }
+
+    this.setCachedData(cacheKey, committees);
+    return committees;
   }
 
   /**
@@ -876,6 +1012,80 @@ class AIDataGeneratorService {
   }
 
   /**
+   * 生成人才数据
+   * @param count 生成数量
+   * @param category 人才分类
+   * @returns Promise<VirtualTalent[]> 人才数组
+   */
+  async generateTalents(count: number = 8, category?: string): Promise<VirtualTalent[]> {
+    this.initialize();
+    
+    const cacheKey = `talents_${count}_${category || 'all'}`;
+    const cached = this.getCachedData<VirtualTalent[]>(cacheKey);
+    if (cached) return cached;
+
+    const categories = ['UI设计', '包装设计', '室内设计', '广告创意', '工业设计', '平面设计', '形象设计', '摄影'];
+    const titles = ['高级设计师', '资深设计师', '设计总监', '创意总监', '首席设计师', '设计专家'];
+    const skills = {
+      'UI设计': ['Figma', 'Sketch', 'Adobe XD', 'Principle', '用户体验设计', '交互设计'],
+      '包装设计': ['Adobe Illustrator', 'Photoshop', 'InDesign', '3D建模', '材料工艺', '品牌设计'],
+      '室内设计': ['AutoCAD', '3ds Max', 'SketchUp', 'V-Ray', '空间规划', '软装搭配'],
+      '广告创意': ['创意策划', 'Adobe Creative Suite', '品牌策略', '视觉传达', '文案创作'],
+      '工业设计': ['Rhino', 'KeyShot', 'SolidWorks', '产品设计', '用户研究', '材料选择'],
+      '平面设计': ['Adobe Illustrator', 'Photoshop', 'InDesign', '版式设计', '字体设计', '品牌视觉'],
+      '形象设计': ['色彩搭配', '造型设计', '时尚趋势', '个人形象', '服装搭配', '化妆技巧'],
+      '摄影': ['摄影技巧', 'Lightroom', 'Photoshop', '商业摄影', '人像摄影', '后期处理']
+    };
+    
+    const talents: VirtualTalent[] = [];
+    
+    for (let i = 0; i < count; i++) {
+      const talentCategory = category || categories[Math.floor(Math.random() * categories.length)];
+      const title = titles[Math.floor(Math.random() * titles.length)];
+      const talentSkills = skills[talentCategory as keyof typeof skills] || skills['UI设计'];
+      const selectedSkills = talentSkills.slice(0, Math.floor(Math.random() * 4) + 3);
+      
+      const experience = Math.floor(Math.random() * 10) + 2;
+      const experienceText = experience < 3 ? '2-3年' : experience < 5 ? '3-5年' : experience < 8 ? '5-8年' : '8年以上';
+      
+      const projects = [
+        `${talentCategory}项目案例A - 获得设计大奖`,
+        `知名品牌${talentCategory}合作项目`,
+        `创新${talentCategory}解决方案设计`,
+        `国际${talentCategory}竞赛获奖作品`
+      ].slice(0, Math.floor(Math.random() * 3) + 2);
+      
+      const fallbackTalent: VirtualTalent = {
+        id: this.generateId(),
+        name: `${['张', '李', '王', '刘', '陈', '杨', '赵', '黄', '周', '吴'][Math.floor(Math.random() * 10)]}${['设计', '创意', '艺术', '美学', '视觉'][Math.floor(Math.random() * 5)]}${['师', '家', '专家'][Math.floor(Math.random() * 3)]}`,
+        title: `${title} - ${talentCategory}`,
+        experience: experienceText,
+        bio: `专注于${talentCategory}领域${experience}年，擅长创新设计和用户体验优化。曾参与多个知名品牌项目，具有丰富的实战经验和独特的设计理念。`,
+        skills: selectedSkills,
+        projects: projects,
+        avatar: this.generateImageUrl('professional designer portrait', 'square'),
+        category: talentCategory,
+        available: Math.random() > 0.3,
+        rating: {
+          score: 4.0 + Math.random() * 1.0,
+          reviews: Math.floor(Math.random() * 50) + 10
+        },
+        contact: {
+          email: `talent${i + 1}@example.com`,
+          portfolio: `https://portfolio.example.com/talent${i + 1}`
+        },
+        createdAt: new Date(this.generateRandomDate(365)),
+        updatedAt: new Date(this.generateRandomDate(30))
+      };
+
+      talents.push(fallbackTalent);
+    }
+
+    this.setCachedData(cacheKey, talents);
+    return talents;
+  }
+
+  /**
    * 清除所有缓存
    */
   clearCache(): void {
@@ -903,13 +1113,3 @@ const aiDataGeneratorService = new AIDataGeneratorService();
 
 // 导出服务实例和类型
 export { aiDataGeneratorService, AIDataGeneratorService };
-export type {
-  VirtualCourse,
-  VirtualUser,
-  VirtualNews,
-  VirtualTraining,
-  VirtualBrand,
-  VirtualCommitteeMember,
-  VirtualEvent,
-  AIDataGeneratorConfig
-};

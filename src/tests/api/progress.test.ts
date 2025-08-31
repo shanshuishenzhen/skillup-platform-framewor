@@ -253,10 +253,7 @@ const mockJwt = {
   sign: jest.fn()
 };
 
-// Mock 类型定义
-interface MockedModule<T> {
-  [K in keyof T]: T[K] extends (...args: any[]) => any ? jest.MockedFunction<T[K]> : T[K];
-}
+// Mock 类型定义已移除
 
 // 设置 Mock
 jest.mocked(supabaseClient).mockReturnValue(mockSupabaseClient);

@@ -12,8 +12,8 @@ import {
   PlayCircle,
   CheckCircle
 } from 'lucide-react';
-import { useLearningProgress } from '@/hooks/useLearningProgress';
-import { getAllCourses } from '@/services/courseService';
+import { useLearningProgress, LearningStats } from '@/hooks/useLearningProgress';
+import { getAllCourses, Course } from '@/services/courseService';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
@@ -26,9 +26,9 @@ export default function ProgressPage() {
   const { user } = useAuth();
 
   // 状态管理
-  const [learningStats, setLearningStats] = useState<Record<string, unknown> | null>(null);
-  const [courseProgresses, setCourseProgresses] = useState<Array<Record<string, unknown>>>([]);
-  const [recentCourses, setRecentCourses] = useState<Array<Record<string, unknown>>>([]);
+  const [learningStats, setLearningStats] = useState<LearningStats | null>(null);
+  const [courseProgresses, setCourseProgresses] = useState<Array<Course & { progress?: any }>>([]);
+  const [recentCourses, setRecentCourses] = useState<Array<Course & { progress?: any }>>([]);
   const {
     getCourseProgress,
     getLearningStats
@@ -49,7 +49,7 @@ export default function ProgressPage() {
 
         // 并行加载学习统计和课程进度
         const [statsResult, coursesResult] = await Promise.all([
-          getLearningStats(user.id),
+          getLearningStats(),
           getAllCourses() // 暂时获取所有课程，后续可以添加用户课程过滤
         ]);
 
@@ -57,11 +57,11 @@ export default function ProgressPage() {
           setLearningStats(statsResult);
         }
 
-        if (coursesResult.success) {
+        if (coursesResult && coursesResult.length > 0) {
           // 获取每个课程的详细进度
           const coursesWithProgress = await Promise.all(
-            coursesResult.data.map(async (course: Record<string, unknown>) => {
-              const progressResult = await getCourseProgress(user.id, course.id as string);
+            coursesResult.map(async (course: Course) => {
+              const progressResult = await getCourseProgress(course.id as string);
               return {
                 ...course,
                 progress: progressResult || null
@@ -73,8 +73,13 @@ export default function ProgressPage() {
           
           // 获取最近学习的课程（按最后学习时间排序）
           const recentlyStudied = coursesWithProgress
-            .filter(course => course.progress && course.progress.lastStudyTime)
-            .sort((a, b) => new Date(b.progress.lastStudyTime).getTime() - new Date(a.progress.lastStudyTime).getTime())
+            .filter(course => course.progress && course.progress.lastWatchedAt)
+            .sort((a, b) => {
+              const aTime = a.progress?.lastWatchedAt;
+              const bTime = b.progress?.lastWatchedAt;
+              if (!aTime || !bTime) return 0;
+              return new Date(bTime).getTime() - new Date(aTime).getTime();
+            })
             .slice(0, 5);
           
           setRecentCourses(recentlyStudied);
@@ -146,7 +151,7 @@ export default function ProgressPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 pt-20 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">加载学习进度中...</p>
@@ -156,7 +161,7 @@ export default function ProgressPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pt-20">
       {/* 页面头部 */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -206,7 +211,7 @@ export default function ProgressPage() {
                     <div className="ml-4">
                       <p className="text-sm font-medium text-gray-600">学习中课程</p>
                       <p className="text-2xl font-bold text-gray-900">
-                        {learningStats.coursesInProgress}
+                        {learningStats.totalCourses - learningStats.completedCourses}
                       </p>
                     </div>
                   </div>
@@ -234,7 +239,7 @@ export default function ProgressPage() {
                     <div className="ml-4">
                       <p className="text-sm font-medium text-gray-600">总学习时长</p>
                       <p className="text-2xl font-bold text-gray-900">
-                        {formatDuration(learningStats.totalStudyTime)}
+                        {formatDuration(learningStats.totalWatchTime)}
                       </p>
                     </div>
                   </div>
@@ -265,10 +270,10 @@ export default function ProgressPage() {
                 {recentCourses.length > 0 ? (
                   <div className="space-y-4">
                     {recentCourses.map((course) => (
-                      <div key={course.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                      <div key={course.id as string} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                         <div className="flex items-center space-x-4">
                           <Image
-                            src={course.thumbnail || `https://trae-api-sg.mchost.guru/api/ide/v1/text_to_image?prompt=course%20thumbnail%20${encodeURIComponent(course.title)}&image_size=square`}
+                            src={course.imageUrl || `https://trae-api-sg.mchost.guru/api/ide/v1/text_to_image?prompt=course%20thumbnail%20${encodeURIComponent(course.title)}&image_size=square`}
                             alt={course.title}
                             className="w-12 h-12 rounded-lg object-cover"
                           />
@@ -276,12 +281,12 @@ export default function ProgressPage() {
                             <h3 className="font-medium text-gray-900">{course.title}</h3>
                             <div className="flex items-center space-x-4 text-sm text-gray-600">
                               <span>进度: {Math.round(course.progress?.progressPercentage || 0)}%</span>
-                              <span>最后学习: {formatDate(course.progress?.lastStudyTime)}</span>
+                              <span>最后学习: {formatDate(course.progress?.lastWatchedAt)}</span>
                             </div>
                           </div>
                         </div>
                         <button
-                          onClick={() => continueLearning(course.id)}
+                          onClick={() => continueLearning(course.id as string)}
                           className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                         >
                           <PlayCircle className="h-4 w-4 mr-2" />
@@ -317,11 +322,11 @@ export default function ProgressPage() {
               {courseProgresses.length > 0 ? (
                 <div className="space-y-6">
                   {courseProgresses.map((course) => (
-                    <div key={course.id} className="border border-gray-200 rounded-lg p-6">
+                    <div key={course.id as string} className="border border-gray-200 rounded-lg p-6">
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex items-start space-x-4">
                           <Image
-                             src={course.thumbnail || `https://trae-api-sg.mchost.guru/api/ide/v1/text_to_image?prompt=course%20thumbnail%20${encodeURIComponent(course.title)}&image_size=square`}
+                             src={course.imageUrl || `https://trae-api-sg.mchost.guru/api/ide/v1/text_to_image?prompt=course%20thumbnail%20${encodeURIComponent(course.title)}&image_size=square`}
                              alt={course.title}
                              className="w-16 h-16 rounded-lg object-cover"
                              width={64}
@@ -334,8 +339,8 @@ export default function ProgressPage() {
                               <div className="flex items-center space-x-4 mt-2 text-sm text-gray-600">
                                 <span>已完成: {course.progress.completedLessons} / {course.progress.totalLessons} 课时</span>
                                 <span>学习时长: {formatDuration(course.progress.totalWatchTime)}</span>
-                                {course.progress.lastStudyTime && (
-                                  <span>最后学习: {formatDate(course.progress.lastStudyTime)}</span>
+                                {course.progress.lastWatchedAt && (
+                                  <span>最后学习: {formatDate(course.progress.lastWatchedAt)}</span>
                                 )}
                               </div>
                             )}
@@ -343,14 +348,14 @@ export default function ProgressPage() {
                         </div>
                         <div className="flex space-x-2">
                           <button
-                            onClick={() => viewCourse(course.id)}
+                            onClick={() => viewCourse(course.id as string)}
                             className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                           >
                             查看详情
                           </button>
                           {course.progress && course.progress.progressPercentage < 100 && (
                             <button
-                              onClick={() => continueLearning(course.id)}
+                              onClick={() => continueLearning(course.id as string)}
                               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                             >
                               继续学习
@@ -402,16 +407,16 @@ export default function ProgressPage() {
                 <div className="space-y-4">
                   <div className="flex justify-between">
                     <span className="text-gray-600">总学习时长</span>
-                    <span className="font-medium">{formatDuration(learningStats.totalStudyTime)}</span>
+                    <span className="font-medium">{formatDuration(learningStats.totalWatchTime)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">本周学习时长</span>
-                    <span className="font-medium">{formatDuration(learningStats.weeklyStudyTime)}</span>
+                    <span className="font-medium">{formatDuration(Math.floor(learningStats.totalWatchTime / 4))}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">平均每日学习</span>
                     <span className="font-medium">
-                      {formatDuration(Math.floor(learningStats.weeklyStudyTime / 7))}
+                      {formatDuration(Math.floor(learningStats.totalWatchTime / 28))}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -427,12 +432,12 @@ export default function ProgressPage() {
                   <div className="flex justify-between">
                     <span className="text-gray-600">已报名课程</span>
                     <span className="font-medium">
-                      {learningStats.coursesInProgress + learningStats.completedCourses}
+                      {learningStats.totalCourses}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">学习中课程</span>
-                    <span className="font-medium">{learningStats.coursesInProgress}</span>
+                    <span className="font-medium">{learningStats.totalCourses - learningStats.completedCourses}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">已完成课程</span>
@@ -441,9 +446,9 @@ export default function ProgressPage() {
                   <div className="flex justify-between">
                     <span className="text-gray-600">完成率</span>
                     <span className="font-medium">
-                      {learningStats.coursesInProgress + learningStats.completedCourses > 0
-                        ? Math.round((learningStats.completedCourses / (learningStats.coursesInProgress + learningStats.completedCourses)) * 100)
-                        : 0}%
+                      {learningStats.totalCourses > 0
+                      ? Math.round((learningStats.completedCourses / learningStats.totalCourses) * 100)
+                      : 0}%
                     </span>
                   </div>
                 </div>
@@ -457,12 +462,12 @@ export default function ProgressPage() {
                 <div>
                   <div className="flex justify-between text-sm text-gray-600 mb-2">
                     <span>本周学习目标 (10小时)</span>
-                    <span>{Math.round((learningStats.weeklyStudyTime / 36000) * 100)}%</span>
+                    <span>{Math.round((Math.floor(learningStats.totalWatchTime / 4) / 36000) * 100)}%</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div 
                       className="bg-green-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${Math.min((learningStats.weeklyStudyTime / 36000) * 100, 100)}%` }}
+                      style={{ width: `${Math.min((Math.floor(learningStats.totalWatchTime / 4) / 36000) * 100, 100)}%` }}
                     ></div>
                   </div>
                 </div>

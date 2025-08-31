@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense, ChangeEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,7 @@ import { Eye, EyeOff, Phone, Lock, Loader2, MessageSquare } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login, adminLogin, isLoggedIn } = useAuth();
@@ -218,7 +218,7 @@ export default function LoginPage() {
                   type="tel"
                   placeholder="请输入手机号"
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, phone: e.target.value })}
                   className="pl-10"
                   required
                   disabled={loading}
@@ -236,7 +236,7 @@ export default function LoginPage() {
                     type={showPassword ? 'text' : 'password'}
                     placeholder="请输入密码"
                     value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, password: e.target.value })}
                     className="pl-10 pr-10"
                     required
                     disabled={loading}
@@ -262,7 +262,7 @@ export default function LoginPage() {
                       type="text"
                       placeholder="请输入验证码"
                       value={formData.smsCode}
-                      onChange={(e) => setFormData({ ...formData, smsCode: e.target.value })}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, smsCode: e.target.value })}
                       className="pl-10"
                       required
                       disabled={loading}
@@ -298,5 +298,13 @@ export default function LoginPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">加载中...</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }

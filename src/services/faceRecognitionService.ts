@@ -107,7 +107,7 @@ export class FaceRecognitionService {
 
   constructor(config?: Partial<FaceRecognitionConfig>) {
     const envConfig = getEnvConfig();
-    const faceConfig = envConfig.getFaceRecognition();
+    const faceConfig = envConfig.faceRecognition || {};
     
     this.config = {
       confidenceThreshold: faceConfig.confidenceThreshold || 80,
@@ -149,8 +149,7 @@ export class FaceRecognitionService {
       // 调用百度AI人脸检测
       const result = await this.baiduService.detectFace(imageBase64, {
         faceField: options?.faceField || 'age,beauty,expression,gender,glasses,race,quality,emotion',
-        maxFaceNum: options?.maxFaceNum || 1,
-        faceType: options?.faceType || 'LIVE'
+        maxFaceNum: options?.maxFaceNum || 1
       });
 
       if (!result.success) {
@@ -161,33 +160,49 @@ export class FaceRecognitionService {
         };
       }
 
+      // 检查检测结果
+      if (!result.success) {
+        return {
+          success: false,
+          message: result.message || '人脸检测失败',
+          faceCount: result.faceCount || 0
+        };
+      }
+
+      // 检查人脸数量
+      if (!result.faceCount || result.faceCount === 0) {
+        return {
+          success: false,
+          message: '未检测到人脸',
+          faceCount: 0
+        };
+      }
+
       // 检查人脸质量
-      if (result.faces && result.faces.length > 0) {
-        const face = result.faces[0];
-        const quality = this.calculateFaceQuality(face);
+      if (result.quality) {
+        const qualityScore = this.calculateQualityScore(result.quality);
         
-        if (quality < this.config.qualityThreshold) {
+        if (qualityScore < this.config.qualityThreshold) {
           return {
             success: false,
-            message: `人脸质量不符合要求，当前质量: ${(quality * 100).toFixed(1)}%，要求: ${(this.config.qualityThreshold * 100).toFixed(1)}%`,
-            faceCount: result.faces.length,
-            quality
+            message: `人脸质量不符合要求，当前质量: ${(qualityScore * 100).toFixed(1)}%，要求: ${(this.config.qualityThreshold * 100).toFixed(1)}%`,
+            faceCount: result.faceCount,
+            quality: qualityScore
           };
         }
 
         return {
           success: true,
           message: '人脸检测成功',
-          faceCount: result.faces.length,
-          faces: result.faces,
-          quality
+          faceCount: result.faceCount,
+          quality: qualityScore
         };
       }
 
       return {
-        success: false,
-        message: '未检测到人脸',
-        faceCount: 0
+        success: true,
+        message: '人脸检测成功',
+        faceCount: result.faceCount
       };
 
     } catch (error) {
@@ -223,10 +238,10 @@ export class FaceRecognitionService {
       }
 
       // 调用百度AI人脸比对
-      const result = await this.baiduService.compareFaces([
-        { image: imageBase64_1, imageType: 'BASE64' },
-        { image: imageBase64_2, imageType: 'BASE64' }
-      ]);
+      const result = await this.baiduService.compareFaces(
+        imageBase64_1,
+        imageBase64_2
+      );
 
       if (!result.success) {
         return {
@@ -296,12 +311,7 @@ export class FaceRecognitionService {
       // 调用百度AI人脸搜索进行身份验证
       const searchResult = await this.baiduService.searchFace(
         imageBase64,
-        [`group_${userId}`],
-        {
-          maxUserNum: 1,
-          qualityControl: 'NORMAL',
-          livenessControl: 'NONE'
-        }
+        [`group_${userId}`]
       );
 
       if (!searchResult.success || !searchResult.userList || searchResult.userList.length === 0) {
@@ -367,15 +377,11 @@ export class FaceRecognitionService {
       }
 
       // 调用百度AI人脸注册
-      const result = await this.baiduService.addUser(
+      const result = await this.baiduService.registerFace(
         imageBase64,
-        `group_${userId}`,
         userId,
-        {
-          userInfo: userInfo || '',
-          qualityControl: 'NORMAL',
-          livenessControl: 'NONE'
-        }
+        `group_${userId}`,
+        userInfo || ''
       );
 
       return {
@@ -482,6 +488,51 @@ export class FaceRecognitionService {
     
     // 综合质量分数
     return (blurScore * 0.4 + illuminationScore * 0.3 + completenessScore * 0.3);
+  }
+
+  /**
+   * 计算人脸质量分数（基于检测响应）
+   * @private
+   * @param quality - 质量数据
+   * @returns 质量分数 (0-1)
+   */
+  private calculateQualityScore(quality: {
+    blur?: number;
+    illumination?: number;
+    completeness?: number;
+    occlusion?: {
+      leftEye?: number;
+      rightEye?: number;
+      nose?: number;
+      mouth?: number;
+      leftCheek?: number;
+      rightCheek?: number;
+      chin?: number;
+    };
+  }): number {
+    const { blur, illumination, completeness, occlusion } = quality;
+    
+    // 模糊度：值越小越好 (0-1)
+    const blurScore = Math.max(0, 1 - (blur || 0));
+    
+    // 光照：值越接近50越好 (0-255)
+    const illuminationScore = Math.max(0, 1 - Math.abs((illumination || 128) - 128) / 128);
+    
+    // 完整度：值越大越好 (0-1)
+    const completenessScore = completeness || 0.5;
+    
+    // 遮挡度：计算平均遮挡程度
+    let occlusionScore = 1.0;
+    if (occlusion) {
+      const occlusionValues = Object.values(occlusion).filter(val => typeof val === 'number');
+      if (occlusionValues.length > 0) {
+        const avgOcclusion = occlusionValues.reduce((sum, val) => sum + val, 0) / occlusionValues.length;
+        occlusionScore = Math.max(0, 1 - avgOcclusion);
+      }
+    }
+    
+    // 综合质量分数
+    return (blurScore * 0.3 + illuminationScore * 0.25 + completenessScore * 0.25 + occlusionScore * 0.2);
   }
 }
 

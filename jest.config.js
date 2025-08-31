@@ -83,7 +83,7 @@ module.exports = {
   
   // 转换忽略模式
   transformIgnorePatterns: [
-    'node_modules/(?!(.*\\.mjs$|@supabase|@openai))'
+    'node_modules/(?!(.*\.mjs$|@supabase))'
   ],
   
   // 覆盖率配置

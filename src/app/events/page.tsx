@@ -39,23 +39,7 @@ export default function EventsPage() {
   const categories = ['全部', '行业论坛', '技能培训', '职业发展', '技术大会', '网络研讨会'];
   const statusOptions = ['全部', '报名中', '即将开放', '已结束'];
 
-  /**
-   * 获取状态标签样式
-   * @param status 活动状态
-   * @returns 样式类名
-   */
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case '报名中':
-        return 'bg-green-100 text-green-800';
-      case '即将开放':
-        return 'bg-blue-100 text-blue-800';
-      case '已结束':
-        return 'bg-gray-100 text-gray-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+
 
   /**
    * 格式化价格显示
@@ -67,7 +51,7 @@ export default function EventsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pt-20">
       {/* 页面头部 */}
       <section className="bg-white border-b">
         <div className="container mx-auto px-4 py-12">
@@ -183,13 +167,13 @@ export default function EventsPage() {
               ) : (
                 <>
                   {/* 精选活动 */}
-                  {events.filter(event => event.featured).map((event) => (
+                  {events.slice(0, 2).map((event) => (
                 <Card key={event.id} className="overflow-hidden border-0 shadow-lg hover:shadow-xl transition-shadow">
                   <div className="md:flex">
                     <div className="md:w-2/5">
                       <div className="relative h-64 md:h-full">
                         <img
-                          src={event.imageUrl}
+                          src={event.thumbnail}
                           alt={event.title}
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -206,10 +190,10 @@ export default function EventsPage() {
                           <div className="bg-white rounded-lg px-3 py-2 shadow-lg">
                             <div className="text-center">
                               <div className="text-2xl font-bold text-blue-600">
-                                {new Date(event.date).getDate()}
+                                {new Date(event.startDate).getDate()}
                               </div>
                               <div className="text-xs text-gray-600">
-                                {new Date(event.date).toLocaleDateString('zh-CN', { month: 'short' })}
+                                {new Date(event.startDate).toLocaleDateString('zh-CN', { month: 'short' })}
                               </div>
                             </div>
                           </div>
@@ -220,13 +204,8 @@ export default function EventsPage() {
                       <CardHeader className="p-0 mb-4">
                         <div className="flex items-center gap-2 mb-2">
                           <Badge variant="outline">{event.category}</Badge>
-                          <Badge className={getStatusBadge(event.status)}>
-                            {event.status}
-                          </Badge>
-                          <div className="flex items-center text-sm text-yellow-600">
-                            <Star className="w-4 h-4 mr-1 fill-current" />
-                            {event.rating}
-                          </div>
+
+
                         </div>
                         <CardTitle className="text-xl font-bold hover:text-blue-600 transition-colors">
                           <Link href={`/events/${event.id}`}>
@@ -236,21 +215,21 @@ export default function EventsPage() {
                       </CardHeader>
                       <CardContent className="p-0">
                         <p className="text-gray-600 mb-4 line-clamp-2">
-                          {event.summary}
+                          {event.description}
                         </p>
                         
                         <div className="space-y-2 mb-4">
                           <div className="flex items-center text-sm text-gray-600">
                             <Calendar className="w-4 h-4 mr-2" />
-                            {event.date} {event.time}
+                            {event.startDate} {event.startTime}
                           </div>
                           <div className="flex items-center text-sm text-gray-600">
                             <MapPin className="w-4 h-4 mr-2" />
-                            {event.location}
+                            {event.location.city}
                           </div>
                           <div className="flex items-center text-sm text-gray-600">
                             <Users className="w-4 h-4 mr-2" />
-                            {event.participants}人参与
+                            {event.registered}人参与
                           </div>
                         </div>
 
@@ -272,11 +251,11 @@ export default function EventsPage() {
 
                   {/* 普通活动列表 */}
                   <div className="grid md:grid-cols-2 gap-6">
-                    {events.filter(event => !event.featured).map((event) => (
+                    {events.slice(2).map((event) => (
                   <Card key={event.id} className="overflow-hidden border-0 shadow-lg hover:shadow-xl transition-shadow group">
                     <div className="relative h-48">
                       <img
-                        src={event.imageUrl}
+                        src={event.thumbnail}
                         alt={event.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         onError={(e) => {
@@ -285,18 +264,16 @@ export default function EventsPage() {
                         }}
                       />
                       <div className="absolute top-4 left-4">
-                        <Badge className={getStatusBadge(event.status)}>
-                          {event.status}
-                        </Badge>
+
                       </div>
                       <div className="absolute bottom-4 right-4">
                         <div className="bg-white rounded-lg px-2 py-1 shadow-lg">
                           <div className="text-center">
                             <div className="text-lg font-bold text-blue-600">
-                              {new Date(event.date).getDate()}
+                              {new Date(event.startDate).getDate()}
                             </div>
                             <div className="text-xs text-gray-600">
-                              {new Date(event.date).toLocaleDateString('zh-CN', { month: 'short' })}
+                              {new Date(event.startDate).toLocaleDateString('zh-CN', { month: 'short' })}
                             </div>
                           </div>
                         </div>
@@ -305,10 +282,7 @@ export default function EventsPage() {
                     <CardHeader className="pb-3">
                       <div className="flex items-center gap-2 mb-2">
                         <Badge variant="outline" className="text-xs">{event.category}</Badge>
-                        <div className="flex items-center text-xs text-yellow-600">
-                          <Star className="w-3 h-3 mr-1 fill-current" />
-                          {event.rating}
-                        </div>
+
                       </div>
                       <CardTitle className="text-lg font-bold line-clamp-2 group-hover:text-blue-600 transition-colors">
                         <Link href={`/events/${event.id}`}>
@@ -318,17 +292,17 @@ export default function EventsPage() {
                     </CardHeader>
                     <CardContent className="pt-0">
                       <p className="text-gray-600 text-sm line-clamp-2 mb-3">
-                        {event.summary}
+                        {event.description}
                       </p>
                       
                       <div className="space-y-1 mb-4 text-xs text-gray-600">
                         <div className="flex items-center">
                           <Clock className="w-3 h-3 mr-1" />
-                          {event.time}
+                          {event.startTime}
                         </div>
                         <div className="flex items-center">
                           <MapPin className="w-3 h-3 mr-1" />
-                          {event.location}
+                          {event.location.city}
                         </div>
                       </div>
 
@@ -366,10 +340,10 @@ export default function EventsPage() {
                     <div key={event.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
                       <div className="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-lg flex flex-col items-center justify-center">
                         <div className="text-sm font-bold text-blue-600">
-                          {new Date(event.date).getDate()}
+                          {new Date(event.startDate).getDate()}
                         </div>
                         <div className="text-xs text-blue-500">
-                          {new Date(event.date).toLocaleDateString('zh-CN', { month: 'short' })}
+                          {new Date(event.startDate).toLocaleDateString('zh-CN', { month: 'short' })}
                         </div>
                       </div>
                       <div className="flex-1">
@@ -380,7 +354,7 @@ export default function EventsPage() {
                         </h4>
                         <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
                           <MapPin className="w-3 h-3" />
-                          {event.location}
+                          {event.location.city}
                         </div>
                       </div>
                     </div>
@@ -401,12 +375,9 @@ export default function EventsPage() {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-600">参与</span>
-                      <span className="text-lg font-bold text-green-600">{events.reduce((sum, event) => sum + event.participants, 0)}人</span>
+                      <span className="text-lg font-bold text-green-600">{events.reduce((sum, event) => sum + event.registered, 0)}人</span>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">平均评分</span>
-                      <span className="text-lg font-bold text-yellow-600">{events.length > 0 ? (events.reduce((sum, event) => sum + event.rating, 0) / events.length).toFixed(1) : '0.0'}分</span>
-                    </div>
+
                   </div>
                 </CardContent>
               </Card>

@@ -7,6 +7,7 @@ export enum UserRole {
   EXPERT = 'expert', 
   TEACHER = 'teacher',
   STUDENT = 'student',
+  EXAMINER = 'examiner',
   GRADER = 'grader',
   INTERNAL_SUPERVISOR = 'internal_supervisor',
   GUEST = 'guest'
@@ -21,10 +22,11 @@ export const ROLE_DISPLAY_NAMES: Record<UserRole, string> = {
   [UserRole.EXPERT]: '专家',
   [UserRole.TEACHER]: '教师',
   [UserRole.STUDENT]: '考生',
+  [UserRole.EXAMINER]: '考官',
   [UserRole.GRADER]: '考评员',
   [UserRole.INTERNAL_SUPERVISOR]: '内部督导员',
   [UserRole.GUEST]: '访客'
-};
+}
 
 /**
  * 角色权限级别定义
@@ -35,10 +37,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, number> = {
   [UserRole.INTERNAL_SUPERVISOR]: 80,
   [UserRole.EXPERT]: 70,
   [UserRole.TEACHER]: 60,
+  [UserRole.EXAMINER]: 55,
   [UserRole.GRADER]: 50,
   [UserRole.STUDENT]: 30,
   [UserRole.GUEST]: 10
-};
+}
 
 /**
  * 获取角色的显示名称

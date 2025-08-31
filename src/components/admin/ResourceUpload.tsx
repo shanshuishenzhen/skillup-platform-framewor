@@ -7,6 +7,7 @@
 
 import React, { useState, useRef } from 'react';
 import { Upload, FileText, Video, Music, Image, File, X, CheckCircle, AlertCircle, Trash2 } from 'lucide-react';
+import TemplateDownload from './TemplateDownload';
 
 /**
  * 文件类型配置
@@ -107,7 +108,7 @@ export default function ResourceUpload() {
   /**
    * 验证文件
    */
-  const validateFile = (file: File): string | null => {
+  const validateFile = (file: File): string | undefined => {
     const fileType = getFileType(file);
     const config = FILE_TYPES[fileType];
     
@@ -115,7 +116,7 @@ export default function ResourceUpload() {
       return `文件大小超过限制 (最大 ${(config.maxSize / 1024 / 1024).toFixed(0)}MB)`;
     }
     
-    return null;
+    return undefined;
   };
 
   /**
@@ -300,6 +301,16 @@ export default function ResourceUpload() {
 
   return (
     <div className="space-y-6">
+      {/* Excel模板下载 */}
+      <TemplateDownload
+        onTemplateSelect={(type) => {
+          if (type === 'resources') {
+            console.log('资源模板已下载');
+          }
+        }}
+        showPreview={true}
+      />
+
       {/* 页面标题 */}
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center mb-4">

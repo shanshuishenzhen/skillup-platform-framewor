@@ -321,8 +321,8 @@ describe('API路由测试', () => {
         }]);
         
         // 模拟密码不匹配
-        const bcrypt = jest.mocked(require('bcrypt'));
-        bcrypt.compare.mockResolvedValueOnce(false);
+        const bcrypt = await import('bcrypt');
+        jest.mocked(bcrypt.compare).mockResolvedValueOnce(false);
         
         const response = await request(app)
           .post('/api/auth/login')
@@ -908,14 +908,14 @@ describe('API路由测试', () => {
   describe('管理员路由 (/api/admin)', () => {
     const mockAdminToken = 'Bearer mock-admin-jwt-token';
     
-    beforeEach(() => {
+    beforeEach(async () => {
       // 模拟管理员JWT验证
-      const jwt = jest.mocked(require('jsonwebtoken'));
-      jwt.verify.mockReturnValue({
+      const jwt = await import('jsonwebtoken');
+      jest.mocked(jwt.verify).mockReturnValue({
         userId: 'admin-123',
         email: 'admin@example.com',
         role: 'admin'
-      });
+      } as any);
     });
     
     describe('GET /api/admin/users', () => {
@@ -1047,12 +1047,12 @@ describe('API路由测试', () => {
     
     it('应该验证管理员权限', async () => {
       // 模拟普通用户JWT
-      const jwt = jest.mocked(require('jsonwebtoken'));
-      jwt.verify.mockReturnValue({
+      const jwt = await import('jsonwebtoken');
+      jest.mocked(jwt.verify).mockReturnValue({
         userId: 'user-123',
         email: 'user@example.com',
         role: 'user' // 非管理员
-      });
+      } as any);
       
       const response = await request(app)
         .get('/api/admin/users')

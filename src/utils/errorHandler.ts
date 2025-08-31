@@ -19,7 +19,8 @@ export enum ErrorType {
   DATABASE_ERROR = 'DATABASE_ERROR',
   FILE_UPLOAD_ERROR = 'FILE_UPLOAD_ERROR',
   AI_SERVICE_ERROR = 'AI_SERVICE_ERROR',
-  FACE_RECOGNITION_ERROR = 'FACE_RECOGNITION_ERROR'
+  FACE_RECOGNITION_ERROR = 'FACE_RECOGNITION_ERROR',
+  NOT_FOUND = 'NOT_FOUND'
 }
 
 /**
@@ -182,7 +183,7 @@ export class AppError extends Error {
     };
   } {
     const response = {
-      success: false,
+      success: false as const,
       error: {
         type: this.type,
         message: this.message,
@@ -192,11 +193,11 @@ export class AppError extends Error {
     };
 
     if (includeStack && this.stack) {
-      response.error.stack = this.stack;
+      (response.error as any).stack = this.stack;
     }
 
     if (this.context?.requestId) {
-      response.error.requestId = this.context.requestId;
+      (response.error as any).requestId = this.context.requestId;
     }
 
     return response;
@@ -300,44 +301,44 @@ export class ErrorHandler {
     let severity = ErrorSeverity.MEDIUM;
     let retryable = false;
 
-    if (error?.name === 'TypeError' || error?.code === 'ENOTFOUND') {
+    if ((error as any)?.name === 'TypeError' || (error as any)?.code === 'ENOTFOUND') {
       errorType = ErrorType.NETWORK_ERROR;
       statusCode = 503;
       retryable = true;
-    } else if (error?.name === 'TimeoutError' || error?.code === 'ETIMEDOUT') {
+    } else if ((error as any)?.name === 'TimeoutError' || (error as any)?.code === 'ETIMEDOUT') {
       errorType = ErrorType.TIMEOUT_ERROR;
       statusCode = 408;
       retryable = true;
-    } else if (error?.status === 401 || error?.statusCode === 401) {
+    } else if ((error as any)?.status === 401 || (error as any)?.statusCode === 401) {
       errorType = ErrorType.AUTHENTICATION_ERROR;
       statusCode = 401;
       severity = ErrorSeverity.HIGH;
-    } else if (error?.status === 403 || error?.statusCode === 403) {
+    } else if ((error as any)?.status === 403 || (error as any)?.statusCode === 403) {
       errorType = ErrorType.AUTHORIZATION_ERROR;
       statusCode = 403;
       severity = ErrorSeverity.HIGH;
-    } else if (error?.status === 429 || error?.statusCode === 429) {
+    } else if ((error as any)?.status === 429 || (error as any)?.statusCode === 429) {
       errorType = ErrorType.RATE_LIMIT_ERROR;
       statusCode = 429;
       retryable = true;
-    } else if (error?.status === 503 || error?.statusCode === 503) {
+    } else if ((error as any)?.status === 503 || (error as any)?.statusCode === 503) {
       errorType = ErrorType.SERVICE_UNAVAILABLE;
       statusCode = 503;
       retryable = true;
-    } else if (error?.status >= 400 && error?.status < 500) {
+    } else if ((error as any)?.status >= 400 && (error as any)?.status < 500) {
       errorType = ErrorType.VALIDATION_ERROR;
-      statusCode = error.status;
+      statusCode = (error as any).status;
     }
 
     return new AppError(
       errorType,
-      error?.message || '未知错误',
+      (error as any)?.message || '未知错误',
       {
-        code: error?.code,
+        code: (error as any)?.code,
         statusCode,
         severity,
         context: errorContext,
-        originalError: error,
+        originalError: error as Error,
         retryable
       }
     );

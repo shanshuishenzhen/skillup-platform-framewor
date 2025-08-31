@@ -16,7 +16,7 @@ export default function TrainingPage() {
   const loadTraining = async () => {
     try {
       setLoading(true);
-      const virtualTraining = await aiDataGeneratorService.generateTraining(9);
+      const virtualTraining = await aiDataGeneratorService.generateTrainings(9);
       setTrainingCourses(virtualTraining);
     } catch (error) {
       console.error('加载培训数据失败:', error);
@@ -29,7 +29,7 @@ export default function TrainingPage() {
   const refreshTraining = async () => {
     try {
       setRefreshing(true);
-      const virtualTraining = await aiDataGeneratorService.generateTraining(9, true);
+      const virtualTraining = await aiDataGeneratorService.generateTrainings(9);
       setTrainingCourses(virtualTraining);
     } catch (error) {
       console.error('刷新培训数据失败:', error);
@@ -44,7 +44,7 @@ export default function TrainingPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pt-20">
       {/* 页面头部 */}
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

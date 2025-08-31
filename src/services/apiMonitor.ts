@@ -79,17 +79,14 @@ export class ApiMonitorService {
   private isInitialized = false;
 
   constructor(config?: Partial<ApiMonitorConfig>) {
-    const envConfig = getEnvConfig();
-    const monitoringConfig = envConfig.getMonitoring?.() || {};
-    
     this.config = {
-      enabled: monitoringConfig.enabled ?? true,
-      sampleRate: monitoringConfig.sampleRate ?? 1.0,
-      maxStatsHistory: monitoringConfig.maxStatsHistory ?? 10000,
-      performanceThreshold: monitoringConfig.performanceThreshold ?? 5000,
-      errorThreshold: monitoringConfig.errorThreshold ?? 0.05,
-      enableRealTimeAlerts: monitoringConfig.enableRealTimeAlerts ?? true,
-      excludeEndpoints: monitoringConfig.excludeEndpoints ?? ['/health', '/metrics'],
+      enabled: true,
+      sampleRate: 1.0,
+      maxStatsHistory: 10000,
+      performanceThreshold: 5000,
+      errorThreshold: 0.05,
+      enableRealTimeAlerts: true,
+      excludeEndpoints: ['/health', '/metrics'],
       ...config
     };
   }
@@ -114,9 +111,9 @@ export class ApiMonitorService {
     } catch (error) {
       console.error('API监控服务初始化失败:', error);
       throw createError(
-        ErrorType.SYSTEM_ERROR,
+        ErrorType.INTERNAL_ERROR,
         'API监控服务初始化失败',
-        { originalError: error }
+        { originalError: error instanceof Error ? error : new Error(String(error)) }
       );
     }
   }

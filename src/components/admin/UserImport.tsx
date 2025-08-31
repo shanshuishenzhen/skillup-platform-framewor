@@ -7,6 +7,7 @@
 
 import React, { useState, useRef } from 'react';
 import { Upload, Download, Users, AlertCircle, CheckCircle, X, FileText } from 'lucide-react';
+import TemplateDownload from './TemplateDownload';
 
 /**
  * 导入结果接口
@@ -211,25 +212,16 @@ export default function UserImport() {
         </div>
       </div>
 
-      {/* 模板下载 */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <Download className="h-5 w-5 text-green-600 mr-3" />
-            <div>
-              <h3 className="text-lg font-medium text-gray-900">下载导入模板</h3>
-              <p className="text-sm text-gray-600">下载标准的CSV用户导入模板文件</p>
-            </div>
-          </div>
-          <button
-            onClick={downloadTemplate}
-            className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            下载模板
-          </button>
-        </div>
-      </div>
+      {/* Excel模板下载 */}
+      <TemplateDownload
+        onTemplateSelect={(type) => {
+          if (type === 'users') {
+            // 模板下载后的回调处理
+            console.log('用户模板已下载');
+          }
+        }}
+        showPreview={true}
+      />
 
       {/* 文件上传区域 */}
       <div className="bg-white rounded-lg shadow p-6">
@@ -345,10 +337,11 @@ export default function UserImport() {
                       if (typeof error === 'string') {
                         errorMessage = error;
                       } else if (typeof error === 'object' && error !== null) {
-                        if (error.error) {
-                          errorMessage = `第${error.row || '?'}行: ${error.error}`;
+                        const errorObj = error as { error?: string; row?: number };
+                        if (errorObj.error) {
+                          errorMessage = `第${errorObj.row || '?'}行: ${errorObj.error}`;
                         } else {
-                          errorMessage = `第${error.row || '?'}行: 数据格式错误`;
+                          errorMessage = `第${errorObj.row || '?'}行: 数据格式错误`;
                         }
                       } else {
                         errorMessage = '未知错误';

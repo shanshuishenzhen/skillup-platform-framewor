@@ -50,7 +50,7 @@ export default function BrandsPage() {
   const industries = getAllIndustries()
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pt-20">
       {/* 页面头部 */}
       <div className="bg-white border-b">
         <div className="container mx-auto px-4 py-8">
@@ -171,26 +171,26 @@ export default function BrandsPage() {
                 <p className="text-gray-600 text-sm mb-4 line-clamp-3">{brand.description}</p>
                 
                 <div className="mb-4">
-                  <h4 className="font-semibold text-sm mb-2">核心优势：</h4>
+                  <h4 className="font-semibold text-sm mb-2">核心服务：</h4>
                   <div className="flex flex-wrap gap-2">
-                    {brand.features.map((feature, index) => (
+                    {brand.services.map((service, index) => (
                       <span 
                         key={index}
                         className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded"
                       >
-                        {feature}
+                        {service}
                       </span>
                     ))}
                   </div>
                 </div>
 
                 <div className="mb-6">
-                  <h4 className="font-semibold text-sm mb-2">主要荣誉：</h4>
+                  <h4 className="font-semibold text-sm mb-2">主要成就：</h4>
                   <div className="space-y-1">
-                    {brand.awards.map((award, index) => (
+                    {brand.achievements.map((achievement, index) => (
                       <div key={index} className="text-xs text-gray-500 flex items-center">
                         <span className="w-1 h-1 bg-yellow-500 rounded-full mr-2"></span>
-                        {award}
+                        {achievement}
                       </div>
                     ))}
                   </div>

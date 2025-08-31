@@ -84,7 +84,7 @@ function getRetryConfig(): RetryConfig {
       ErrorType.NETWORK_ERROR,
       ErrorType.TIMEOUT_ERROR,
       ErrorType.DATABASE_ERROR,
-      ErrorType.SERVICE_UNAVAILABLE_ERROR
+      ErrorType.SERVICE_UNAVAILABLE
     ]
   };
 }
@@ -188,13 +188,20 @@ export async function getCourseById(
   try {
     // 使用重试机制进行数据库查询
     const course = await withRetry(async () => {
+      let selectQuery = `
+        *,
+        instructor:instructors(*)
+      `;
+      
+      if (includeChapters) {
+        selectQuery += `,
+        chapters(*, videos(*))
+        `;
+      }
+      
       const query = supabase
         .from('courses')
-        .select(`
-          *,
-          instructor:instructors(*)
-          ${includeChapters ? ',chapters(*, videos(*))' : ''}
-        `)
+        .select(selectQuery)
         .eq('id', courseId)
         .single();
 
@@ -204,7 +211,7 @@ export async function getCourseById(
         if (error.code === 'PGRST116') {
           // 记录未找到
           throw createError(
-            ErrorType.NOT_FOUND_ERROR,
+            ErrorType.NOT_FOUND,
             '课程不存在',
             {
               code: 'COURSE_NOT_FOUND',
@@ -228,10 +235,10 @@ export async function getCourseById(
 
       if (!course) {
         throw createError(
-          ErrorType.NOT_FOUND_ERROR,
-          '课程不存在',
-          {
-            code: 'COURSE_NOT_FOUND',
+            ErrorType.NOT_FOUND,
+            '课程不存在',
+            {
+              code: 'COURSE_NOT_FOUND',
             statusCode: 404,
             severity: ErrorSeverity.MEDIUM
           }
@@ -241,9 +248,22 @@ export async function getCourseById(
       return course;
     }, getRetryConfig());
 
-    return transformCourseData(course);
+    // 确保 course 是有效的数据对象
+    if (!course || typeof course !== 'object' || 'error' in course) {
+      throw createError(
+        ErrorType.DATABASE_ERROR,
+        '获取课程数据格式错误',
+        {
+          code: 'INVALID_COURSE_DATA',
+          statusCode: 500,
+          severity: ErrorSeverity.HIGH
+        }
+      );
+    }
+
+    return transformCourseData(course as Record<string, unknown>);
   } catch (error) {
-    if (error instanceof AppError && error.context?.code === 'COURSE_NOT_FOUND') {
+    if (error instanceof AppError && error.code === 'COURSE_NOT_FOUND') {
       return null;
     }
     
@@ -628,14 +648,14 @@ export async function getCoursePreviewVideos(courseId: string): Promise<Video[]>
  */
 function transformCourseData(dbCourse: Record<string, unknown>): Course {
   return {
-    id: dbCourse.id,
-    title: dbCourse.title,
-    description: dbCourse.description || '',
+    id: dbCourse.id as string,
+    title: dbCourse.title as string,
+    description: (dbCourse.description as string) || '',
     instructor: {
-      id: dbCourse.instructor?.id || '',
-      name: dbCourse.instructor?.name || '未知讲师',
-      avatar: dbCourse.instructor?.avatar_url,
-      bio: dbCourse.instructor?.bio
+      id: (dbCourse.instructor as any)?.id || '',
+      name: (dbCourse.instructor as any)?.name || '未知讲师',
+      avatar: (dbCourse.instructor as any)?.avatar_url,
+      bio: (dbCourse.instructor as any)?.bio
     },
     duration: 120, // 默认时长
     level: (dbCourse.difficulty as 'beginner' | 'intermediate' | 'advanced') || 'beginner',
@@ -643,28 +663,28 @@ function transformCourseData(dbCourse: Record<string, unknown>): Course {
     originalPrice: Number(dbCourse.price) || 0,
     rating: 4.5, // 默认评分
     studentsCount: 100, // 默认学员数
-    imageUrl: dbCourse.cover_image_url || 'https://trae-api-sg.mchost.guru/api/ide/v1/text_to_image?prompt=online%20course%20cover%20image%20modern%20design&image_size=landscape_4_3',
-    tags: [dbCourse.category].filter(Boolean) || [],
+    imageUrl: (dbCourse.cover_image_url as string) || 'https://trae-api-sg.mchost.guru/api/ide/v1/text_to_image?prompt=online%20course%20cover%20image%20modern%20design&image_size=landscape_4_3',
+    tags: [dbCourse.category as string].filter(Boolean) || [],
     isPopular: true, // 默认为热门
     isFree: Number(dbCourse.price) === 0,
-    createdAt: dbCourse.created_at,
-    updatedAt: dbCourse.updated_at,
-    chapters: dbCourse.chapters?.map((chapter: Record<string, unknown>) => ({
-      id: chapter.id,
-      courseId: chapter.course_id,
-      title: chapter.title,
-      description: chapter.description,
-      orderIndex: chapter.order_index,
-      duration: chapter.duration,
-      videos: chapter.videos?.map((video: Record<string, unknown>) => ({
-        id: video.id,
-        chapterId: video.chapter_id,
-        title: video.title,
-        description: video.description,
-        videoUrl: video.video_url,
-        duration: video.duration,
-        orderIndex: video.order_index,
-        isPreview: video.is_preview
+    createdAt: dbCourse.created_at as string,
+    updatedAt: dbCourse.updated_at as string,
+    chapters: (dbCourse.chapters as any[])?.map((chapter: Record<string, unknown>) => ({
+      id: chapter.id as string,
+      courseId: chapter.course_id as string,
+      title: chapter.title as string,
+      description: chapter.description as string,
+      orderIndex: chapter.order_index as number,
+      duration: chapter.duration as number,
+      videos: (chapter.videos as any[])?.map((video: Record<string, unknown>) => ({
+        id: video.id as string,
+        chapterId: video.chapter_id as string,
+        title: video.title as string,
+        description: video.description as string,
+        videoUrl: video.video_url as string,
+        duration: video.duration as number,
+        orderIndex: video.order_index as number,
+        isPreview: video.is_preview as boolean
       })).sort((a: Video, b: Video) => a.orderIndex - b.orderIndex) || []
     })).sort((a: Chapter, b: Chapter) => a.orderIndex - b.orderIndex) || []
   };
@@ -695,10 +715,10 @@ export async function getCoursePreviewVideo(courseId: string): Promise<Video | n
         if (error.code === 'PGRST116') {
           // 记录未找到
           throw createError(
-            ErrorType.NOT_FOUND_ERROR,
-            '课程预览视频不存在',
-            {
-              code: 'COURSE_PREVIEW_VIDEO_NOT_FOUND',
+          ErrorType.NOT_FOUND,
+          '课程预览视频不存在',
+          {
+            code: 'COURSE_PREVIEW_VIDEO_NOT_FOUND',
               statusCode: 404,
               severity: ErrorSeverity.MEDIUM
             }
@@ -719,7 +739,7 @@ export async function getCoursePreviewVideo(courseId: string): Promise<Video | n
 
       if (!video) {
         throw createError(
-          ErrorType.NOT_FOUND_ERROR,
+          ErrorType.NOT_FOUND,
           '课程预览视频不存在',
           {
             code: 'COURSE_PREVIEW_VIDEO_NOT_FOUND',
@@ -743,7 +763,7 @@ export async function getCoursePreviewVideo(courseId: string): Promise<Video | n
       isPreview: video.is_preview
     };
   } catch (error) {
-    if (error instanceof AppError && error.context?.code === 'COURSE_PREVIEW_VIDEO_NOT_FOUND') {
+    if (error instanceof AppError && error.code === 'COURSE_PREVIEW_VIDEO_NOT_FOUND') {
       return null;
     }
     

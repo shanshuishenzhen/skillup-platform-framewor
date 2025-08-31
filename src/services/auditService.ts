@@ -13,8 +13,8 @@
  */
 
 import { logger } from '../utils/logger';
-import { supabaseClient } from '../utils/supabase';
-import { envConfig } from '../utils/envConfig';
+import { createServerClient } from '../utils/supabase';
+import { getEnvConfig } from '../utils/envConfig';
 import { cacheService } from './cacheService';
 import { analyticsService } from './analyticsService';
 
@@ -124,6 +124,7 @@ export class AuditService {
   private metrics: AuditMetrics;
 
   constructor(config?: Partial<AuditConfig>) {
+    const envConfig = getEnvConfig();
     this.config = {
       enableAudit: envConfig?.audit?.enabled || true,
       logLevel: (envConfig?.audit?.logLevel as AuditLevel) || 'info',
@@ -222,7 +223,7 @@ export class AuditService {
 
       return true;
     } catch (error) {
-      logger.error('Failed to log audit entry', error);
+      logger.error('Failed to log audit entry', { error: error instanceof Error ? error.message : String(error) });
       return false;
     }
   }
@@ -312,7 +313,8 @@ export class AuditService {
    */
   async queryLogs(query: AuditQuery): Promise<AuditLog[]> {
     try {
-      let queryBuilder = supabaseClient
+      const supabase = createServerClient();
+      let queryBuilder = supabase
         .from('audit_logs')
         .select('*');
 
@@ -355,13 +357,13 @@ export class AuditService {
       const { data, error } = await queryBuilder;
 
       if (error) {
-        logger.error('Failed to query audit logs', error);
+        logger.error('Failed to query audit logs', { error: error instanceof Error ? error.message : String(error) });
         return [];
       }
 
       return data || [];
     } catch (error) {
-      logger.error('Failed to query audit logs', error);
+      logger.error('Failed to query audit logs', { error: error instanceof Error ? error.message : String(error) });
       return [];
     }
   }
@@ -408,7 +410,7 @@ export class AuditService {
         size: Buffer.byteLength(data, 'utf8')
       };
     } catch (error) {
-      logger.error('Failed to export audit logs', error);
+      logger.error('Failed to export audit logs', { error: error instanceof Error ? error.message : String(error) });
       throw error;
     }
   }
@@ -422,7 +424,8 @@ export class AuditService {
     standards: string[];
   }): Promise<ComplianceReport> {
     try {
-      const { data, error } = await supabaseClient
+      const supabase = createServerClient();
+      const { data, error } = await supabase
         .from('compliance_checks')
         .select('*')
         .gte('check_date', params.startDate.toISOString())
@@ -430,14 +433,14 @@ export class AuditService {
         .in('standard', params.standards);
 
       if (error) {
-        logger.error('Failed to generate compliance report', error);
+        logger.error('Failed to generate compliance report', { error: error instanceof Error ? error.message : String(error) });
         throw error;
       }
 
       const checks = data || [];
       const totalChecks = checks.length;
-      const violations = checks.filter(check => check.violations > 0);
-      const violationCount = violations.reduce((sum, check) => sum + check.violations, 0);
+      const violations = checks.filter((check: any) => check.violations > 0);
+      const violationCount = violations.reduce((sum: number, check: any) => sum + check.violations, 0);
 
       return {
         period: {
@@ -450,7 +453,7 @@ export class AuditService {
           violations: violationCount,
           complianceRate: totalChecks > 0 ? (totalChecks - violations.length) / totalChecks : 1
         },
-        violations: violations.map(v => ({
+        violations: violations.map((v: any) => ({
           standard: v.standard,
           rule: v.rule,
           count: v.violations,
@@ -459,7 +462,7 @@ export class AuditService {
         recommendations: this.generateRecommendations(violations)
       };
     } catch (error) {
-      logger.error('Failed to generate compliance report', error);
+      logger.error('Failed to generate compliance report', { error: error instanceof Error ? error.message : String(error) });
       throw error;
     }
   }
@@ -470,7 +473,7 @@ export class AuditService {
   async getMetrics(): Promise<AuditMetrics> {
     try {
       // 从缓存获取
-      const cached = await cacheService.get('audit:metrics');
+      const cached = await cacheService.get<AuditMetrics>('audit:metrics');
       if (cached) {
         return cached;
       }
@@ -483,7 +486,7 @@ export class AuditService {
 
       return metrics;
     } catch (error) {
-      logger.error('Failed to get audit metrics', error);
+      logger.error('Failed to get audit metrics', { error: error instanceof Error ? error.message : String(error) });
       return this.metrics;
     }
   }
@@ -496,18 +499,19 @@ export class AuditService {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - this.config.retentionDays);
 
-      const { error } = await supabaseClient
+      const supabase = createServerClient();
+      const { error } = await supabase
         .from('audit_logs')
         .delete()
         .lt('timestamp', cutoffDate.toISOString());
 
       if (error) {
-        logger.error('Failed to cleanup audit logs', error);
+        logger.error('Failed to cleanup audit logs', { error: error instanceof Error ? error.message : String(error) });
       } else {
         logger.info('Audit logs cleanup completed', { cutoffDate });
       }
     } catch (error) {
-      logger.error('Failed to cleanup audit logs', error);
+      logger.error('Failed to cleanup audit logs', { error: error instanceof Error ? error.message : String(error) });
     }
   }
 
@@ -523,7 +527,8 @@ export class AuditService {
       const logs = [...this.logBuffer];
       this.logBuffer = [];
 
-      const { error } = await supabaseClient
+      const supabase = createServerClient();
+      const { error } = await supabase
         .from('audit_logs')
         .insert(logs.map(log => ({
           id: log.id,
@@ -545,12 +550,12 @@ export class AuditService {
         })));
 
       if (error) {
-        logger.error('Failed to flush audit logs', error);
+        logger.error('Failed to flush audit logs', { error: error instanceof Error ? error.message : String(error) });
         // 重新添加到缓冲区
         this.logBuffer.unshift(...logs);
       }
     } catch (error) {
-      logger.error('Failed to flush audit logs', error);
+      logger.error('Failed to flush audit logs', { error: error instanceof Error ? error.message : String(error) });
     }
   }
 

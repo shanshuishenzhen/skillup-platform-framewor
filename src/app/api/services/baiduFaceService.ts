@@ -130,6 +130,10 @@ class BaiduFaceService {
       // 设置过期时间（提前5分钟刷新）
       this.tokenExpireTime = Date.now() + (data.expires_in - 300) * 1000;
       
+      if (!this.accessToken) {
+        throw new Error('获取到的访问令牌为空');
+      }
+      
       return this.accessToken;
     } catch (error) {
       throw new Error(`获取百度AI访问令牌失败: ${error}`);
@@ -378,7 +382,7 @@ class BaiduFaceService {
    * @param face2 第二张人脸数据
    * @returns number 相似度分数
    */
-  private calculateSimilarity(face1: Record<string, unknown>, face2: Record<string, unknown>): number {
+  private calculateSimilarity(face1: FaceDetectResult | Record<string, unknown>, face2: FaceDetectResult | Record<string, unknown>): number {
     // 这里是简化的相似度计算，实际应该使用更复杂的算法
     // 比较关键点位置、人脸质量等特征
     
@@ -386,27 +390,27 @@ class BaiduFaceService {
     let totalFeatures = 0;
     
     // 比较年龄相似度
-    if (face1.age && face2.age) {
-      const ageDiff = Math.abs(face1.age - face2.age);
+    if ((face1 as any).age && (face2 as any).age) {
+      const ageDiff = Math.abs((face1 as any).age - (face2 as any).age);
       similarity += Math.max(0, 1 - ageDiff / 50); // 年龄差异权重
       totalFeatures++;
     }
     
     // 比较性别
-    if (face1.gender && face2.gender && face1.gender.type === face2.gender.type) {
+    if ((face1 as any).gender && (face2 as any).gender && (face1 as any).gender.type === (face2 as any).gender.type) {
       similarity += 0.1; // 性别匹配加分
     }
     totalFeatures++;
     
     // 比较关键点（简化版本）
-    if (face1.landmark && face2.landmark) {
+    if ((face1 as any).landmark && (face2 as any).landmark) {
       let landmarkSimilarity = 0;
-      const minLength = Math.min(face1.landmark.length, face2.landmark.length);
+      const minLength = Math.min((face1 as any).landmark.length, (face2 as any).landmark.length);
       
       for (let i = 0; i < minLength; i++) {
         const dist = Math.sqrt(
-          Math.pow(face1.landmark[i].x - face2.landmark[i].x, 2) +
-          Math.pow(face1.landmark[i].y - face2.landmark[i].y, 2)
+          Math.pow((face1 as any).landmark[i].x - (face2 as any).landmark[i].x, 2) +
+          Math.pow((face1 as any).landmark[i].y - (face2 as any).landmark[i].y, 2)
         );
         landmarkSimilarity += Math.max(0, 1 - dist / 100); // 距离权重
       }

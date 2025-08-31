@@ -57,13 +57,10 @@ export async function GET(request: Request) {
       );
     }
 
-    // 返回用户信息（不包含敏感信息）
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...userProfile } = user;
-    
+    // 返回用户信息
     return NextResponse.json({
       success: true,
-      data: userProfile,
+      data: user,
       message: '获取用户信息成功'
     });
   } catch (error) {

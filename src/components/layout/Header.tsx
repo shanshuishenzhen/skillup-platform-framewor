@@ -12,6 +12,8 @@ const navigation = [
     { name: '在线学习', href: '/courses' },
     { name: '技能培训学习', href: '/skill-training' },
     { name: '技能等级考试', href: '/skill-exam' },
+    { name: 'OA 办公系统', href: '/oa' },
+    { name: '项目管理', href: '/oa/projects' },
     { name: '技术咨询', href: '/consulting' },
     { name: '解决方案', href: '/solutions' },
   ]},
@@ -95,7 +97,7 @@ export default function Header() {
                     <ChevronDown className="h-5 w-5 flex-none" aria-hidden="true" />
                   </button>
                   <div className="absolute -left-8 top-full z-10 mt-3 w-screen max-w-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-                    <div className="overflow-hidden rounded-3xl bg-white/95 dark:bg-gray-900/95 shadow-lg ring-1 ring-gray-900/5 backdrop-blur-sm">
+                    <div className="overflow-hidden rounded-3xl bg-white/95 dark:bg-gray-900/95 shadow-lg ring-1 ring-gray-900/5 backdrop-blur-sm border border-gray-200/50">
                       <div className="p-4">
                         {item.children.map((child) => (
                           <div
@@ -144,7 +146,7 @@ export default function Header() {
           {isLoggedIn ? (
             <>
               <span className="text-sm font-semibold leading-6 text-gray-900 dark:text-gray-100">
-                欢迎，{user?.name || user?.email}
+                欢迎，{user?.real_name || user?.username || user?.email}
               </span>
               <button
                 onClick={() => {

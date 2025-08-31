@@ -3,8 +3,8 @@
  * 处理和格式化测试结果，生成自定义报告
  */
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
 
 /**
  * 处理测试结果
@@ -92,4 +92,4 @@ function processResults(results) {
   return results;
 }
 
-module.exports = processResults;
+export default processResults;

@@ -116,7 +116,7 @@ export async function POST(req: NextRequest, context: { params: Promise<UploadPa
        if (!uploadResult.success) {
          return NextResponse.json({
            success: false,
-           message: uploadResult.message || '文件上传失败'
+           message: uploadResult.error || '文件上传失败'
          }, { status: 400 });
        }
      } catch (error) {

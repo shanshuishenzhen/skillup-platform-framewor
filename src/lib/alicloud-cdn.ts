@@ -3,7 +3,7 @@
  * 提供CDN域名管理、缓存刷新、预热等功能
  */
 
-import { Core } from '@alicloud/pop-core';
+import Core from '@alicloud/pop-core';
 
 /**
  * CDN配置接口
@@ -250,7 +250,7 @@ export class AliCloudCDN {
     });
 
     // 转换为统计数据格式
-    return result.BpsDataPerInterval?.DataModule?.map((item: { Value: number; TimeStamp: string }) => ({
+    return (result as any).BpsDataPerInterval?.DataModule?.map((item: { Value: number; TimeStamp: string }) => ({
       domainName,
       bandwidth: item.Value,
       traffic: 0, // 需要单独查询

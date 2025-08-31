@@ -258,8 +258,7 @@ describe('Uploads API', () => {
       order: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
       range: jest.fn().mockReturnThis(),
-      single: jest.fn().mockResolvedValue({ data: testFile, error: null }),
-      mockResolvedValue: jest.fn().mockResolvedValue({ data: [testFile], error: null })
+      single: jest.fn().mockResolvedValue({ data: testFile, error: null })
     });
     
     // 设置Supabase存储
@@ -285,7 +284,7 @@ describe('Uploads API', () => {
           error: null
         })
       })
-    });
+    };
     
     // 设置缓存服务
     mockCacheService.get.mockResolvedValue(null);

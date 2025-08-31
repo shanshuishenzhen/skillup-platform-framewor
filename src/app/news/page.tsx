@@ -32,7 +32,7 @@ export default function NewsPage() {
   const refreshNews = async () => {
     try {
       setRefreshing(true);
-      const virtualNews = await aiDataGeneratorService.generateNews(12, true);
+      const virtualNews = await aiDataGeneratorService.generateNews(12);
       setNewsData(virtualNews);
       setFilteredNews(virtualNews);
     } catch (error) {
@@ -60,7 +60,7 @@ export default function NewsPage() {
   const categories = ["全部", "赛事动态", "行业动态"];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pt-20">
       {/* 页面头部 */}
       <div className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -118,7 +118,7 @@ export default function NewsPage() {
                   <div className="md:w-1/3">
                     <div className="relative w-full h-48 md:h-full">
                       <Image
-                        src={news.image}
+                        src={news.thumbnail}
                         alt={news.title}
                         fill
                         className="object-cover"
@@ -137,7 +137,7 @@ export default function NewsPage() {
                       </span>
                       <span className="inline-flex items-center gap-1 text-gray-500 text-sm">
                         <Calendar className="w-3 h-3" />
-                        {news.date}
+                        {new Date(news.publishedAt).toLocaleDateString('zh-CN')}
                       </span>
                     </div>
                     <h2 className="text-xl font-bold mb-3 text-gray-900 hover:text-blue-600 transition-colors">

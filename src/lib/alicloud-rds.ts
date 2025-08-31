@@ -91,6 +91,26 @@ interface PoolStatus {
 }
 
 /**
+ * 数据库信息类型
+ */
+type DatabaseInfo = {
+  type: string
+  version: string
+  database: string
+}
+
+/**
+ * 数据库客户端类型
+ */
+type DatabaseClient = {
+  query: (sql: string, params?: unknown[]) => Promise<QueryResult>
+  release?: () => void
+  beginTransaction?: () => Promise<void>
+  commit?: () => Promise<void>
+  rollback?: () => Promise<void>
+}
+
+/**
  * 阿里云RDS数据库客户端类
  * 支持MySQL和PostgreSQL数据库
  */
@@ -175,7 +195,6 @@ class AliCloudRDS {
         password: this.config.password,
         ssl: this.config.ssl ? {} : false,
         max: this.config.connectionLimit,
-        acquireTimeoutMillis: this.config.acquireTimeoutMillis,
         idleTimeoutMillis: this.config.idleTimeoutMillis
       })
       
@@ -196,20 +215,8 @@ class AliCloudRDS {
         database: this.config.database,
         user: this.config.username,
         password: this.config.password,
-        ssl: this.config.ssl ? {} : false,
-        connectionLimit: this.config.connectionLimit,
-        acquireTimeout: this.config.acquireTimeoutMillis,
-        timeout: this.config.idleTimeoutMillis
-      })
-      
-      // 监听连接池事件
-      this.pool.on('error', (err) => {
-        console.error('MySQL连接池错误:', err)
-        this.handleConnectionError(err)
-      })
-      
-      this.pool.on('connection', () => {
-        console.log('MySQL连接池建立新连接')
+        ssl: this.config.ssl ? {} : undefined,
+        connectionLimit: this.config.connectionLimit
       })
     }
   }
@@ -244,9 +251,9 @@ class AliCloudRDS {
       } else if (this.config.type === DatabaseType.MYSQL) {
         const [rows, fields] = await (this.pool as mysql.Pool).execute(sql, params)
         return {
-          rows: Array.isArray(rows) ? rows : [],
+          rows: Array.isArray(rows) ? rows as any[] : [],
           rowCount: Array.isArray(rows) ? rows.length : 0,
-          fields
+          fields: fields as any
         }
       }
       
@@ -284,7 +291,7 @@ class AliCloudRDS {
   private isConnectionError(error: unknown): boolean {
     if (!error) return false
     
-    const errorMessage = error.message?.toLowerCase() || ''
+    const errorMessage = (error as any).message?.toLowerCase() || ''
     const connectionErrorKeywords = [
       'connection',
       'connect',
@@ -301,16 +308,7 @@ class AliCloudRDS {
     return connectionErrorKeywords.some(keyword => errorMessage.includes(keyword))
   }
 
-  /**
-   * 数据库客户端类型
-   */
-  type DatabaseClient = {
-    query: (sql: string, params?: unknown[]) => Promise<QueryResult>
-    release?: () => void
-    beginTransaction?: () => Promise<void>
-    commit?: () => Promise<void>
-    rollback?: () => Promise<void>
-  }
+
 
   /**
    * 执行事务
@@ -345,7 +343,21 @@ class AliCloudRDS {
       const connection = await (this.pool as mysql.Pool).getConnection()
       try {
         await connection.beginTransaction()
-        const result = await callback(connection)
+        
+        // 创建包装器以匹配 DatabaseClient 接口
+        const wrappedConnection = {
+          ...connection,
+          query: async (sql: string, params?: any[]) => {
+            const [rows, fields] = await connection.execute(sql, params || [])
+            return {
+              rows: Array.isArray(rows) ? rows as any[] : [],
+              rowCount: Array.isArray(rows) ? rows.length : 0,
+              fields: fields as any
+            }
+          }
+        }
+        
+        const result = await callback(wrappedConnection as any)
         await connection.commit()
         return result
       } catch (error) {
@@ -375,14 +387,7 @@ class AliCloudRDS {
     }
   }
 
-  /**
-   * 数据库信息类型
-   */
-  type DatabaseInfo = {
-    type: string
-    version: string
-    database: string
-  }
+
 
   /**
    * 获取数据库信息
@@ -396,17 +401,19 @@ class AliCloudRDS {
         const result = await this.query('SELECT version()')
         return {
           type: 'PostgreSQL',
-          version: result.rows[0]?.version,
+          version: result.rows[0]?.version as string,
           database: this.config.database
         }
       } else if (this.config.type === DatabaseType.MYSQL) {
         const result = await this.query('SELECT VERSION() as version')
         return {
           type: 'MySQL',
-          version: result.rows[0]?.version,
+          version: result.rows[0]?.version as string,
           database: this.config.database
         }
       }
+      
+      throw new Error('不支持的数据库类型')
     } catch (error) {
       console.error('获取数据库信息失败:', error)
       throw new Error(`获取数据库信息失败: ${error instanceof Error ? error.message : '未知错误'}`)

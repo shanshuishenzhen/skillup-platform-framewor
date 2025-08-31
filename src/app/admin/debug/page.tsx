@@ -8,13 +8,27 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
-import { AlertCircle, CheckCircle, XCircle, RefreshCw, Trash2, LogIn, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, CheckCircle, XCircle, RefreshCw, Trash2, LogIn, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
+import AdminPageLayout from '@/components/layout/AdminPageLayout';
+import { PAGE_CONFIGS } from '@/components/ui/page-header';
+
+interface TokenHeader {
+  alg?: string;
+  typ?: string;
+}
+
+interface TokenPayload {
+  userId?: string;
+  role?: string;
+  exp?: number;
+  iat?: number;
+}
 
 interface TokenInfo {
   raw: string;
-  header?: any;
-  payload?: any;
+  header?: TokenHeader;
+  payload?: TokenPayload;
   signature?: string;
   isValid: boolean;
   error?: string;
@@ -204,17 +218,23 @@ export default function AdminDebugPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
-      <div className="max-w-6xl mx-auto">
-        {/* 页面标题 */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-            管理员权限调试工具
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            诊断和解决管理员权限验证问题
-          </p>
-        </div>
+    <AdminPageLayout
+      pageHeaderProps={{
+        ...PAGE_CONFIGS.adminDebug(),
+        actions: (
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={checkLocalStorageToken}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              重新检查
+            </button>
+          </div>
+        )
+      }}
+      containerClassName="max-w-6xl"
+    >
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* 左侧：状态信息 */}
@@ -256,126 +276,6 @@ export default function AdminDebugPage() {
                     <p className="font-medium text-gray-900 dark:text-gray-100">角色: {user.role}</p>
                   </div>
                 )}
-              </div>
-            </div>
-
-            {/* Token信息 */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center">
-                <Eye className="h-5 w-5 mr-2" />
-                Token信息
-                <button
-                  onClick={() => setShowTokenDetails(!showTokenDetails)}
-                  className="ml-2 p-1 text-gray-500 hover:text-gray-700"
-                >
-                  {showTokenDetails ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </h2>
-              
-              {tokenInfo ? (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Token状态:</span>
-                    <span className={`flex items-center ${tokenInfo.isValid ? 'text-green-600' : 'text-red-600'}`}>
-                      {tokenInfo.isValid ? (
-                        <><CheckCircle className="h-4 w-4 mr-1" />有效</>
-                      ) : (
-                        <><XCircle className="h-4 w-4 mr-1" />无效</>
-                      )}
-                    </span>
-                  </div>
-                  
-                  {tokenInfo.error && (
-                    <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded">
-                      <p className="text-red-600 dark:text-red-400 text-sm">{tokenInfo.error}</p>
-                    </div>
-                  )}
-                  
-                  {showTokenDetails && tokenInfo.payload && (
-                    <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-700 rounded">
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Token Payload:</p>
-                      <pre className="text-xs text-gray-800 dark:text-gray-200 overflow-x-auto">
-                        {JSON.stringify(tokenInfo.payload, null, 2)}
-                      </pre>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-gray-500 dark:text-gray-400">点击"检查Token"按钮开始检查</p>
-              )}
-            </div>
-
-            {/* 权限检查结果 */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center">
-                <CheckCircle className="h-5 w-5 mr-2" />
-                权限检查结果
-              </h2>
-              
-              {permissionResult ? (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">权限状态:</span>
-                    <span className={`flex items-center ${permissionResult.success ? 'text-green-600' : 'text-red-600'}`}>
-                      {permissionResult.success ? (
-                        <><CheckCircle className="h-4 w-4 mr-1" />通过</>
-                      ) : (
-                        <><XCircle className="h-4 w-4 mr-1" />失败</>
-                      )}
-                    </span>
-                  </div>
-                  
-                  {permissionResult.error && (
-                    <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded">
-                      <p className="text-red-600 dark:text-red-400 text-sm">
-                        {permissionResult.error}
-                        {permissionResult.statusCode && ` (状态码: ${permissionResult.statusCode})`}
-                      </p>
-                    </div>
-                  )}
-                  
-                  {permissionResult.message && (
-                    <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded">
-                      <p className="text-green-600 dark:text-green-400 text-sm">{permissionResult.message}</p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-gray-500 dark:text-gray-400">点击"测试权限API"按钮开始测试</p>
-              )}
-            </div>
-          </div>
-
-          {/* 右侧：操作和日志 */}
-          <div className="space-y-6">
-            {/* 操作按钮 */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                调试操作
-              </h2>
-              
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={checkLocalStorageToken}
-                  className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  检查Token
-                </button>
-                
-                <button
-                  onClick={testPermissionAPI}
-                  disabled={isChecking}
-                  className="flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 transition-colors"
-                >
-                  {isChecking ? (
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                  )}
-                  测试权限API
-                </button>
-                
                 <button
                   onClick={clearCache}
                   className="flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
@@ -431,7 +331,7 @@ export default function AdminDebugPage() {
               
               <div className="space-y-3 text-sm">
                 <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
-                  <p className="font-medium text-yellow-800 dark:text-yellow-200">如果显示"权限不足":</p>
+                  <p className="font-medium text-yellow-800 dark:text-yellow-200">如果显示&quot;权限不足&quot;:</p>
                   <ul className="mt-2 text-yellow-700 dark:text-yellow-300 list-disc list-inside space-y-1">
                     <li>检查是否已正确登录管理员账户</li>
                     <li>确认Token是否有效且未过期</li>
@@ -452,7 +352,6 @@ export default function AdminDebugPage() {
             </div>
           </div>
         </div>
-      </div>
-    </div>
+    </AdminPageLayout>
   );
 }

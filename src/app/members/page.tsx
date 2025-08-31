@@ -3,7 +3,18 @@
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { RefreshCw } from 'lucide-react'
-import { aiDataGeneratorService, VirtualMember, VirtualEnterprise } from '@/services/aiDataGeneratorService'
+import { aiDataGeneratorService, VirtualUser } from '@/services/aiDataGeneratorService'
+
+// 为会员页面定义类型别名
+type VirtualMember = VirtualUser
+type VirtualEnterprise = {
+  id: string
+  name: string
+  logo: string
+  description: string
+  industry: string
+  features: string[]
+}
 
 /**
  * 会员页面组件
@@ -15,15 +26,39 @@ export default function MembersPage() {
   const [loading, setLoading] = useState(true)
 
   /**
+   * 生成企业数据
+   */
+  const generateEnterpriseData = (count: number): VirtualEnterprise[] => {
+    const industries = ['科技', '金融', '教育', '医疗', '制造', '零售', '咨询', '媒体']
+    const features = [
+      ['创新技术', '专业团队', '优质服务'],
+      ['资金雄厚', '风险控制', '投资专业'],
+      ['教学质量', '师资力量', '课程丰富'],
+      ['医疗设备', '专业医师', '服务贴心'],
+      ['生产效率', '质量控制', '技术先进'],
+      ['商品丰富', '价格优惠', '服务周到'],
+      ['专业咨询', '经验丰富', '解决方案'],
+      ['内容优质', '传播广泛', '影响力大']
+    ]
+    
+    return Array.from({ length: count }, (_, index) => ({
+      id: `enterprise-${Date.now()}-${index}`,
+      name: `优秀企业${index + 1}`,
+      logo: `https://trae-api-sg.mchost.guru/api/ide/v1/text_to_image?prompt=professional%20company%20logo%20modern%20design&image_size=square`,
+      description: `这是一家专业的${industries[index % industries.length]}公司，致力于为客户提供优质的服务和解决方案。`,
+      industry: industries[index % industries.length],
+      features: features[index % features.length]
+    }))
+  }
+
+  /**
    * 加载会员数据
    */
   const loadMembers = async () => {
     setLoading(true)
     try {
-      const [personalData, enterpriseData] = await Promise.all([
-        aiDataGeneratorService.generateMembers(4),
-        aiDataGeneratorService.generateEnterprises(4)
-      ])
+      const personalData = await aiDataGeneratorService.generateUsers(4, 'student')
+      const enterpriseData = generateEnterpriseData(4)
       setPersonalMembers(personalData)
       setEnterpriseMembers(enterpriseData)
     } catch (error) {
@@ -45,7 +80,7 @@ export default function MembersPage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pt-20">
       {/* 页面头部 */}
       <div className="bg-white border-b">
         <div className="container mx-auto px-4 py-8">
@@ -124,7 +159,7 @@ export default function MembersPage() {
                   </div>
                   <div className="p-6">
                     <h3 className="font-semibold text-lg mb-2">{member.name}</h3>
-                    <p className="text-blue-600 text-sm mb-3">{member.title}</p>
+                    <p className="text-blue-600 text-sm mb-3">{member.role === 'student' ? '学员' : member.role === 'instructor' ? '讲师' : '管理员'}</p>
                     <p className="text-gray-600 text-sm mb-4 line-clamp-3">{member.bio}</p>
                     
                     <div className="mb-4">

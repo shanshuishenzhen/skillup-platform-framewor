@@ -13,33 +13,23 @@
  */
 
 import { 
-  SupabaseClient,
-  createSupabaseClient,
-  getSupabaseClient,
-  executeQuery,
-  executeTransaction,
-  subscribeToChanges,
-  unsubscribeFromChanges,
-  uploadFile,
-  downloadFile,
-  deleteFile,
-  authenticateUser,
+  createClient,
+  createServerClient,
+  createBrowserClient,
+  getCurrentUser,
+  validateSession,
   refreshSession,
   signOut,
-  createRLSPolicy,
-  enableRLS,
-  disableRLS,
-  createIndex,
-  dropIndex,
-  vacuum,
-  analyze
+  checkAdminPermission,
+  getUserFromRequest,
+  validateRequestAuth
 } from '../../utils/supabase';
 import { logger } from '../../utils/logger';
 import { cacheService } from '../../services/cacheService';
 import { auditService } from '../../services/auditService';
 import { analyticsService } from '../../services/analyticsService';
 import { envConfig } from '../../config/envConfig';
-import { createClient } from '@supabase/supabase-js';
+import { createClient as supabaseCreateClient } from '@supabase/supabase-js';
 
 // Mock 依赖
 jest.mock('../../utils/logger');
@@ -49,101 +39,23 @@ jest.mock('../../services/analyticsService');
 jest.mock('../../config/envConfig');
 jest.mock('@supabase/supabase-js');
 
-// 模块类型定义
-type MockedModule<T> = T & { [K in keyof T]: jest.MockedFunction<T[K]> };
-
 // 类型定义
 interface User {
   id: string;
   email: string;
-  username: string;
-  full_name: string;
-  avatar_url?: string;
-  role: 'student' | 'instructor' | 'admin';
-  status: 'active' | 'inactive' | 'suspended';
-  created_at: string;
-  updated_at: string;
-  last_login_at?: string;
-  email_verified: boolean;
-  phone?: string;
-  bio?: string;
-  preferences: {
-    language: string;
-    timezone: string;
-    notifications: {
-      email: boolean;
-      push: boolean;
-      sms: boolean;
-    };
-  };
+  name?: string;
+  role?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface Course {
   id: string;
   title: string;
-  description: string;
+  description?: string;
   instructor_id: string;
-  category_id: string;
-  level: 'beginner' | 'intermediate' | 'advanced';
-  status: 'draft' | 'published' | 'archived';
-  price: number;
-  currency: string;
-  duration_hours: number;
-  max_students: number;
-  enrolled_count: number;
-  rating: number;
-  review_count: number;
-  thumbnail_url?: string;
-  preview_video_url?: string;
-  tags: string[];
-  requirements: string[];
-  learning_objectives: string[];
-  created_at: string;
-  updated_at: string;
-  published_at?: string;
-}
-
-interface QueryOptions {
-  select?: string;
-  filter?: Record<string, unknown>;
-  order?: { column: string; ascending?: boolean }[];
-  limit?: number;
-  offset?: number;
-  count?: 'exact' | 'planned' | 'estimated';
-}
-
-interface TransactionOperation {
-  table: string;
-  operation: 'insert' | 'update' | 'delete' | 'upsert';
-  data?: Record<string, unknown>;
-  filter?: Record<string, unknown>;
-}
-
-interface SubscriptionOptions {
-  event: 'INSERT' | 'UPDATE' | 'DELETE' | '*';
-  schema?: string;
-  table?: string;
-  filter?: string;
-}
-
-interface FileUploadOptions {
-  bucket: string;
-  path: string;
-  file: File | Buffer;
-  options?: {
-    cacheControl?: string;
-    contentType?: string;
-    upsert?: boolean;
-  };
-}
-
-interface RLSPolicy {
-  name: string;
-  table: string;
-  command: 'SELECT' | 'INSERT' | 'UPDATE' | 'DELETE' | 'ALL';
-  role?: string;
-  using?: string;
-  withCheck?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // Mock 实例
@@ -256,37 +168,17 @@ const mockChannel = {
 };
 
 // 设置 Mock
-jest.mocked(logger).mockReturnValue(mockLogger);
-jest.mocked(cacheService).mockReturnValue(mockCacheService);
-jest.mocked(auditService).mockReturnValue(mockAuditService);
-jest.mocked(analyticsService).mockReturnValue(mockAnalyticsService);
-jest.mocked(envConfig).mockReturnValue(mockEnvConfig);
-(createClient as jest.Mock).mockReturnValue(mockSupabaseClient);
+// 注意：这些服务的mock设置根据实际导入的模块进行调整
+(supabaseCreateClient as jest.Mock).mockReturnValue(mockSupabaseClient);
 
 // 测试数据
 const testUser: User = {
   id: 'user-123',
   email: 'test@example.com',
-  username: 'testuser',
-  full_name: 'Test User',
-  avatar_url: 'https://example.com/avatar.jpg',
+  name: 'Test User',
   role: 'student',
-  status: 'active',
   created_at: '2024-01-01T00:00:00Z',
-  updated_at: '2024-01-01T00:00:00Z',
-  last_login_at: '2024-01-01T12:00:00Z',
-  email_verified: true,
-  phone: '+1234567890',
-  bio: 'Test user bio',
-  preferences: {
-    language: 'zh-CN',
-    timezone: 'Asia/Shanghai',
-    notifications: {
-      email: true,
-      push: true,
-      sms: false
-    }
-  }
+  updated_at: '2024-01-01T00:00:00Z'
 };
 
 const testCourse: Course = {
@@ -294,24 +186,8 @@ const testCourse: Course = {
   title: 'Test Course',
   description: 'A test course description',
   instructor_id: 'instructor-123',
-  category_id: 'category-123',
-  level: 'beginner',
-  status: 'published',
-  price: 99.99,
-  currency: 'USD',
-  duration_hours: 10,
-  max_students: 100,
-  enrolled_count: 25,
-  rating: 4.5,
-  review_count: 10,
-  thumbnail_url: 'https://example.com/thumbnail.jpg',
-  preview_video_url: 'https://example.com/preview.mp4',
-  tags: ['programming', 'javascript', 'web development'],
-  requirements: ['Basic computer skills', 'Internet connection'],
-  learning_objectives: ['Learn JavaScript basics', 'Build web applications'],
   created_at: '2024-01-01T00:00:00Z',
-  updated_at: '2024-01-01T00:00:00Z',
-  published_at: '2024-01-01T00:00:00Z'
+  updated_at: '2024-01-01T00:00:00Z'
 };
 
 describe('Supabase Database Utils', () => {
@@ -337,48 +213,32 @@ describe('Supabase Database Utils', () => {
    */
   describe('Client Initialization', () => {
     it('应该创建Supabase客户端', () => {
-      const client = createSupabaseClient();
+      const client = createClient();
       
-      expect(createClient).toHaveBeenCalledWith(
+      expect(supabaseCreateClient).toHaveBeenCalledWith(
         mockEnvConfig.supabase.url,
-        mockEnvConfig.supabase.anonKey,
-        expect.objectContaining({
-          auth: expect.objectContaining({
-            persistSession: true,
-            autoRefreshToken: true
-          })
-        })
+        mockEnvConfig.supabase.anonKey
       );
       
       expect(client).toBe(mockSupabaseClient);
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        'Supabase client created successfully'
-      );
     });
 
-    it('应该获取现有的客户端实例', () => {
-      // 第一次创建
-      const client1 = getSupabaseClient();
-      // 第二次获取应该返回同一个实例
-      const client2 = getSupabaseClient();
+    it('应该创建服务端客户端', () => {
+      const serverClient = createServerClient();
       
-      expect(client1).toBe(client2);
-      expect(createClient).toHaveBeenCalledTimes(1);
+      expect(supabaseCreateClient).toHaveBeenCalled();
+      expect(serverClient).toBe(mockSupabaseClient);
     });
 
-    it('应该使用服务角色密钥创建管理客户端', () => {
-      const adminClient = createSupabaseClient(true);
+    it('应该创建浏览器客户端', () => {
+      const browserClient = createBrowserClient();
       
-      expect(createClient).toHaveBeenCalledWith(
+      expect(supabaseCreateClient).toHaveBeenCalledWith(
         mockEnvConfig.supabase.url,
-        mockEnvConfig.supabase.serviceRoleKey,
-        expect.objectContaining({
-          auth: expect.objectContaining({
-            autoRefreshToken: false,
-            persistSession: false
-          })
-        })
+        mockEnvConfig.supabase.anonKey
       );
+      
+      expect(browserClient).toBe(mockSupabaseClient);
     });
   });
 
@@ -386,338 +246,57 @@ describe('Supabase Database Utils', () => {
    * 查询操作测试
    */
   describe('Query Operations', () => {
-    beforeEach(() => {
-      mockQueryBuilder.select.mockResolvedValue({
-        data: [testUser],
-        error: null,
-        count: 1
-      });
-    });
-
-    it('应该执行简单查询', async () => {
-      const result = await executeQuery('users', {
-        select: '*',
-        filter: { status: 'active' },
-        limit: 10
-      });
-      
-      expect(mockSupabaseClient.from).toHaveBeenCalledWith('users');
-      expect(mockQueryBuilder.select).toHaveBeenCalledWith('*');
-      expect(mockQueryBuilder.eq).toHaveBeenCalledWith('status', 'active');
-      expect(mockQueryBuilder.limit).toHaveBeenCalledWith(10);
-      
-      expect(result.data).toEqual([testUser]);
-      expect(result.error).toBeNull();
-    });
-
-    it('应该执行复杂查询', async () => {
-      const options: QueryOptions = {
-        select: 'id, email, full_name, role',
-        filter: {
-          role: 'student',
-          status: 'active',
-          created_at: { gte: '2024-01-01' }
-        },
-        order: [
-          { column: 'created_at', ascending: false },
-          { column: 'full_name', ascending: true }
-        ],
-        limit: 20,
-        offset: 10
-      };
-      
-      await executeQuery('users', options);
-      
-      expect(mockQueryBuilder.select).toHaveBeenCalledWith('id, email, full_name, role');
-      expect(mockQueryBuilder.eq).toHaveBeenCalledWith('role', 'student');
-      expect(mockQueryBuilder.eq).toHaveBeenCalledWith('status', 'active');
-      expect(mockQueryBuilder.gte).toHaveBeenCalledWith('created_at', '2024-01-01');
-      expect(mockQueryBuilder.order).toHaveBeenCalledWith('created_at', { ascending: false });
-      expect(mockQueryBuilder.order).toHaveBeenCalledWith('full_name', { ascending: true });
-      expect(mockQueryBuilder.range).toHaveBeenCalledWith(10, 29);
-    });
-
-    it('应该处理查询错误', async () => {
-      mockQueryBuilder.select.mockResolvedValue({
-        data: null,
-        error: { message: 'Table not found', code: '42P01' }
-      });
-      
-      const result = await executeQuery('nonexistent_table', { select: '*' });
-      
-      expect(result.error).toBeDefined();
-      expect(result.error.message).toBe('Table not found');
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        'Query execution failed',
-        expect.objectContaining({
-          table: 'nonexistent_table',
-          error: expect.objectContaining({})
-        })
-      );
-    });
-
-    it('应该缓存查询结果', async () => {
-      const cacheKey = 'query:users:active';
-      mockCacheService.get.mockResolvedValue(null);
-      
-      await executeQuery('users', {
-        select: '*',
-        filter: { status: 'active' },
-        cache: { key: cacheKey, ttl: 300 }
-      });
-      
-      expect(mockCacheService.get).toHaveBeenCalledWith(cacheKey);
-      expect(mockCacheService.set).toHaveBeenCalledWith(
-        cacheKey,
-        expect.objectContaining({}),
-        300
-      );
-    });
-
-    it('应该从缓存返回结果', async () => {
-      const cacheKey = 'query:users:active';
-      const cachedResult = { data: [testUser], error: null };
-      mockCacheService.get.mockResolvedValue(cachedResult);
-      
-      const result = await executeQuery('users', {
-        select: '*',
-        cache: { key: cacheKey }
-      });
-      
-      expect(result).toEqual(cachedResult);
-      expect(mockSupabaseClient.from).not.toHaveBeenCalled();
-    });
+    // executeQuery函数测试已移除，因为该函数不在supabase.ts中定义
+    // 数据库查询应该直接使用Supabase客户端的方法
   });
 
   /**
    * 事务处理测试
    */
   describe('Transaction Operations', () => {
-    it('应该执行事务操作', async () => {
-      const operations: TransactionOperation[] = [
-        {
-          table: 'users',
-          operation: 'insert',
-          data: { email: 'new@example.com', username: 'newuser' }
-        },
-        {
-          table: 'user_profiles',
-          operation: 'insert',
-          data: { user_id: 'user-123', bio: 'New user bio' }
-        },
-        {
-          table: 'users',
-          operation: 'update',
-          data: { last_login_at: new Date().toISOString() },
-          filter: { id: 'user-123' }
-        }
-      ];
-      
-      mockQueryBuilder.insert.mockResolvedValue({ data: testUser, error: null });
-      mockQueryBuilder.update.mockResolvedValue({ data: testUser, error: null });
-      
-      const result = await executeTransaction(operations);
-      
-      expect(result.success).toBe(true);
-      expect(result.results).toHaveLength(3);
-      expect(mockAuditService.logDatabaseOperation).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'transaction',
-          operations: operations.length
-        })
-      );
-    });
-
-    it('应该回滚失败的事务', async () => {
-      const operations: TransactionOperation[] = [
-        {
-          table: 'users',
-          operation: 'insert',
-          data: { email: 'new@example.com' }
-        },
-        {
-          table: 'invalid_table',
-          operation: 'insert',
-          data: { some_field: 'value' }
-        }
-      ];
-      
-      mockQueryBuilder.insert
-        .mockResolvedValueOnce({ data: testUser, error: null })
-        .mockResolvedValueOnce({ data: null, error: { message: 'Table not found' } });
-      
-      const result = await executeTransaction(operations);
-      
-      expect(result.success).toBe(false);
-      expect(result.error).toBeDefined();
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        'Transaction failed, rolling back',
-        expect.objectContaining({})
-      );
-    });
+    // executeTransaction函数测试已移除，因为该函数不在supabase.ts中定义
+    // 事务处理应该使用Supabase的RPC或其他事务机制
   });
 
   /**
    * 实时订阅测试
    */
   describe('Real-time Subscriptions', () => {
-    it('应该订阅表变化', () => {
-      const callback = jest.fn();
-      const options: SubscriptionOptions = {
-        event: 'INSERT',
-        table: 'users',
-        filter: 'role=eq.student'
-      };
-      
-      const subscription = subscribeToChanges('users', options, callback);
-      
-      expect(mockSupabaseClient.channel).toHaveBeenCalledWith('users-changes');
-      expect(mockChannel.on).toHaveBeenCalledWith(
-        'postgres_changes',
-        expect.objectContaining({
-          event: 'INSERT',
-          schema: 'public',
-          table: 'users',
-          filter: 'role=eq.student'
-        }),
-        callback
-      );
-      expect(mockChannel.subscribe).toHaveBeenCalled();
-    });
-
-    it('应该取消订阅', () => {
-      const subscription = { id: 'sub-123', channel: mockChannel };
-      
-      unsubscribeFromChanges(subscription);
-      
-      expect(mockChannel.unsubscribe).toHaveBeenCalled();
-      expect(mockSupabaseClient.removeChannel).toHaveBeenCalledWith(mockChannel);
-    });
-
-    it('应该处理订阅错误', () => {
-      const callback = jest.fn();
-      mockChannel.subscribe.mockImplementation(() => {
-        throw new Error('Subscription failed');
-      });
-      
-      expect(() => {
-        subscribeToChanges('users', { event: '*' }, callback);
-      }).toThrow('Subscription failed');
-      
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        'Failed to subscribe to changes',
-        expect.objectContaining({})
-      );
-    });
+    // 数据订阅测试已移除，因为这些函数不在supabase.ts中定义
+    // 实时订阅功能应该使用Supabase内置的realtime方法
   });
 
   /**
    * 文件存储测试
    */
   describe('File Storage Operations', () => {
-    it('应该上传文件', async () => {
-      const file = new File(['test content'], 'test.txt', { type: 'text/plain' });
-      const options: FileUploadOptions = {
-        bucket: 'uploads',
-        path: 'documents/test.txt',
-        file,
-        options: {
-          cacheControl: '3600',
-          contentType: 'text/plain',
-          upsert: true
-        }
-      };
-      
-      mockStorageBucket.upload.mockResolvedValue({
-        data: { path: 'documents/test.txt' },
-        error: null
-      });
-      
-      const result = await uploadFile(options);
-      
-      expect(mockSupabaseClient.storage.from).toHaveBeenCalledWith('uploads');
-      expect(mockStorageBucket.upload).toHaveBeenCalledWith(
-        'documents/test.txt',
-        file,
-        {
-          cacheControl: '3600',
-          contentType: 'text/plain',
-          upsert: true
-        }
-      );
-      
-      expect(result.data).toBeDefined();
-      expect(result.error).toBeNull();
-    });
+    // 文件上传测试已移除，因为uploadFile函数不在supabase.ts中定义
+    // 文件上传功能应该在专门的文件存储模块中测试
 
-    it('应该下载文件', async () => {
-      const fileData = new Blob(['test content'], { type: 'text/plain' });
-      mockStorageBucket.download.mockResolvedValue({
-        data: fileData,
-        error: null
-      });
-      
-      const result = await downloadFile('uploads', 'documents/test.txt');
-      
-      expect(mockStorageBucket.download).toHaveBeenCalledWith('documents/test.txt');
-      expect(result.data).toBe(fileData);
-    });
-
-    it('应该删除文件', async () => {
-      mockStorageBucket.remove.mockResolvedValue({
-        data: [{ name: 'test.txt' }],
-        error: null
-      });
-      
-      const result = await deleteFile('uploads', 'documents/test.txt');
-      
-      expect(mockStorageBucket.remove).toHaveBeenCalledWith(['documents/test.txt']);
-      expect(result.error).toBeNull();
-    });
-
-    it('应该处理文件操作错误', async () => {
-      mockStorageBucket.upload.mockResolvedValue({
-        data: null,
-        error: { message: 'File too large' }
-      });
-      
-      const file = new File(['test'], 'test.txt');
-      const result = await uploadFile({
-        bucket: 'uploads',
-        path: 'test.txt',
-        file
-      });
-      
-      expect(result.error).toBeDefined();
-      expect(result.error.message).toBe('File too large');
-    });
+    // 文件操作测试已移除，因为这些函数不在supabase.ts中定义
+    // 这些功能应该在专门的文件存储模块中测试
   });
 
   /**
    * 认证集成测试
    */
   describe('Authentication Integration', () => {
-    it('应该认证用户', async () => {
-      const session = {
-        access_token: 'access_token',
-        refresh_token: 'refresh_token',
-        user: testUser
+    it('应该获取当前用户', async () => {
+      const testUser = {
+        id: 'user-123',
+        email: 'test@example.com',
+        role: 'student'
       };
       
-      mockSupabaseClient.auth.signInWithPassword.mockResolvedValue({
-        data: { session, user: testUser },
+      mockSupabaseClient.auth.getUser.mockResolvedValue({
+        data: { user: testUser },
         error: null
       });
       
-      const result = await authenticateUser('test@example.com', 'password');
+      const result = await getCurrentUser();
       
-      expect(mockSupabaseClient.auth.signInWithPassword).toHaveBeenCalledWith({
-        email: 'test@example.com',
-        password: 'password'
-      });
-      
-      expect(result.data.user).toEqual(testUser);
-      expect(result.error).toBeNull();
+      expect(mockSupabaseClient.auth.getUser).toHaveBeenCalled();
+      expect(result).toEqual(testUser);
     });
 
     it('应该刷新会话', async () => {
@@ -733,217 +312,155 @@ describe('Supabase Database Utils', () => {
       });
       
       const result = await refreshSession('refresh_token');
-      
-      expect(mockSupabaseClient.auth.refreshSession).toHaveBeenCalledWith({
-        refresh_token: 'refresh_token'
-      });
-      
-      expect(result.data.session).toEqual(newSession);
+       
+       expect(mockSupabaseClient.auth.refreshSession).toHaveBeenCalledWith({
+         refresh_token: 'refresh_token'
+       });
+      expect(result.session).toEqual(newSession);
     });
 
     it('应该登出用户', async () => {
-      mockSupabaseClient.auth.signOut.mockResolvedValue({ error: null });
+      mockSupabaseClient.auth.signOut.mockResolvedValue({
+        error: null
+      });
       
-      const result = await signOut();
+      await signOut();
       
       expect(mockSupabaseClient.auth.signOut).toHaveBeenCalled();
-      expect(result.error).toBeNull();
     });
-  });
 
-  /**
-   * RLS策略管理测试
-   */
-  describe('RLS Policy Management', () => {
-    it('应该创建RLS策略', async () => {
-      const policy: RLSPolicy = {
-        name: 'users_select_own',
-        table: 'users',
-        command: 'SELECT',
-        role: 'authenticated',
-        using: 'auth.uid() = id'
+    it('应该从请求中获取用户', async () => {
+      const testUser = {
+        id: 'user-123',
+        email: 'test@example.com'
       };
       
-      mockSupabaseClient.rpc.mockResolvedValue({ data: null, error: null });
+      const mockRequest = {
+        headers: {
+          authorization: 'Bearer valid-token'
+        }
+      } as any;
       
-      const result = await createRLSPolicy(policy);
+      mockSupabaseClient.auth.getUser.mockResolvedValue({
+        data: { user: testUser },
+        error: null
+      });
       
-      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
-        'create_policy',
-        expect.objectContaining({
-          policy_name: 'users_select_own',
-          table_name: 'users',
-          command: 'SELECT',
-          role_name: 'authenticated',
-          using_expression: 'auth.uid() = id'
-        })
-      );
+      const result = await getUserFromRequest(mockRequest);
       
-      expect(result.error).toBeNull();
+      expect(result).toEqual(testUser);
     });
 
-    it('应该启用RLS', async () => {
-      mockSupabaseClient.rpc.mockResolvedValue({ data: null, error: null });
+    it('应该验证请求认证', async () => {
+      const testUser = {
+        id: 'user-123',
+        email: 'test@example.com'
+      };
       
-      const result = await enableRLS('users');
+      const mockRequest = {
+        headers: {
+          authorization: 'Bearer valid-token'
+        }
+      } as any;
       
-      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
-        'enable_rls',
-        { table_name: 'users' }
-      );
+      mockSupabaseClient.auth.getUser.mockResolvedValue({
+        data: { user: testUser },
+        error: null
+      });
       
-      expect(result.error).toBeNull();
-    });
-
-    it('应该禁用RLS', async () => {
-      mockSupabaseClient.rpc.mockResolvedValue({ data: null, error: null });
-      
-      const result = await disableRLS('users');
-      
-      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
-        'disable_rls',
-        { table_name: 'users' }
-      );
-      
-      expect(result.error).toBeNull();
+      const result = await validateRequestAuth(mockRequest);
+       
+       expect(result).toEqual(testUser);
     });
   });
 
   /**
-   * 数据库维护测试
+   * 会话验证测试
    */
-  describe('Database Maintenance', () => {
-    it('应该创建索引', async () => {
-      mockSupabaseClient.rpc.mockResolvedValue({ data: null, error: null });
+  describe('Session Validation', () => {
+    it('应该验证有效会话', async () => {
+      const testUser = {
+        id: 'user-123',
+        email: 'test@example.com'
+      };
       
-      const result = await createIndex('users', ['email'], {
-        unique: true,
-        name: 'idx_users_email'
+      mockSupabaseClient.auth.getUser.mockResolvedValue({
+        data: { user: testUser },
+        error: null
       });
       
-      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
-        'create_index',
-        expect.objectContaining({
-          table_name: 'users',
-          columns: ['email'],
-          unique: true,
-          index_name: 'idx_users_email'
-        })
-      );
+      const result = await validateSession('valid-token');
+      
+      expect(mockSupabaseClient.auth.getUser).toHaveBeenCalledWith('valid-token');
+      expect(result.valid).toBe(true);
+      expect(result.user).toEqual(testUser);
     });
 
-    it('应该删除索引', async () => {
-      mockSupabaseClient.rpc.mockResolvedValue({ data: null, error: null });
+    it('应该处理无效会话', async () => {
+      mockSupabaseClient.auth.getUser.mockResolvedValue({
+        data: { user: null },
+        error: { message: 'Invalid token' }
+      });
       
-      const result = await dropIndex('idx_users_email');
+      const result = await validateSession('invalid-token');
       
-      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
-        'drop_index',
-        { index_name: 'idx_users_email' }
-      );
-    });
-
-    it('应该执行VACUUM', async () => {
-      mockSupabaseClient.rpc.mockResolvedValue({ data: null, error: null });
-      
-      const result = await vacuum('users', { full: true });
-      
-      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
-        'vacuum_table',
-        expect.objectContaining({
-          table_name: 'users',
-          full: true
-        })
-      );
-    });
-
-    it('应该执行ANALYZE', async () => {
-      mockSupabaseClient.rpc.mockResolvedValue({ data: null, error: null });
-      
-      const result = await analyze('users');
-      
-      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
-        'analyze_table',
-        { table_name: 'users' }
-      );
+      expect(result.valid).toBe(false);
+      expect(result.user).toBeNull();
+      expect(result.error).toBe('Invalid token');
     });
   });
 
   /**
-   * 性能测试
+   * 管理员权限测试
    */
-  describe('Performance Tests', () => {
-    it('应该高效处理批量查询', async () => {
-      const queries = Array.from({ length: 100 }, (_, i) => 
-        executeQuery('users', { select: '*', filter: { id: `user-${i}` } })
-      );
+  describe('Admin Permission', () => {
+    it('应该检查管理员权限', async () => {
+      const adminUser = {
+        id: 'admin-123',
+        email: 'admin@example.com',
+        role: 'admin'
+      };
       
-      const startTime = Date.now();
-      await Promise.all(queries);
-      const executionTime = Date.now() - startTime;
+      const mockRequest = {
+        headers: {
+          authorization: 'Bearer admin-token'
+        }
+      } as any;
       
-      expect(executionTime).toBeLessThan(1000); // 1秒内完成100个查询
+      mockSupabaseClient.auth.getUser.mockResolvedValue({
+        data: { user: adminUser },
+        error: null
+      });
+      
+      const result = await checkAdminPermission(mockRequest);
+      
+      expect(mockSupabaseClient.auth.getUser).toHaveBeenCalled();
+      expect(result).toBe(true);
     });
 
-    it('应该有效利用连接池', async () => {
-      // 模拟并发查询
-      const concurrentQueries = Array.from({ length: 50 }, () => 
-        executeQuery('users', { select: 'id, email' })
-      );
+    it('应该拒绝非管理员用户', async () => {
+      const regularUser = {
+        id: 'user-123',
+        email: 'user@example.com',
+        role: 'student'
+      };
       
-      await Promise.all(concurrentQueries);
+      const mockRequest = {
+        headers: {
+          authorization: 'Bearer user-token'
+        }
+      } as any;
       
-      // 验证没有超过最大连接数
-      expect(mockSupabaseClient.from).toHaveBeenCalledTimes(50);
+      mockSupabaseClient.auth.getUser.mockResolvedValue({
+        data: { user: regularUser },
+        error: null
+      });
+      
+      await expect(checkAdminPermission(mockRequest)).rejects.toThrow();
     });
   });
 
-  /**
-   * 边界情况测试
-   */
-  describe('Edge Cases', () => {
-    it('应该处理空查询结果', async () => {
-      mockQueryBuilder.select.mockResolvedValue({
-        data: [],
-        error: null,
-        count: 0
-      });
-      
-      const result = await executeQuery('users', {
-        select: '*',
-        filter: { status: 'nonexistent' }
-      });
-      
-      expect(result.data).toEqual([]);
-      expect(result.count).toBe(0);
-    });
 
-    it('应该处理网络超时', async () => {
-      mockQueryBuilder.select.mockRejectedValue(new Error('Network timeout'));
-      
-      const result = await executeQuery('users', { select: '*' });
-      
-      expect(result.error).toBeDefined();
-      expect(result.error.message).toContain('Network timeout');
-    });
 
-    it('应该处理大量数据', async () => {
-      const largeDataset = Array.from({ length: 10000 }, (_, i) => ({
-        ...testUser,
-        id: `user-${i}`,
-        email: `user${i}@example.com`
-      }));
-      
-      mockQueryBuilder.select.mockResolvedValue({
-        data: largeDataset,
-        error: null,
-        count: 10000
-      });
-      
-      const result = await executeQuery('users', { select: '*' });
-      
-      expect(result.data).toHaveLength(10000);
-      expect(result.count).toBe(10000);
-    });
-  });
+
 });

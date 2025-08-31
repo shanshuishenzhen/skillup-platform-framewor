@@ -24,6 +24,7 @@ import {
   updateUserInfo,
   PERMISSION_LEVELS
 } from '@/lib/auth';
+import { UserType } from '@/lib/supabase';
 import { autoRefreshToken, isJWTTokenValid } from '@/utils/jwt';
 
 /**
@@ -100,7 +101,7 @@ export function useAuth() {
       ...userData,
       id: userData.id || '',
       phone: userData.phone || '',
-      userType: userData.userType || 'guest',
+      userType: (userData.userType || 'guest') as UserType,
       createdAt: userData.createdAt || new Date().toISOString(),
       updatedAt: userData.updatedAt || new Date().toISOString()
     };
@@ -127,7 +128,7 @@ export function useAuth() {
       ...adminData,
       id: adminData.id || '',
       phone: adminData.phone || '',
-      userType: 'admin' as const,
+      userType: UserType.PREMIUM,
       // 保留管理员的role字段，这对权限验证很重要
       role: adminData.role || 'admin',
       createdAt: adminData.createdAt || new Date().toISOString(),

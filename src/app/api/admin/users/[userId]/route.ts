@@ -45,23 +45,23 @@ type UserUpdate = z.infer<typeof UserUpdateSchema>;
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     // 检查管理员权限
     const rbacResult = await verifyAdminAccess(request);
     if (!rbacResult.success) {
       return NextResponse.json(
-        { success: false, error: rbacResult.error },
-        { status: rbacResult.statusCode }
+        { success: false, error: rbacResult.message || '权限验证失败' },
+        { status: 403 }
       );
     }
 
-    const { userId } = params;
+    const { userId } = await params;
 
     // 获取用户详情
     const { data: user, error } = await supabase
-      .from('user_profiles')
+      .from('users')
       .select(`
         id,
         name,
@@ -154,25 +154,25 @@ export async function GET(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     // 检查管理员权限
     const rbacResult = await verifyAdminAccess(request);
     if (!rbacResult.success) {
       return NextResponse.json(
-        { success: false, error: rbacResult.error },
-        { status: rbacResult.statusCode }
+        { success: false, error: rbacResult.message || '权限验证失败' },
+        { status: 403 }
       );
     }
 
-    const { userId } = params;
+    const { userId } = await params;
     const body = await request.json();
     const updateData = UserUpdateSchema.parse(body);
 
     // 检查用户是否存在
     const { data: existingUser, error: checkError } = await supabase
-      .from('user_profiles')
+      .from('users')
       .select('id, email')
       .eq('id', userId)
       .single();
@@ -206,7 +206,7 @@ export async function PUT(
 
     // 更新用户信息
     const { data: updatedUser, error: updateError } = await supabase
-      .from('user_profiles')
+      .from('users')
       .update({
         ...updateData,
         updated_at: new Date().toISOString()
@@ -256,23 +256,23 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     // 检查管理员权限
     const rbacResult = await verifyAdminAccess(request);
     if (!rbacResult.success) {
       return NextResponse.json(
-        { success: false, error: rbacResult.error },
-        { status: rbacResult.statusCode }
+        { success: false, error: rbacResult.message || '权限验证失败' },
+        { status: 403 }
       );
     }
 
-    const { userId } = params;
+    const { userId } = await params;
 
     // 检查用户是否存在
     const { data: existingUser, error: checkError } = await supabase
-      .from('user_profiles')
+      .from('users')
       .select('id, name, email')
       .eq('id', userId)
       .single();
@@ -289,7 +289,7 @@ export async function DELETE(
 
     // 软删除用户（设置状态为inactive）
     const { data: deletedUser, error: deleteError } = await supabase
-      .from('user_profiles')
+      .from('users')
       .update({
         status: 'inactive',
         updated_at: new Date().toISOString()

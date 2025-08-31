@@ -74,7 +74,7 @@ const TokenDebugInfo: React.FC = () => {
           <div className="text-xs font-medium text-gray-600 mb-1">👤 用户信息</div>
           <div className="text-xs space-y-1">
             <div><strong>用户ID:</strong> {tokenInfo.payload.userId || '未知'}</div>
-            <div><strong>用户类型:</strong> {tokenInfo.payload.userType || '未知'}</div>
+            <div><strong>用户类型:</strong> {tokenInfo.payload.type || '未知'}</div>
             <div><strong>角色:</strong> 
               <span className={`ml-1 px-2 py-0.5 rounded text-xs ${
                 tokenInfo.payload.role === 'admin' || tokenInfo.payload.role === 'super_admin' 
@@ -354,7 +354,7 @@ export default function AdminGuard({ children, fallback, skipRemoteCheck = false
           const extraFields = Object.keys(tokenPayload).filter(key => !knownFields.includes(key));
           if (extraFields.length > 0) {
             console.log('📊 Token额外字段:', extraFields.reduce((acc, key) => {
-              acc[key] = tokenPayload[key];
+              acc[key] = (tokenPayload as any)[key];
               return acc;
             }, {} as any));
           }
@@ -429,7 +429,7 @@ export default function AdminGuard({ children, fallback, skipRemoteCheck = false
           hasAdminRole: tokenPayload?.role === 'admin',
           hasSuperAdminRole: tokenPayload?.role === 'super_admin',
           userId: tokenPayload?.userId,
-          userType: tokenPayload?.userType
+          userType: tokenPayload?.type
         });
         }
         
@@ -439,7 +439,7 @@ export default function AdminGuard({ children, fallback, skipRemoteCheck = false
             currentRole: tokenPayload?.role,
             requiredRoles: ['admin', 'super_admin'],
             userId: tokenPayload?.userId,
-            userType: tokenPayload?.userType,
+            userType: tokenPayload?.type,
             tokenValid: true,
             payloadValid: !!tokenPayload,
             roleFieldExists: 'role' in (tokenPayload || {}),
@@ -466,7 +466,7 @@ export default function AdminGuard({ children, fallback, skipRemoteCheck = false
           handleAuthError(`您没有管理员权限访问此页面。${roleMessage}`, 'permission_denied', {
             userRole: tokenPayload?.role,
             userId: tokenPayload?.userId,
-            userType: tokenPayload?.userType,
+            userType: tokenPayload?.type,
             requiredRoles: ['admin', 'super_admin'],
             debugInfo: {
               hasAdminPermissionResult: hasAdminAccess,
@@ -602,9 +602,9 @@ export default function AdminGuard({ children, fallback, skipRemoteCheck = false
       } catch (tokenError) {
         console.log('❌ AdminGuard: Token解析错误', tokenError);
         console.log('📊 权限检查错误详情:', {
-          error: tokenError.message,
-          errorType: tokenError.name,
-          stack: tokenError.stack,
+          error: tokenError instanceof Error ? tokenError.message : String(tokenError),
+          errorType: tokenError instanceof Error ? tokenError.name : typeof tokenError,
+          stack: tokenError instanceof Error ? tokenError.stack : undefined,
           timestamp: new Date().toISOString(),
           context: 'permission_check',
           userAgent: navigator.userAgent,
@@ -625,13 +625,13 @@ export default function AdminGuard({ children, fallback, skipRemoteCheck = false
           });
         } else if (tokenError instanceof TypeError) {
           console.log('🔍 AdminGuard: 类型错误 - 可能是数据结构问题');
-          handleAuthError('系统数据错误，请刷新页面重试', 'system_error', {
+          handleAuthError('系统数据错误，请刷新页面重试', 'server_error', {
             errorType: 'type_error',
             originalError: tokenError.message
           });
         } else if (tokenError instanceof ReferenceError) {
           console.log('🔍 AdminGuard: 引用错误 - 可能是代码问题');
-          handleAuthError('系统配置错误，请联系技术支持', 'system_error', {
+          handleAuthError('系统配置错误，请联系技术支持', 'server_error', {
             errorType: 'reference_error',
             originalError: tokenError.message
           });

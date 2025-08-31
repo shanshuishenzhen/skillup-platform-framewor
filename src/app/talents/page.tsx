@@ -28,7 +28,7 @@ export default function TalentsPage() {
   const categories = ["全部", "UI设计", "包装设计", "室内设计", "广告创意", "工业设计", "平面设计", "形象设计", "摄影"]
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pt-20">
       {/* 页面头部 */}
       <div className="bg-white border-b">
         <div className="container mx-auto px-4 py-8">

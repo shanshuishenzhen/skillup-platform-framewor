@@ -4,7 +4,7 @@
  */
 
 // 设置测试环境变量
-process.env.NODE_ENV = 'test';
+// process.env.NODE_ENV = 'test'; // NODE_ENV 是只读属性，不能直接赋值
 process.env.NEXT_PUBLIC_APP_ENV = 'test';
 
 // 数据库配置

@@ -5,7 +5,7 @@
 
 import path from 'path';
 
-export default {
+const e2eConfig = {
   // 显示名称
   displayName: 'E2E Tests',
   
@@ -157,3 +157,5 @@ export default {
   // 测试结果处理器
   testResultsProcessor: '<rootDir>/src/tests/e2e/utils/results-processor.js'
 };
+
+export default e2eConfig;

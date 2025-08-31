@@ -84,7 +84,7 @@ function generateRandomPassword(): string {
 /**
  * 解析Excel/CSV文件
  */
-function parseFile(buffer: Buffer, filename: string): UserImportData[] {
+function parseFile(buffer: Buffer, filename: string): Record<string, string>[] {
   try {
     let data: Record<string, string>[] = [];
     
@@ -129,18 +129,19 @@ function parseFile(buffer: Buffer, filename: string): UserImportData[] {
       const workbook = XLSX.read(buffer, { type: 'buffer' });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      const rawData = XLSX.utils.sheet_to_json(worksheet);
+      const rawData = XLSX.utils.sheet_to_json(worksheet) as Record<string, unknown>[];
       
       // 转换中文表头为英文字段名
       data = rawData.map(row => {
         const convertedRow: Record<string, string> = {};
         Object.keys(row).forEach(key => {
           const englishKey = getEnglishFieldName(key) || key;
-          let value = (row as any)[key];
+          const rawValue = row[key as keyof typeof row];
           
           // 确保所有值都转换为字符串类型，包括空值
-          if (value !== null && value !== undefined) {
-            value = value.toString().trim();
+          let value: string;
+          if (rawValue !== null && rawValue !== undefined) {
+            value = rawValue.toString().trim();
           } else {
             value = '';
           }
@@ -236,7 +237,14 @@ async function checkDuplicateUsers(users: UserImportData[]): Promise<{
   if (idCards.length > 0) conditions.push(`id_card.in.(${idCards.join(',')})`);
   if (employeeIds.length > 0) conditions.push(`employee_id.in.(${employeeIds.join(',')})`);
   
-  let existingUsers: any[] = [];
+  interface ExistingUser {
+    email?: string;
+    phone?: string;
+    id_card?: string;
+    employee_id?: string;
+  }
+  
+  let existingUsers: ExistingUser[] = [];
   
   if (conditions.length > 0) {
     // 查询已存在的用户
@@ -438,7 +446,7 @@ export async function POST(request: NextRequest) {
     // 处理数据格式
     const processedData = rawData.map((row: Record<string, string>) => {
       // 处理可能的字段名变体
-      const normalizedRow: Record<string, unknown> = {};
+      const normalizedRow: Record<string, string> = {};
       
       Object.keys(row).forEach(key => {
         const normalizedKey = key.toLowerCase().replace(/[\s-_]/g, '');
@@ -482,16 +490,14 @@ export async function POST(request: NextRequest) {
             break;
           case 'learninghours':
           case 'hours':
-            normalizedRow.learning_hours = Number(row[key]) || 0;
+            normalizedRow.learning_hours = (Number(row[key]) || 0).toString();
             break;
           case 'exampermissions':
           case 'permissions':
             if (typeof row[key] === 'string') {
-              normalizedRow.exam_permissions = row[key].split(',').map((perm: string) => perm.trim()).filter((perm: string) => perm.length > 0);
-            } else if (Array.isArray(row[key])) {
-              normalizedRow.exam_permissions = row[key];
+              normalizedRow.exam_permissions = row[key].split(',').map((perm: string) => perm.trim()).filter((perm: string) => perm.length > 0).join(',');
             } else {
-              normalizedRow.exam_permissions = [];
+              normalizedRow.exam_permissions = '';
             }
             break;
           case 'certificationstatus':

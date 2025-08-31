@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import path from 'path';
-import { ErrorHandler } from '@/utils/errorHandler';
+import { ErrorHandler, AppError, ErrorType, ErrorSeverity } from '@/utils/errorHandler';
 
 // 初始化 Supabase 客户端
 const supabase = createClient(
@@ -313,6 +313,14 @@ export async function POST(request: NextRequest) {
     // 上传文件
     const fileUrl = await uploadFileToStorage(file, uniqueFilename, fileValidation.type!);
     
+    // 确保文件类型存在
+    if (!fileValidation.type) {
+      return NextResponse.json(
+        { success: false, error: '无法确定文件类型' },
+        { status: 400 }
+      );
+    }
+
     // 保存文件信息
     const fileInfo = {
       title: validMetadata.title,
@@ -357,7 +365,28 @@ export async function POST(request: NextRequest) {
     console.error('文件上传错误:', error);
     
     // 记录错误
-    errorHandler.logError(error as Error, {
+    const appError = error instanceof Error 
+      ? new AppError(
+          ErrorType.FILE_UPLOAD_ERROR,
+          error.message,
+          {
+            statusCode: 500,
+            severity: ErrorSeverity.HIGH,
+            retryable: true,
+            originalError: error
+          }
+        )
+      : new AppError(
+          ErrorType.FILE_UPLOAD_ERROR,
+          '文件上传失败',
+          {
+            statusCode: 500,
+            severity: ErrorSeverity.HIGH,
+            retryable: true
+          }
+        );
+    
+    errorHandler.logError(appError, {
       context: 'file_upload',
       endpoint: '/api/admin/resources/upload'
     });

@@ -15,7 +15,7 @@ import jwt from 'jsonwebtoken';
 function verifyToken(token: string): string | null {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as Record<string, unknown>;
-    return decoded.userId;
+    return decoded.userId as string;
   } catch {
     return null;
   }
@@ -31,15 +31,13 @@ export async function POST(request: Request): Promise<Response> {
     const { faceData, token } = await request.json();
 
     // 验证token
-    const decoded = verifyToken(token) as Record<string, unknown>;
-    if (!decoded || !decoded.valid) {
+    const userId = verifyToken(token);
+    if (!userId) {
       return Response.json(
         { success: false, error: '无效的认证token' },
         { status: 401 }
       );
     }
-
-    const userId = decoded.userId;
 
     // 验证请求参数
     if (!faceData) {
@@ -50,19 +48,19 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     // 调用用户服务进行人脸识别验证
-    const result = await verifyFaceRecognition(userId, faceData as Record<string, unknown>);
+    const result = await verifyFaceRecognition(userId, faceData as string);
 
     if (result.success) {
       return NextResponse.json({
         success: true,
         data: {
-          user: result.user
+          score: result.score
         },
         message: '人脸识别验证成功'
       });
     } else {
       return NextResponse.json(
-        { error: result.error },
+        { error: result.message },
         { status: 400 }
       );
     }

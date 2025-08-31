@@ -5,6 +5,7 @@
 
 import { supabaseAdmin } from '@/lib/supabase';
 import { getEnvConfig } from '@/utils/envConfig';
+import { SmsProviderFactory } from './smsProviders';
 
 // 验证码存储接口
 /*
@@ -149,9 +150,9 @@ export async function sendVerificationCode(
       };
     }
 
-    // 模拟发送短信（实际应调用第三方短信服务）
-    // const sendResult = await simulateSendSms(phone, code, purpose);
-    const sendResult = { success: true }; // 临时模拟成功
+    // 使用配置的短信服务提供商发送短信
+    const smsProvider = SmsProviderFactory.createProvider();
+    const sendResult = await smsProvider.sendSms(phone, code, purpose);
     
     if (!sendResult.success) {
       // 发送失败，删除已存储的验证码
@@ -289,7 +290,7 @@ export async function verifyCode(
 export async function cleanupExpiredCodes(): Promise<number> {
   try {
     // 删除过期的验证码记录
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('sms_verification_codes')
       .delete()
       .lt('expires_at', new Date().toISOString());
@@ -299,8 +300,8 @@ export async function cleanupExpiredCodes(): Promise<number> {
       return 0;
     }
 
-    // 返回清理的记录数量（如果数据库支持返回删除的行数）
-    return data ? data.length : 0;
+    // Supabase delete 操作不返回删除的行数，返回成功标识
+    return 1;
   } catch (error) {
     console.error('清理过期验证码失败:', error);
     return 0;
@@ -392,5 +393,48 @@ export async function getRecentCodes(phone: string): Promise<SmsVerificationCode
   } catch (error) {
     console.error('获取验证码记录异常:', error);
     return [];
+  }
+}
+
+/**
+ * 获取短信服务状态
+ * @returns {Promise<{provider: string, configured: boolean, available: boolean}>} 服务状态
+ */
+export async function getSmsServiceStatus(): Promise<{
+  provider: string;
+  configured: boolean;
+  available: boolean;
+  message: string;
+}> {
+  try {
+    const provider = process.env.SMS_PROVIDER || 'mock';
+    const smsProvider = SmsProviderFactory.createProvider();
+    const configured = smsProvider.validateConfig();
+
+    // 对于mock服务，总是可用的
+    if (provider === 'mock') {
+      return {
+        provider,
+        configured: true,
+        available: true,
+        message: '使用模拟短信服务（开发环境）'
+      };
+    }
+
+    return {
+      provider,
+      configured,
+      available: configured,
+      message: configured
+        ? `${provider}短信服务已配置且可用`
+        : `${provider}短信服务未正确配置，请检查环境变量`
+    };
+  } catch (error) {
+    return {
+      provider: 'unknown',
+      configured: false,
+      available: false,
+      message: '短信服务状态检查失败'
+    };
   }
 }

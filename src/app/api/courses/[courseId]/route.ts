@@ -47,13 +47,13 @@ export async function GET(request: NextRequest, context: { params: Promise<{ cou
       previewVideo,
       // 计算总时长（所有章节视频时长之和）
       totalDuration: chapters.reduce((total, chapter) => {
-        return total + chapter.videos.reduce((chapterTotal, video) => {
+        return total + (chapter.videos || []).reduce((chapterTotal, video) => {
           return chapterTotal + (video.duration || 0);
         }, 0);
       }, 0),
       // 计算总视频数
       totalVideos: chapters.reduce((total, chapter) => {
-        return total + chapter.videos.length;
+        return total + (chapter.videos || []).length;
       }, 0)
     };
 

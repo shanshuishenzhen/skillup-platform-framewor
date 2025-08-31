@@ -268,29 +268,29 @@ function getGroupByFromTimeRange(timeRange: string): 'hour' | 'day' | 'week' | '
  * @param requestedWidgets 请求的组件列表
  * @returns 过滤后的数据
  */
-function filterDashboardData(dashboardData: DashboardData, requestedWidgets: string[]): Partial<DashboardData> {
+function filterDashboardData(dashboardData: DashboardData, widgets: string[]): Partial<DashboardData> {
   const filtered: Partial<DashboardData> = {};
-
-  if (requestedWidgets.includes('overview') && dashboardData.overview) {
+  
+  if (widgets.includes('overview')) {
     filtered.overview = dashboardData.overview;
   }
-
-  if (requestedWidgets.includes('performance') && dashboardData.performance) {
-    filtered.performance = dashboardData.performance;
+  
+  if (widgets.includes('performance')) {
+    filtered.timeSeriesData = dashboardData.timeSeriesData;
   }
 
-  if (requestedWidgets.includes('errors') && dashboardData.errors) {
-    filtered.errors = dashboardData.errors;
+  if (widgets.includes('errors')) {
+    filtered.recentErrors = dashboardData.recentErrors;
   }
-
-  if (requestedWidgets.includes('users') && dashboardData.users) {
-    filtered.users = dashboardData.users;
+  
+  if (widgets.includes('users')) {
+    filtered.topEndpoints = dashboardData.topEndpoints;
   }
-
-  if (requestedWidgets.includes('alerts') && dashboardData.alerts) {
-    filtered.alerts = dashboardData.alerts;
+  
+  if (widgets.includes('alerts')) {
+    filtered.systemHealth = dashboardData.systemHealth;
   }
-
+  
   return filtered;
 }
 
@@ -305,17 +305,17 @@ async function enhanceDashboardData(dashboardData: Partial<DashboardData>, query
 
   // 添加趋势分析
   if (enhanced.overview) {
-    enhanced.overview.trends = await calculateTrends(query);
+    (enhanced.overview as any).trends = await calculateTrends(query);
   }
 
   // 添加性能基准
-  if (enhanced.performance) {
-    enhanced.performance.benchmarks = await getPerformanceBenchmarks();
+  if (enhanced.timeSeriesData) {
+    (enhanced.timeSeriesData as any).benchmarks = await getPerformanceBenchmarks();
   }
 
   // 添加错误分析
-  if (enhanced.errors) {
-    enhanced.errors.analysis = await analyzeErrors(query);
+  if (enhanced.recentErrors) {
+    (enhanced as any).errorAnalysis = await analyzeErrors(query);
   }
 
   return enhanced;

@@ -37,10 +37,7 @@ jest.mock('crypto');
 jest.mock('validator');
 jest.mock('isomorphic-dompurify');
 
-// Mock 类型定义
-interface MockedModule<T> {
-  [K in keyof T]: T[K] extends (...args: unknown[]) => unknown ? jest.MockedFunction<T[K]> : T[K];
-}
+
 
 // 类型定义
 interface SecurityConfig {

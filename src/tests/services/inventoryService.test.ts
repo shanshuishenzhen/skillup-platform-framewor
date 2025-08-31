@@ -212,13 +212,13 @@ let getStockLevel: (courseId: string) => Promise<any>;
 
 beforeAll(async () => {
   // 动态导入模块
-  const module = await import('@/services/inventoryService');
-  inventoryService = module.inventoryService;
-  checkStock = module.checkStock;
-  reserveStock = module.reserveStock;
-  releaseStock = module.releaseStock;
-  updateStock = module.updateStock;
-  getStockLevel = module.getStockLevel;
+  const inventoryServiceModule = await import('@/services/inventoryService');
+  inventoryService = inventoryServiceModule.inventoryService;
+  checkStock = inventoryServiceModule.checkStock;
+  reserveStock = inventoryServiceModule.reserveStock;
+  releaseStock = inventoryServiceModule.releaseStock;
+  updateStock = inventoryServiceModule.updateStock;
+  getStockLevel = inventoryServiceModule.getStockLevel;
 });
 
 describe('库存服务', () => {

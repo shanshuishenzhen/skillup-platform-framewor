@@ -12,7 +12,7 @@ import {
   ErrorSeverity,
   RetryConfig 
 } from '../utils/errorHandler';
-import { aliCloudOSS } from '../lib/alicloud-oss';
+import { createOSSClient } from '../lib/alicloud-oss';
 
 /**
  * 云存储提供商类型
@@ -27,6 +27,9 @@ export enum FileType {
   VIDEO = 'video',
   DOCUMENT = 'document',
   AUDIO = 'audio',
+  MATERIAL = 'material',
+  PREVIEW = 'preview',
+  AVATAR = 'avatar',
   OTHER = 'other'
 }
 
@@ -38,6 +41,7 @@ export interface FileUploadConfig {
   allowedTypes: string[]; // 允许的文件类型
   bucket?: string; // 存储桶名称
   path?: string; // 存储路径
+  folder?: string; // 文件夹名称
 }
 
 /**
@@ -70,16 +74,16 @@ export class CloudStorageError extends AppError {
   constructor(
     message: string,
     public code?: string,
-    public originalError?: Error | unknown
+    originalError?: Error | unknown
   ) {
     super(
-      ErrorType.STORAGE_ERROR,
+      ErrorType.FILE_UPLOAD_ERROR,
       message,
       {
         code: code || 'CLOUD_STORAGE_ERROR',
         statusCode: 500,
         severity: ErrorSeverity.HIGH,
-        originalError
+        originalError: originalError instanceof Error ? originalError : undefined
       }
     );
     this.name = 'CloudStorageError';
@@ -146,6 +150,40 @@ const FILE_TYPE_CONFIGS: Record<FileType, FileUploadConfig> = {
       'text/plain'
     ],
     folder: 'documents'
+  },
+  [FileType.IMAGE]: {
+    maxSize: 10 * 1024 * 1024, // 10MB
+    allowedTypes: [
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+      'image/bmp',
+      'image/svg+xml'
+    ],
+    folder: 'images'
+  },
+  [FileType.AUDIO]: {
+    maxSize: 100 * 1024 * 1024, // 100MB
+    allowedTypes: [
+      'audio/mp3',
+      'audio/wav',
+      'audio/aac',
+      'audio/flac',
+      'audio/ogg',
+      'audio/m4a'
+    ],
+    folder: 'audios'
+  },
+  [FileType.OTHER]: {
+    maxSize: 50 * 1024 * 1024, // 50MB
+    allowedTypes: [
+      'application/octet-stream',
+      'application/zip',
+      'application/x-rar-compressed',
+      'application/x-7z-compressed'
+    ],
+    folder: 'others'
   }
 };
 
@@ -174,8 +212,8 @@ abstract class BaseCloudStorageService {
         ErrorType.NETWORK_ERROR,
         ErrorType.TIMEOUT_ERROR,
         ErrorType.RATE_LIMIT_ERROR,
-        ErrorType.SERVICE_UNAVAILABLE_ERROR,
-        ErrorType.STORAGE_ERROR
+        ErrorType.SERVICE_UNAVAILABLE,
+        ErrorType.FILE_UPLOAD_ERROR
       ]
     };
   }
@@ -299,27 +337,57 @@ class AliyunOSSService extends BaseCloudStorageService {
         const fileName = this.generateFileName(file.name, fileType, options?.customPath);
         
         // 使用阿里云OSS客户端上传文件
-        const uploadResult = await aliCloudOSS.uploadFile(
+        const ossClient = createOSSClient();
+        
+        // 模拟进度回调（因为阿里云OSS客户端不支持进度回调）
+        if (options?.onProgress) {
+          // 模拟上传进度
+          for (let i = 0; i <= 100; i += 25) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            options.onProgress({
+              loaded: (file.size * i) / 100,
+              total: file.size,
+              percentage: i
+            });
+          }
+        }
+        
+        const uploadResult = await ossClient.uploadFile(
           file,
           fileName,
           {
-            onProgress: options?.onProgress ? (progress) => {
-              options.onProgress!({
-                loaded: progress.loaded,
-                total: progress.total,
-                percentage: Math.round((progress.loaded / progress.total) * 100)
-              });
-            } : undefined,
-            metadata: options?.metadata
+            folder: FILE_TYPE_CONFIGS[fileType].folder,
+            isPublic: true
           }
         );
+        
+        // 从文件名推断内容类型
+        const getContentType = (fileName: string): string => {
+          const ext = fileName.split('.').pop()?.toLowerCase();
+          const mimeTypes: Record<string, string> = {
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'png': 'image/png',
+            'gif': 'image/gif',
+            'webp': 'image/webp',
+            'pdf': 'application/pdf',
+            'doc': 'application/msword',
+            'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'xls': 'application/vnd.ms-excel',
+            'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'txt': 'text/plain',
+            'mp4': 'video/mp4',
+            'mp3': 'audio/mpeg'
+          };
+          return mimeTypes[ext || ''] || 'application/octet-stream';
+        };
         
         return {
           success: true,
           url: uploadResult.url,
           key: uploadResult.key,
           size: uploadResult.size,
-          contentType: uploadResult.contentType,
+          contentType: getContentType(fileName),
           uploadedAt: new Date()
         };
       }, this.getRetryConfig());
@@ -328,7 +396,7 @@ class AliyunOSSService extends BaseCloudStorageService {
     } catch (error) {
       console.error('阿里云OSS上传失败:', error);
       throw createError(
-        ErrorType.STORAGE_ERROR,
+        ErrorType.FILE_UPLOAD_ERROR,
         '阿里云OSS上传失败',
         {
           code: 'ALIYUN_UPLOAD_ERROR',
@@ -344,7 +412,8 @@ class AliyunOSSService extends BaseCloudStorageService {
     try {
       const result = await withRetry(async () => {
         // 使用阿里云OSS客户端删除文件
-        await aliCloudOSS.deleteFile(key);
+        const ossClient = createOSSClient();
+        await ossClient.deleteFile(key);
         return { success: true };
       }, this.getRetryConfig());
       
@@ -359,12 +428,13 @@ class AliyunOSSService extends BaseCloudStorageService {
     try {
       return await withRetry(async () => {
         // 使用阿里云OSS客户端生成签名URL
-        return await aliCloudOSS.getSignedUrl(key, expiresIn);
+        const ossClient = createOSSClient();
+        return await ossClient.getSignedUrl(key, expiresIn);
       }, this.getRetryConfig());
     } catch (error) {
       console.error('获取阿里云OSS文件URL失败:', error);
       throw createError(
-        ErrorType.STORAGE_ERROR,
+        ErrorType.FILE_UPLOAD_ERROR,
         '获取文件URL失败',
         {
           code: 'ALIYUN_URL_ERROR',
@@ -437,7 +507,7 @@ class LocalStorageService extends BaseCloudStorageService {
     } catch (error) {
       console.error('本地存储上传失败:', error);
       throw createError(
-        ErrorType.STORAGE_ERROR,
+        ErrorType.FILE_UPLOAD_ERROR,
         '本地存储上传失败',
         {
           code: 'LOCAL_UPLOAD_ERROR',

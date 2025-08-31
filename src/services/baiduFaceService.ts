@@ -29,6 +29,11 @@ export interface BaiduApiResponse {
 }
 
 /**
+ * 百度人脸识别API响应接口（别名）
+ */
+export type BaiduFaceApiResponse = BaiduApiResponse;
+
+/**
  * 人脸检测结果接口
  */
 export interface FaceDetectionResult {
@@ -105,18 +110,7 @@ export interface FaceMatchResult {
   }>;
 }
 
-/**
- * 人脸搜索结果接口
- */
-export interface FaceSearchResult {
-  face_token: string;
-  user_list: Array<{
-    group_id: string;
-    user_id: string;
-    user_info: string;
-    score: number;
-  }>;
-}
+
 
 /**
  * 活体检测结果接口
@@ -215,7 +209,7 @@ export class BaiduFaceServiceError extends AppError {
       code,
       statusCode: statusCode || 500,
       severity: ErrorSeverity.HIGH,
-      originalError,
+      originalError: originalError instanceof Error ? originalError : undefined,
       retryable: true
     });
     this.name = 'BaiduFaceServiceError';
@@ -307,6 +301,18 @@ class BaiduFaceService {
       // 提前5分钟过期，确保token有效性
       this.tokenExpireTime = Date.now() + (data.expires_in - 300) * 1000;
       
+      if (!this.accessToken) {
+        throw createError(
+          ErrorType.FACE_RECOGNITION_ERROR,
+          '获取访问令牌失败：返回的令牌为空',
+          {
+            code: 'EMPTY_ACCESS_TOKEN',
+            statusCode: 500,
+            severity: ErrorSeverity.HIGH
+          }
+        );
+      }
+      
       return this.accessToken;
     } catch (error) {
       if (error instanceof AppError) {
@@ -355,7 +361,7 @@ class BaiduFaceService {
    */
   private async makeApiRequest(
     endpoint: string,
-    data: Record<string, unknown>
+    data: Record<string, unknown> | unknown[]
   ): Promise<BaiduFaceApiResponse> {
     try {
       const accessToken = await this.getAccessToken();
@@ -428,7 +434,7 @@ class BaiduFaceService {
       faceField?: string;
       maxFaceNum?: number;
     } = {}
-  ): Promise<FaceDetectionResult> {
+  ): Promise<FaceDetectionResponse> {
     try {
       const requestData = {
         image: imageBase64,
@@ -439,7 +445,7 @@ class BaiduFaceService {
 
       const response = await this.makeApiRequest('/rest/2.0/face/v3/detect', requestData);
 
-      if (!response.result || !response.result.face_list || response.result.face_list.length === 0) {
+      if (!response.result || !response.result.face_list || !(response.result.face_list as any[])?.length) {
         return {
           success: false,
           message: '未检测到人脸',
@@ -447,13 +453,13 @@ class BaiduFaceService {
         };
       }
 
-      const face = response.result.face_list[0];
+      const face = (response.result.face_list as any[])[0];
       
       return {
         success: true,
         message: '人脸检测成功',
         faceToken: face.face_token,
-        faceCount: response.result.face_num || 0,
+        faceCount: (response.result.face_num as number) || 0,
         quality: face.quality ? {
           blur: face.quality.blur,
           illumination: face.quality.illumination,
@@ -515,7 +521,7 @@ class BaiduFaceService {
         };
       }
 
-      const score = response.result.score;
+      const score = response.result.score as number;
       const threshold = 80; // 相似度阈值
       const isMatch = score >= threshold;
 
@@ -569,7 +575,7 @@ class BaiduFaceService {
       return {
         success: true,
         message: '人脸注册成功',
-        faceToken: response.result?.face_token
+        faceToken: response.result?.face_token as string
       };
     } catch (error) {
       if (error instanceof AppError) {
@@ -583,6 +589,59 @@ class BaiduFaceService {
         message: '人脸注册失败，请稍后重试'
       };
     }
+  }
+
+  /**
+   * 删除用户
+   * @param groupId 用户组ID
+   * @param userId 用户ID
+   * @returns Promise<{ success: boolean; message: string }> 删除结果
+   */
+  async deleteUser(
+    groupId: string,
+    userId: string
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      const requestData = {
+        group_id: groupId,
+        user_id: userId
+      };
+
+      await this.makeApiRequest('/rest/2.0/face/v3/faceset/user/delete', requestData);
+
+      return {
+        success: true,
+        message: '用户删除成功'
+      };
+    } catch (error) {
+      if (error instanceof AppError) {
+        return {
+          success: false,
+          message: error.message
+        };
+      }
+      return {
+        success: false,
+        message: '用户删除失败，请稍后重试'
+      };
+    }
+  }
+
+  /**
+   * 添加用户（registerFace 的别名）
+   * @param imageBase64 图像的base64编码
+   * @param userId 用户ID
+   * @param groupId 用户组ID
+   * @param userInfo 用户信息
+   * @returns Promise<FaceRegisterResult> 注册结果
+   */
+  async addUser(
+    imageBase64: string,
+    userId: string,
+    groupId: string = 'skillup_users',
+    userInfo?: string
+  ): Promise<FaceRegisterResult> {
+    return this.registerFace(imageBase64, userId, groupId, userInfo);
   }
 
   /**
@@ -608,14 +667,14 @@ class BaiduFaceService {
 
       const response = await this.makeApiRequest('/rest/2.0/face/v3/search', requestData);
 
-      if (!response.result || !response.result.user_list || response.result.user_list.length === 0) {
+      if (!response.result || !response.result.user_list || !(response.result.user_list as any[])?.length) {
         return {
           success: false,
           message: '未找到匹配的人脸'
         };
       }
 
-      const userList = response.result.user_list.map(user => ({
+      const userList = (response.result.user_list as any[]).map((user: any) => ({
         userId: user.user_id,
         score: user.score,
         groupId: user.group_id
@@ -664,7 +723,7 @@ class BaiduFaceService {
       }
 
       // 百度AI活体检测返回的是一个分数，通常大于0.5认为是活体
-      const score = response.result.score || 0;
+      const score = (response.result.score as number) || 0;
       const threshold = 0.5;
       const isLive = score >= threshold;
 
@@ -719,7 +778,7 @@ class BaiduFaceService {
 
       const response = await this.makeApiRequest('/rest/2.0/face/v3/detect', requestData);
 
-      if (!response.result || !response.result.face_list || response.result.face_list.length === 0) {
+      if (!response.result || !response.result.face_list || !(response.result.face_list as any[])?.length) {
         throw createError(
           ErrorType.FACE_RECOGNITION_ERROR,
           '未检测到人脸',
@@ -731,7 +790,7 @@ class BaiduFaceService {
         );
       }
 
-      if (response.result.face_list.length > 1) {
+      if ((response.result.face_list as any[]).length > 1) {
         throw createError(
           ErrorType.FACE_RECOGNITION_ERROR,
           '检测到多张人脸，请确保图片中只有一张人脸',
@@ -743,7 +802,7 @@ class BaiduFaceService {
         );
       }
 
-      const face = response.result.face_list[0];
+      const face = (response.result.face_list as any[])[0];
 
       // 检查人脸质量
       if (face.face_probability < 0.8) {
@@ -1030,13 +1089,3 @@ const baiduFaceService = new BaiduFaceService();
 
 // 导出服务实例和类型
 export { baiduFaceService, BaiduFaceService };
-export type {
-  FaceDetectionResult,
-  FaceCompareResult,
-  FaceSearchResult,
-  FaceRegisterResult,
-  FaceDetectionResponse,
-  FaceTemplate,
-  BaiduFaceApiResponse,
-  LivenessResult
-};

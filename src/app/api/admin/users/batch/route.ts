@@ -30,6 +30,11 @@ const BatchUpdateSchema = z.object({
   })
 });
 
+// 批量删除请求验证模式
+const BatchDeleteSchema = z.object({
+  user_ids: z.array(z.string()).min(1, '至少需要选择一个用户')
+});
+
 /**
  * PUT /api/admin/users/batch
  * 批量更新用户信息
@@ -41,10 +46,10 @@ export async function PUT(request: NextRequest) {
     // 检查管理员权限
     const rbacResult = await verifyAdminAccess(request);
     if (!rbacResult.success) {
-      console.error('权限验证失败:', rbacResult.error);
+      console.error('权限验证失败:', rbacResult.message);
       return NextResponse.json(
-        { success: false, error: rbacResult.error },
-        { status: rbacResult.statusCode }
+        { success: false, error: rbacResult.message || '权限验证失败' },
+        { status: 403 }
       );
     }
 
@@ -106,8 +111,8 @@ export async function PUT(request: NextRequest) {
     // 记录操作日志
     const logData = {
       operation_type: 'batch_update',
-      operator_id: rbacResult.user.id,
-      operator_role: rbacResult.user.role,
+      operator_id: rbacResult.user?.userId || 'unknown',
+      operator_role: (rbacResult.user as any)?.role || 'unknown',
       affected_user_count: updatedUsers?.length || 0,
       affected_user_ids: user_ids,
       operation_description: `批量更新用户信息`,
@@ -138,6 +143,113 @@ export async function PUT(request: NextRequest) {
 
   } catch (error) {
     console.error('批量更新用户异常:', error);
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: '服务器内部错误',
+        details: error instanceof Error ? error.message : '未知错误'
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * DELETE /api/admin/users/batch
+ * 批量删除用户
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    console.log('收到批量删除用户请求');
+    
+    // 检查管理员权限
+    const rbacResult = await verifyAdminAccess(request);
+    if (!rbacResult.success) {
+      console.error('权限验证失败:', rbacResult.message);
+      return NextResponse.json(
+        { success: false, error: rbacResult.message || '权限验证失败' },
+        { status: 403 }
+      );
+    }
+
+    // 解析请求体
+    const body = await request.json();
+    console.log('请求体数据:', body);
+    
+    // 验证请求数据
+    const validationResult = BatchDeleteSchema.safeParse(body);
+    if (!validationResult.success) {
+      console.error('数据验证失败:', validationResult.error.errors);
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: '请求数据格式错误',
+          details: validationResult.error.errors
+        },
+        { status: 400 }
+      );
+    }
+
+    const { user_ids } = validationResult.data;
+    
+    console.log('准备删除用户ID:', user_ids);
+
+    // 执行批量删除
+    const { data: deletedUsers, error } = await supabase
+      .from('users')
+      .delete()
+      .in('id', user_ids)
+      .select();
+
+    if (error) {
+      console.error('数据库删除失败:', error);
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: '批量删除失败',
+          details: error.message
+        },
+        { status: 500 }
+      );
+    }
+
+    console.log('批量删除成功，删除用户数:', deletedUsers?.length || 0);
+    
+    // 记录操作日志
+    const logData = {
+      operation_type: 'batch_delete',
+      operator_id: rbacResult.user?.userId || 'unknown',
+      operator_role: (rbacResult.user as any)?.role || 'unknown',
+      affected_user_count: deletedUsers?.length || 0,
+      affected_user_ids: user_ids,
+      operation_description: `批量删除用户`,
+      operation_data: { deleted_user_ids: user_ids },
+      ip_address: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+      user_agent: request.headers.get('user-agent') || 'unknown',
+      success: true,
+      created_at: new Date().toISOString()
+    };
+    
+    // 保存操作日志（不阻塞主流程）
+    supabase.from('operation_logs').insert(logData).then(({ error: logError }) => {
+      if (logError) {
+        console.error('保存操作日志失败:', logError);
+      } else {
+        console.log('操作日志已保存');
+      }
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `成功删除了 ${deletedUsers?.length || 0} 个用户`,
+      data: {
+        deleted_count: deletedUsers?.length || 0,
+        deleted_users: deletedUsers
+      }
+    });
+
+  } catch (error) {
+    console.error('批量删除用户异常:', error);
     return NextResponse.json(
       { 
         success: false, 

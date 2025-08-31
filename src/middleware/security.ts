@@ -132,8 +132,8 @@ async function checkAuth(request: NextRequest): Promise<{
     email?: string;
     role?: string;
     [key: string]: unknown;
-  }; 
-  error?: string 
+  } | null; 
+  error?: string | null 
 }> {
   const authHeader = request.headers.get('authorization');
   
@@ -176,7 +176,16 @@ async function checkAuth(request: NextRequest): Promise<{
       });
     }
     
-    return result;
+    return {
+      valid: result.valid,
+      user: result.user ? {
+        ...result.user,
+        id: result.user.id,
+        email: result.user.email,
+        role: (result.user as any).role
+      } : null,
+      error: result.error
+    };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Authentication failed';
     console.error('Security middleware: Authentication error', {
@@ -311,17 +320,22 @@ export async function security(
     
     // 创建结构化错误响应
     const appError = createError(
-      ErrorType.SECURITY_ERROR,
+      ErrorType.INTERNAL_ERROR,
       'Security middleware encountered an error',
-      ErrorSeverity.HIGH,
-      { originalError: errorMessage }
+      {
+        severity: ErrorSeverity.HIGH,
+        context: { 
+          additionalData: { originalError: errorMessage },
+          timestamp: new Date()
+        }
+      }
     );
     
     const response = NextResponse.json(
       { 
         error: 'Internal security error',
         code: appError.code,
-        timestamp: appError.timestamp
+        timestamp: new Date().toISOString()
       },
       { status: 500 }
     );
@@ -337,7 +351,7 @@ export async function security(
  */
 export function createSecurityConfig(overrides: Partial<SecurityConfig> = {}): SecurityConfig {
   const envConfig = getEnvConfig();
-  const appConfig = envConfig.getApp();
+  const appConfig = envConfig.app;
   
   return {
     ...defaultSecurityConfig,
@@ -384,9 +398,9 @@ export function getRateLimitStatus(ip: string): { count: number; resetTime: numb
 }
 
 /**
- * 默认导出
+ * 安全中间件集合
  */
-export default {
+const securityMiddleware = {
   security,
   securityWithoutAuth,
   rateLimitOnly,
@@ -394,3 +408,5 @@ export default {
   clearRateLimitStore,
   getRateLimitStatus
 };
+
+export default securityMiddleware;

@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { ErrorHandler, AppError, ErrorType } from '@/utils/errorHandler';
+import { createErrorResponse, AppError, ErrorType } from '@/utils/errorHandler';
 
 /**
  * 管理员用户接口定义
@@ -186,19 +186,7 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     // 使用统一的错误处理机制
-    if (error instanceof AppError) {
-      return ErrorHandler.handleApiError(error);
-    }
-    
-    // 处理未知错误
-    const apiError = new AppError(
-      '管理员登录失败',
-      ErrorType.API_ERROR,
-      500,
-      'ADMIN_LOGIN_ERROR',
-      { originalError: error instanceof Error ? error.message : String(error) }
-    );
-    
-    return ErrorHandler.handleApiError(apiError);
+    const errorResponse = createErrorResponse(error);
+    return NextResponse.json(errorResponse.body, { status: errorResponse.status });
   }
 }

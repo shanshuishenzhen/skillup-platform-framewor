@@ -7,6 +7,7 @@
 export const FIELD_DISPLAY_NAMES = {
   // 基本信息字段
   name: '姓名',
+  full_name: '姓名', // 兼容性映射，统一使用name字段
   username: '用户名',
   email: '邮箱',
   phone: '手机号',
@@ -15,6 +16,7 @@ export const FIELD_DISPLAY_NAMES = {
   department: '部门',
   position: '职位',
   organization: '组织机构',
+  avatar_url: '头像',
   
   // 学习相关字段
   learning_level: '学习等级',
@@ -30,32 +32,80 @@ export const FIELD_DISPLAY_NAMES = {
   role: '角色',
   password: '密码',
   status: '状态',
+  user_type: '用户类型',
+  is_verified: '已验证',
+  face_verified: '人脸验证',
   import_source: '导入来源',
   import_date: '导入日期',
+  import_batch_id: '导入批次ID',
   sync_status: '同步状态',
+  last_sync_time: '最后同步时间',
   password_hash: '密码哈希',
   created_at: '创建时间',
-  updated_at: '更新时间'
+  updated_at: '更新时间',
+
+  // 学习时间相关
+  last_learning_time: '最后学习时间',
+  certification_date: '认证日期',
+
+  // 验证码相关字段
+  smsCode: '短信验证码',
+  verificationCode: '验证码',
+  code: '验证码',
+
+  // API字段兼容性映射已在上方定义
+
+  // 项目相关字段
+  project_id: '项目ID',
+  project_name: '项目名称',
+  project_status: '项目状态',
+  project_priority: '项目优先级',
+
+  // 任务相关字段
+  task_id: '任务ID',
+  task_name: '任务名称',
+  task_status: '任务状态',
+  assignee_id: '分配者ID',
+
+  // 文件相关字段
+  file_id: '文件ID',
+  file_name: '文件名称',
+  file_size: '文件大小',
+  file_type: '文件类型',
+  uploaded_by: '上传者',
+  uploaded_at: '上传时间'
 } as const;
 
 // 中文字段名映射到英文字段名（包含带星号的必填字段）
 export const CHINESE_TO_ENGLISH_FIELDS = {
   '姓名': 'name',
   '姓名*': 'name',
+  '全名': 'name', // 兼容性映射
   '用户名': 'username',
   '用户名*': 'username',
   '邮箱': 'email',
+  '电子邮箱': 'email',
+  '邮件地址': 'email',
   '手机号': 'phone',
   '手机号*': 'phone',
   '手机号码': 'phone',
   '手机号码*': 'phone',
+  '电话号码': 'phone',
+  '联系电话': 'phone',
   '身份证号码': 'id_card',
   '身份证号码*': 'id_card',
+  '身份证号': 'id_card',
   '员工编号': 'employee_id',
   '员工ID': 'employee_id',
+  '工号': 'employee_id',
   '部门': 'department',
+  '所属部门': 'department',
   '职位': 'position',
+  '岗位': 'position',
+  '职务': 'position',
   '组织机构': 'organization',
+  '机构': 'organization',
+  '组织': 'organization',
   '学习等级': 'learning_level',
   '学习时长': 'learning_hours',
   '学习进度': 'learning_progress',
@@ -64,9 +114,21 @@ export const CHINESE_TO_ENGLISH_FIELDS = {
   '认证状态': 'certification_status',
   '角色': 'role',
   '角色*': 'role',
+  '用户角色': 'role',
   '密码': 'password',
   '密码*': 'password',
-  '状态': 'status'
+  '登录密码': 'password',
+  '状态': 'status',
+  '用户状态': 'status',
+  '账户状态': 'status',
+  // 验证码相关字段
+  '验证码': 'verificationCode',
+  '短信验证码': 'smsCode',
+  '手机验证码': 'smsCode',
+  // 头像相关
+  '头像': 'avatar_url',
+  '头像地址': 'avatar_url',
+  '用户头像': 'avatar_url'
 } as const;
 
 // 学习等级映射
@@ -296,14 +358,14 @@ export function validateFieldValue(fieldName: string, value: string | number | b
   const stringValue = value.toString().trim();
   
   // 检查长度
-  if (rule.minLength && stringValue.length < rule.minLength) {
+  if ('minLength' in rule && rule.minLength && stringValue.length < rule.minLength) {
     return {
       isValid: false,
       error: `${getFieldDisplayName(fieldName)}长度不能少于${rule.minLength}位`
     };
   }
   
-  if (rule.maxLength && stringValue.length > rule.maxLength) {
+  if ('maxLength' in rule && rule.maxLength && stringValue.length > rule.maxLength) {
     return {
       isValid: false,
       error: `${getFieldDisplayName(fieldName)}长度不能超过${rule.maxLength}位`
@@ -311,7 +373,7 @@ export function validateFieldValue(fieldName: string, value: string | number | b
   }
   
   // 检查正则表达式
-  if (rule.pattern && !rule.pattern.test(stringValue)) {
+  if ('pattern' in rule && rule.pattern && !rule.pattern.test(stringValue)) {
     return {
       isValid: false,
       error: `${getFieldDisplayName(fieldName)}格式不正确`
@@ -319,7 +381,7 @@ export function validateFieldValue(fieldName: string, value: string | number | b
   }
   
   // 检查枚举值
-  if ('enum' in rule && rule.enum && !rule.enum.includes(stringValue)) {
+  if ('enum' in rule && rule.enum && !rule.enum.includes(stringValue as any)) {
     return {
       isValid: false,
       error: `${getFieldDisplayName(fieldName)}必须为以下值之一: ${rule.enum.join(', ')}`
@@ -346,6 +408,102 @@ export function getChineseHeaders(): string[] {
  */
 export function convertChineseHeadersToEnglish(chineseHeaders: string[]): string[] {
   return chineseHeaders.map(header => getEnglishFieldName(header));
+}
+
+/**
+ * 标准化字段名称（处理不同API之间的字段名称不一致问题）
+ * @param fieldName 原始字段名
+ * @returns 标准化后的字段名
+ */
+export function normalizeFieldName(fieldName: string): string {
+  // 字段名称标准化映射表
+  const fieldNormalizationMap: Record<string, string> = {
+    // 用户姓名字段统一
+    'full_name': 'name',
+    'fullName': 'name',
+    'real_name': 'name',
+    'realName': 'name',
+    'user_name': 'name',
+    'userName': 'name',
+
+    // 验证码字段统一
+    'smsCode': 'verificationCode',
+    'sms_code': 'verificationCode',
+    'phone_code': 'verificationCode',
+    'phoneCode': 'verificationCode',
+
+    // 头像字段统一
+    'avatar': 'avatar_url',
+    'avatarUrl': 'avatar_url',
+    'profile_image': 'avatar_url',
+    'profileImage': 'avatar_url',
+
+    // 时间字段统一
+    'createdAt': 'created_at',
+    'updatedAt': 'updated_at',
+    'deletedAt': 'deleted_at'
+  };
+
+  return fieldNormalizationMap[fieldName] || fieldName;
+}
+
+/**
+ * 批量标准化对象的字段名称
+ * @param obj 原始对象
+ * @returns 字段名称标准化后的对象
+ */
+export function normalizeObjectFieldNames<T extends Record<string, any>>(obj: T): Record<string, any> {
+  const normalizedObj: Record<string, any> = {};
+
+  for (const [key, value] of Object.entries(obj)) {
+    const normalizedKey = normalizeFieldName(key);
+    normalizedObj[normalizedKey] = value;
+  }
+
+  return normalizedObj;
+}
+
+/**
+ * 提取验证码字段值（处理不同字段名称的兼容性）
+ * @param requestBody 请求体对象
+ * @returns 验证码值
+ */
+export function extractVerificationCode(requestBody: Record<string, any>): string | undefined {
+  // 按优先级顺序检查不同的验证码字段名
+  const codeFields = [
+    'verificationCode',
+    'smsCode',
+    'code',
+    'verification_code',
+    'sms_code',
+    'phone_code',
+    'phoneCode'
+  ];
+
+  for (const field of codeFields) {
+    if (requestBody[field] !== undefined && requestBody[field] !== null && requestBody[field] !== '') {
+      return String(requestBody[field]);
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * 获取字段的所有可能别名
+ * @param standardFieldName 标准字段名
+ * @returns 字段别名数组
+ */
+export function getFieldAliases(standardFieldName: string): string[] {
+  const aliasMap: Record<string, string[]> = {
+    'name': ['full_name', 'fullName', 'real_name', 'realName', 'user_name', 'userName'],
+    'verificationCode': ['smsCode', 'sms_code', 'code', 'phone_code', 'phoneCode'],
+    'avatar_url': ['avatar', 'avatarUrl', 'profile_image', 'profileImage'],
+    'created_at': ['createdAt', 'create_time', 'createTime'],
+    'updated_at': ['updatedAt', 'update_time', 'updateTime']
+  };
+
+  return aliasMap[standardFieldName] || [];
 }
 
 // 定义行数据类型

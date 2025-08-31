@@ -5,9 +5,10 @@
 
 import { supabase } from '@/lib/supabase';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import * as jwt from 'jsonwebtoken';
 import { verifyCode } from '@/services/smsService';
 import { getEnvConfig } from '@/utils/envConfig';
+import { baiduFaceService } from '@/services/baiduFaceService';
 import { 
   withRetry, 
   createError, 
@@ -44,10 +45,10 @@ export interface RegisterResult {
 }
 
 // JWT密钥 - 实际项目中应该从环境变量获取
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
-const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
+const JWT_SECRET = (process.env.JWT_SECRET || 'your-secret-key-default-fallback') as string;
+const JWT_REFRESH_SECRET = (process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key-default-fallback') as string;
+const JWT_EXPIRES_IN = (process.env.JWT_EXPIRES_IN || '1h') as string;
+const JWT_REFRESH_EXPIRES_IN = (process.env.JWT_REFRESH_EXPIRES_IN || '7d') as string;
 
 /**
  * 获取重试配置
@@ -64,7 +65,7 @@ function getRetryConfig(): RetryConfig {
       ErrorType.NETWORK_ERROR,
       ErrorType.TIMEOUT_ERROR,
       ErrorType.DATABASE_ERROR,
-      ErrorType.SERVICE_UNAVAILABLE_ERROR
+      ErrorType.SERVICE_UNAVAILABLE
     ]
   };
 }
@@ -77,25 +78,20 @@ function getRetryConfig(): RetryConfig {
  * @returns 包含access token和refresh token的对象
  */
 function generateTokens(userId: string, userType: string, role: string = 'user'): { token: string; refreshToken: string } {
-  const accessToken = jwt.sign(
-    { 
-      userId, 
-      userType, 
-      role,
-      type: 'access'
-    },
-    JWT_SECRET,
-    { expiresIn: JWT_EXPIRES_IN }
-  );
+  const payload = { 
+    userId, 
+    userType, 
+    role,
+    type: 'access'
+  };
   
-  const refreshToken = jwt.sign(
-    { 
-      userId,
-      type: 'refresh'
-    },
-    JWT_REFRESH_SECRET,
-    { expiresIn: JWT_REFRESH_EXPIRES_IN }
-  );
+  const refreshPayload = {
+    userId,
+    type: 'refresh'
+  };
+  
+  const accessToken = (jwt.sign as any)(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  const refreshToken = (jwt.sign as any)(refreshPayload, JWT_REFRESH_SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN });
   
   return { token: accessToken, refreshToken };
 }
@@ -112,13 +108,24 @@ function generateToken(userId: string, userType: string): string {
 }
 
 /**
+ * 生成JWT token (通用版本)
+ * @param payload token载荷
+ * @param secret 密钥
+ * @param expiresIn 过期时间
+ * @returns JWT token
+ */
+function generateTokenWithPayload(payload: object, secret: string, expiresIn: string): string {
+  return (jwt.sign as any)(payload, secret, { expiresIn });
+}
+
+/**
  * 验证短信验证码
  * @param phone 手机号
  * @param code 验证码
  * @param purpose 验证码用途
  * @returns 验证结果
  */
-async function verifyPhoneCode(phone: string, code: string, purpose: string = 'register'): Promise<boolean> {
+async function verifyPhoneCode(phone: string, code: string, purpose: 'register' | 'login' | 'reset_password' = 'register'): Promise<boolean> {
   try {
     const result = await verifyCode(phone, code, purpose);
     return result.success;
@@ -223,7 +230,7 @@ export async function registerUser(
       message: '注册成功'
     };
   } catch (error) {
-    if (error instanceof AppError && error.context?.code === 'PHONE_ALREADY_EXISTS') {
+    if (error instanceof AppError && error.context?.additionalData?.code === 'PHONE_ALREADY_EXISTS') {
       return {
         success: false,
         message: error.message
@@ -314,7 +321,7 @@ export async function loginUser(
     };
   } catch (error) {
     if (error instanceof AppError && 
-        (error.context?.code === 'USER_NOT_FOUND' || error.context?.code === 'INVALID_PASSWORD')) {
+        (error.context?.additionalData?.code === 'USER_NOT_FOUND' || error.context?.additionalData?.code === 'INVALID_PASSWORD')) {
       return {
         success: false,
         message: error.message
@@ -878,7 +885,7 @@ export async function verifyFace(
     }
 
     // 人脸搜索验证
-    const searchResult = await baiduFaceService.searchFace(faceImage, userId);
+    const searchResult = await baiduFaceService.searchFace(faceImage, ['skillup_users']);
     if (!searchResult.success) {
       return {
         success: false,

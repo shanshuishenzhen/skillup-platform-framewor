@@ -4,7 +4,6 @@
  */
 
 import { createError, AppError, ErrorType, ErrorSeverity, withRetry } from '@/utils/errorHandler';
-import { getEnvConfig } from '@/utils/envConfig';
 
 /**
  * 邮件配置接口
@@ -79,18 +78,26 @@ export class EmailService {
   private isInitialized = false;
 
   constructor(config?: Partial<EmailConfig>) {
-    const envConfig = getEnvConfig();
-    const emailConfig = envConfig.getEmail?.() || {};
+    // 直接从环境变量获取邮件配置
+    const emailConfig = {
+      host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.EMAIL_PORT || '587', 10),
+      secure: process.env.EMAIL_SECURE === 'true',
+      user: process.env.EMAIL_USER || '',
+      pass: process.env.EMAIL_PASS || '',
+      from: process.env.EMAIL_FROM || '',
+      replyTo: process.env.EMAIL_REPLY_TO
+    };
     
     this.config = {
-      host: emailConfig.host || 'smtp.gmail.com',
-      port: emailConfig.port || 587,
-      secure: emailConfig.secure ?? false,
+      host: emailConfig.host,
+      port: emailConfig.port,
+      secure: emailConfig.secure,
       auth: {
-        user: emailConfig.user || '',
-        pass: emailConfig.pass || ''
+        user: emailConfig.user,
+        pass: emailConfig.pass
       },
-      from: emailConfig.from || '',
+      from: emailConfig.from,
       replyTo: emailConfig.replyTo,
       ...config
     };
@@ -115,9 +122,9 @@ export class EmailService {
     } catch (error) {
       console.error('邮件服务初始化失败:', error);
       throw createError(
-        ErrorType.SYSTEM_ERROR,
+        ErrorType.INTERNAL_ERROR,
         '邮件服务初始化失败',
-        { originalError: error }
+        { originalError: error instanceof Error ? error : new Error(String(error)) }
       );
     }
   }
@@ -399,15 +406,15 @@ export class EmailService {
    */
   private validateConfig(): void {
     if (!this.config.host) {
-      throw createError(ErrorType.CONFIGURATION_ERROR, '邮件服务器地址未配置');
+      throw createError(ErrorType.VALIDATION_ERROR, '邮件服务器地址未配置');
     }
     
     if (!this.config.auth.user || !this.config.auth.pass) {
-      throw createError(ErrorType.CONFIGURATION_ERROR, '邮件服务器认证信息未配置');
+      throw createError(ErrorType.VALIDATION_ERROR, '邮件服务器认证信息未配置');
     }
     
     if (!this.config.from) {
-      throw createError(ErrorType.CONFIGURATION_ERROR, '发件人地址未配置');
+      throw createError(ErrorType.VALIDATION_ERROR, '发件人地址未配置');
     }
   }
 

@@ -55,7 +55,7 @@ export default function CoursesPage() {
     try {
       setRefreshing(true);
       // 清除缓存并重新生成
-      const virtualCourses = await aiDataGeneratorService.generateCourses(12, true);
+      const virtualCourses = await aiDataGeneratorService.generateCourses(12);
       setAllCourses(virtualCourses);
       setCourses(virtualCourses);
     } catch (error) {
@@ -72,7 +72,7 @@ export default function CoursesPage() {
 
   // 过滤和排序课程
   useEffect(() => {
-    let filteredCourses = allCourses.filter(course => {
+    const filteredCourses = allCourses.filter(course => {
       const matchesSearch = course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            course.description.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesCategory = selectedCategory === 'all' || course.category === selectedCategory;
@@ -84,7 +84,7 @@ export default function CoursesPage() {
     // 排序
     switch (sortBy) {
       case 'popular':
-        filteredCourses.sort((a, b) => b.students - a.students);
+        filteredCourses.sort((a, b) => b.studentsCount - a.studentsCount);
         break;
       case 'rating':
         filteredCourses.sort((a, b) => b.rating - a.rating);
@@ -103,7 +103,7 @@ export default function CoursesPage() {
   }, [allCourses, searchTerm, selectedCategory, selectedLevel, sortBy]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pt-20">
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -207,7 +207,7 @@ export default function CoursesPage() {
               <div key={course.id} className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300">
                 <div className="relative">
                   <Image
-                    src={course.image}
+                    src={course.thumbnail}
                     alt={course.title}
                     width={300}
                     height={200}
@@ -239,7 +239,7 @@ export default function CoursesPage() {
                   </p>
                   
                   <div className="flex items-center text-sm text-gray-500 mb-4">
-                    <span className="mr-4">导师：{course.instructor}</span>
+                    <span className="mr-4">导师：{course.instructor.name}</span>
                   </div>
                   
                   <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
@@ -249,7 +249,7 @@ export default function CoursesPage() {
                     </div>
                     <div className="flex items-center">
                       <Users className="w-4 h-4 mr-1" />
-                      <span>{course.students.toLocaleString()}</span>
+                      <span>{course.studentsCount.toLocaleString()}</span>
                     </div>
                     <div className="flex items-center">
                       <Star className="w-4 h-4 mr-1 text-yellow-400 fill-current" />

@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { supabase } from '@/lib/supabase';
 import { getEnvConfig } from '@/utils/envConfig';
@@ -327,17 +327,44 @@ export async function verifyRBAC(
 /**
  * 管理员权限验证中间件
  * @param req Next.js请求对象
+ * @param roles 允许的角色列表（可选，默认为管理员和超级管理员）
  * @param options 验证选项
  * @returns RBAC验证结果
  */
 export async function verifyAdminAccess(
   req: NextRequest,
+  roles?: string[] | {
+    checkDBRole?: boolean;
+    allowExpiredToken?: boolean;
+  },
   options?: {
     checkDBRole?: boolean;
     allowExpiredToken?: boolean;
   }
 ): Promise<RBACResult> {
-  return verifyRBAC(req, [UserRole.ADMIN, UserRole.SUPER_ADMIN], options);
+  // 处理参数重载
+  let allowedRoles: UserRole[];
+  let verifyOptions: { checkDBRole?: boolean; allowExpiredToken?: boolean } = {};
+
+  if (Array.isArray(roles)) {
+    // 如果第二个参数是角色数组
+    allowedRoles = roles.map(role => {
+      switch (role) {
+        case 'admin': return UserRole.ADMIN;
+        case 'teacher': return UserRole.TEACHER;
+        case 'student': return UserRole.USER;
+        case 'super_admin': return UserRole.SUPER_ADMIN;
+        default: return UserRole.USER;
+      }
+    });
+    verifyOptions = options || {};
+  } else {
+    // 如果第二个参数是选项对象或未提供
+    allowedRoles = [UserRole.ADMIN, UserRole.SUPER_ADMIN];
+    verifyOptions = (roles as any) || {};
+  }
+
+  return verifyRBAC(req, allowedRoles, verifyOptions);
 }
 
 /**

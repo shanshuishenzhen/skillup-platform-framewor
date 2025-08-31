@@ -1,6 +1,67 @@
 // /src/services/aiService.ts
 
-import OpenAI from 'openai';
+// DeepSeek API 客户端接口定义
+interface DeepSeekClient {
+  chat: {
+    completions: {
+      create(params: {
+        model: string;
+        messages: Array<{ role: string; content: string }>;
+        temperature?: number;
+        max_tokens?: number;
+        stream?: boolean;
+      }): Promise<{
+        choices: Array<{
+          message: {
+            content: string;
+          };
+        }>;
+      }>;
+    };
+  };
+}
+
+// DeepSeek API 客户端实现
+class DeepSeekAPI implements DeepSeekClient {
+  private apiKey: string;
+  private baseURL: string;
+  private timeout: number;
+  private maxRetries: number;
+
+  constructor(config: { apiKey: string; baseURL?: string; timeout?: number; maxRetries?: number }) {
+    this.apiKey = config.apiKey;
+    this.baseURL = config.baseURL || 'https://api.deepseek.com';
+    this.timeout = config.timeout || 30000;
+    this.maxRetries = config.maxRetries || 3;
+  }
+
+  chat = {
+    completions: {
+      create: async (params: {
+        model: string;
+        messages: Array<{ role: string; content: string }>;
+        temperature?: number;
+        max_tokens?: number;
+        stream?: boolean;
+      }) => {
+        const response = await fetch(`${this.baseURL}/v1/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.apiKey}`
+          },
+          body: JSON.stringify(params)
+        });
+
+        if (!response.ok) {
+          throw new Error(`DeepSeek API error: ${response.status} ${response.statusText}`);
+        }
+
+        return await response.json();
+      }
+    }
+  };
+}
 import {
   ErrorType,
   ErrorSeverity,
@@ -27,12 +88,14 @@ export interface AIServiceConfig {
 export interface CourseData {
   title: string;
   description: string;
-  content: string;
+  instructor: {
+    name: string;
+    bio: string;
+  };
+  chapters: string[];
   difficulty: 'beginner' | 'intermediate' | 'advanced';
   duration: number; // 预估学习时长（分钟）
   tags: string[];
-  objectives: string[]; // 学习目标
-  prerequisites?: string[]; // 前置要求
 }
 
 /**
@@ -56,25 +119,25 @@ export class AIServiceError extends AppError {
 }
 
 /**
- * AI服务类 - 提供OpenAI API集成功能
+ * AI服务类 - 提供DeepSeek API集成功能
  * @class AIService
  */
 class AIService {
-  private openai: OpenAI | null = null;
+  private deepseek: DeepSeekClient | null = null;
   private config: AIServiceConfig;
   private isInitialized = false;
 
   constructor() {
     this.config = {
-      apiKey: process.env.OPENAI_API_KEY || '',
-      baseURL: process.env.OPENAI_BASE_URL,
-      timeout: parseInt(process.env.OPENAI_TIMEOUT || '30000'),
-      maxRetries: parseInt(process.env.OPENAI_MAX_RETRIES || '3')
+      apiKey: process.env.DEEPSEEK_API_KEY || '',
+      baseURL: process.env.DEEPSEEK_BASE_URL,
+      timeout: parseInt(process.env.DEEPSEEK_TIMEOUT || '30000'),
+      maxRetries: parseInt(process.env.DEEPSEEK_MAX_RETRIES || '3')
     };
   }
 
   /**
-   * 初始化OpenAI客户端
+   * 初始化DeepSeek客户端
    * @private
    * @throws {AIServiceError} 当API密钥未配置时抛出错误
    */
@@ -83,13 +146,13 @@ class AIService {
 
     if (!this.config.apiKey) {
       throw new AIServiceError(
-        'OpenAI API密钥未配置，请在环境变量中设置OPENAI_API_KEY',
+        'DeepSeek API密钥未配置，请在环境变量中设置DEEPSEEK_API_KEY',
         'MISSING_API_KEY'
       );
     }
 
     try {
-      this.openai = new OpenAI({
+      this.deepseek = new DeepSeekAPI({
         apiKey: this.config.apiKey,
         baseURL: this.config.baseURL,
         timeout: this.config.timeout,
@@ -98,7 +161,7 @@ class AIService {
       this.isInitialized = true;
     } catch (error) {
       throw new AIServiceError(
-        `OpenAI客户端初始化失败: ${error instanceof Error ? error.message : '未知错误'}`,
+        `DeepSeek客户端初始化失败: ${error instanceof Error ? error.message : '未知错误'}`,
         'INITIALIZATION_FAILED'
       );
     }
@@ -160,7 +223,7 @@ class AIService {
       const tagsLine = this.extractField(lines, ['标签', 'tags', '关键词']);
       const tags = tagsLine ? tagsLine.split(/[,，、]/).map(tag => tag.trim()).filter(tag => tag) : [industry];
 
-      return {
+      return this.validateCourseData({
         title,
         description,
         instructor: {
@@ -171,7 +234,7 @@ class AIService {
         difficulty,
         duration,
         tags
-      };
+      });
     } catch (error) {
       console.warn('解析AI响应失败，使用默认格式:', error);
       return this.getDefaultCourseData(industry);
@@ -206,16 +269,35 @@ class AIService {
    * @returns CourseData 验证后的课程数据
    */
   private validateCourseData(data: Record<string, unknown>): CourseData {
+    // 解析 duration 字段，支持字符串转数字
+    let duration = 480; // 默认8小时（480分钟）
+    if (typeof data.duration === 'number') {
+      duration = data.duration;
+    } else if (typeof data.duration === 'string') {
+      // 尝试从字符串中提取数字（如 "8周" -> 480分钟，"2小时" -> 120分钟）
+      const weekMatch = data.duration.match(/(\d+)周/);
+      const hourMatch = data.duration.match(/(\d+)小时/);
+      const minuteMatch = data.duration.match(/(\d+)分钟/);
+      
+      if (weekMatch) {
+        duration = parseInt(weekMatch[1]) * 60; // 每周按60分钟计算
+      } else if (hourMatch) {
+        duration = parseInt(hourMatch[1]) * 60;
+      } else if (minuteMatch) {
+        duration = parseInt(minuteMatch[1]);
+      }
+    }
+
     return {
-      title: data.title || '未命名课程',
-      description: data.description || '课程描述',
+      title: (data.title as string) || '未命名课程',
+      description: (data.description as string) || '课程描述',
       instructor: {
-        name: data.instructor?.name || 'AI讲师',
-        bio: data.instructor?.bio || '经验丰富的专业讲师'
+        name: (data.instructor as any)?.name || 'AI讲师',
+        bio: (data.instructor as any)?.bio || '经验丰富的专业讲师'
       },
       chapters: Array.isArray(data.chapters) ? data.chapters : ['基础概念', '实践应用', '高级技巧'],
-      difficulty: ['beginner', 'intermediate', 'advanced'].includes(data.difficulty) ? data.difficulty : 'intermediate',
-      duration: data.duration || '8周',
+      difficulty: ['beginner', 'intermediate', 'advanced'].includes(data.difficulty as string) ? (data.difficulty as CourseData['difficulty']) : 'intermediate',
+      duration,
       tags: Array.isArray(data.tags) ? data.tags : []
     };
   }
@@ -240,7 +322,7 @@ class AIService {
         `${industry}高级技巧与发展趋势`
       ],
       difficulty: 'intermediate',
-      duration: '8周',
+      duration: 480, // 8小时（480分钟）
       tags: [industry, '专业课程', '实践应用']
     };
   }
@@ -260,10 +342,10 @@ class AIService {
   ): Promise<CourseData> {
     this.initialize();
 
-    if (!this.openai) {
+    if (!this.deepseek) {
       throw createError(
         ErrorType.AI_SERVICE_ERROR,
-        'OpenAI客户端未初始化',
+        'DeepSeek客户端未初始化',
         {
           code: 'CLIENT_NOT_INITIALIZED',
           statusCode: 500,
@@ -306,8 +388,8 @@ ${customRequirements ? `\n额外要求：${customRequirements}` : ''}
 \`\`\``;
 
     return withRetry(async () => {
-      const response = await this.openai!.chat.completions.create({
-        model: 'gpt-3.5-turbo',
+      const response = await this.deepseek!.chat.completions.create({
+        model: 'deepseek-chat',
         messages: [
           {
             role: 'system',
@@ -352,10 +434,10 @@ ${customRequirements ? `\n额外要求：${customRequirements}` : ''}
   ): Promise<CourseData> {
     this.initialize();
 
-    if (!this.openai) {
+    if (!this.deepseek) {
       throw createError(
         ErrorType.AI_SERVICE_ERROR,
-        'OpenAI客户端未初始化',
+        'DeepSeek客户端未初始化',
         {
           code: 'CLIENT_NOT_INITIALIZED',
           statusCode: 500,
@@ -386,8 +468,8 @@ ${JSON.stringify(courseData, null, 2)}
 请以相同的JSON格式返回优化后的课程内容。`;
 
     return withRetry(async () => {
-      const response = await this.openai!.chat.completions.create({
-        model: 'gpt-3.5-turbo',
+      const response = await this.deepseek!.chat.completions.create({
+        model: 'deepseek-chat',
         messages: [
           {
             role: 'system',
@@ -470,12 +552,11 @@ export async function generateFakeCourse(
         '未来发展趋势展望'
       ],
       difficulty,
-      duration: '8周',
+      duration: 480, // 8周课程，按每周1小时计算
       tags: [industry, '数字化转型', '企业管理']
     };
   }
 }
 
-// 导出AI服务实例和相关类型
+// 导出AI服务实例
 export { aiService, AIService };
-export type { CourseData, AIServiceConfig };

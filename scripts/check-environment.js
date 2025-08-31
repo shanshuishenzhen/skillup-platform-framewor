@@ -44,17 +44,18 @@ function loadConfig() {
 // 检查Node.js版本
 function checkNodeVersion(requiredVersion) {
   log('\n📋 检查Node.js版本...', 'blue');
-  
+
   try {
     const nodeVersion = process.version;
     log(`当前版本: ${nodeVersion}`, 'blue');
     log(`要求版本: ${requiredVersion}`, 'blue');
-    
-    if (semver.gte(nodeVersion, requiredVersion)) {
+
+    // 使用semver.satisfies来检查版本范围
+    if (semver.satisfies(nodeVersion, requiredVersion)) {
       log('✅ Node.js版本检查通过', 'green');
       return true;
     } else {
-      log(`❌ Node.js版本过低，需要 ${requiredVersion} 或更高版本`, 'red');
+      log(`❌ Node.js版本不满足要求，需要 ${requiredVersion}`, 'red');
       return false;
     }
   } catch (error) {
@@ -66,17 +67,18 @@ function checkNodeVersion(requiredVersion) {
 // 检查npm版本
 function checkNpmVersion(requiredVersion) {
   log('\n📋 检查npm版本...', 'blue');
-  
+
   try {
     const npmVersion = execSync('npm --version', { encoding: 'utf8' }).trim();
     log(`当前版本: ${npmVersion}`, 'blue');
     log(`要求版本: ${requiredVersion}`, 'blue');
-    
-    if (semver.gte(npmVersion, requiredVersion)) {
+
+    // 使用semver.satisfies来检查版本范围
+    if (semver.satisfies(npmVersion, requiredVersion)) {
       log('✅ npm版本检查通过', 'green');
       return true;
     } else {
-      log(`❌ npm版本过低，需要 ${requiredVersion} 或更高版本`, 'red');
+      log(`❌ npm版本不满足要求，需要 ${requiredVersion}`, 'red');
       return false;
     }
   } catch (error) {

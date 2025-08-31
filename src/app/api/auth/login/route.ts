@@ -61,25 +61,15 @@ export async function POST(request: NextRequest) {
       });
     } else {
       return NextResponse.json(
-        { error: result.error },
+        { error: result.message },
         { status: 401 }
       );
     }
   } catch (error) {
-    // 使用统一的错误处理机制
-    if (error instanceof AppError) {
-      return ErrorHandler.handleApiError(error);
-    }
-    
-    // 处理未知错误
-    const apiError = new AppError(
-      '用户登录失败',
-      ErrorType.API_ERROR,
-      500,
-      'USER_LOGIN_ERROR',
-      { originalError: error instanceof Error ? error.message : String(error) }
+    console.error('用户登录API错误:', error);
+    return NextResponse.json(
+      { error: '服务器内部错误' },
+      { status: 500 }
     );
-    
-    return ErrorHandler.handleApiError(apiError);
   }
 }

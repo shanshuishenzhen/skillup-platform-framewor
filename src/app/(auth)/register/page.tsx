@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense, ChangeEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,7 @@ import { Eye, EyeOff, Phone, Lock, MessageSquare, Loader2, AlertCircle } from 'l
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login, isLoggedIn } = useAuth();
@@ -164,7 +164,7 @@ export default function RegisterPage() {
                   type="tel"
                   placeholder="请输入手机号"
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, phone: e.target.value })}
                   className="pl-10"
                   required
                   disabled={loading}
@@ -182,7 +182,7 @@ export default function RegisterPage() {
                     type="text"
                     placeholder="请输入验证码"
                     value={formData.smsCode}
-                    onChange={(e) => setFormData({ ...formData, smsCode: e.target.value })}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, smsCode: e.target.value })}
                     className="pl-10"
                     required
                     disabled={loading}
@@ -209,7 +209,7 @@ export default function RegisterPage() {
                   type={showPassword ? 'text' : 'password'}
                   placeholder="请输入密码（至少6位）"
                   value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, password: e.target.value })}
                   className="pl-10 pr-10"
                   required
                   minLength={6}
@@ -249,5 +249,13 @@ export default function RegisterPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">加载中...</div>}>
+      <RegisterForm />
+    </Suspense>
   );
 }

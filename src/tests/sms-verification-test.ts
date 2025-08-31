@@ -177,11 +177,11 @@ async function testRegisterFlow(verificationCode: string): Promise<{ success: bo
   const codeToUse = sendResult.code || verificationCode;
   
   // 尝试注册用户
-  const registerResult = await registerUser({
-    phone: TEST_CONFIG.testPhone,
-    password: TEST_CONFIG.testPassword,
-    smsCode: codeToUse
-  });
+  const registerResult = await registerUser(
+    TEST_CONFIG.testPhone,
+    TEST_CONFIG.testPassword,
+    codeToUse
+  );
 
   if (!registerResult.success) {
     throw new Error(`用户注册失败: ${registerResult.message}`);
@@ -189,7 +189,7 @@ async function testRegisterFlow(verificationCode: string): Promise<{ success: bo
 
   return {
     success: registerResult.success,
-    message: registerResult.message,
+    message: registerResult.message || '注册失败',
     user: registerResult.user,
     phone: TEST_CONFIG.testPhone
   };
@@ -364,16 +364,16 @@ export async function runSmsVerificationTests(): Promise<TestReport> {
   // 测试1: 发送短信验证码API
   const apiTest = await runTest('发送短信验证码API', testSendSmsApi);
   results.push(apiTest);
-  if (apiTest.success && apiTest.data?.code) {
-    verificationCode = apiTest.data.code;
+  if (apiTest.success && (apiTest.data as any)?.code) {
+    verificationCode = (apiTest.data as any).code;
     console.log(`📱 获取到验证码: ${verificationCode}`);
   }
   
   // 测试2: 短信验证码服务
   const serviceTest = await runTest('短信验证码服务发送功能', testSmsService);
   results.push(serviceTest);
-  if (serviceTest.success && serviceTest.data?.code && !verificationCode) {
-    verificationCode = serviceTest.data.code;
+  if (serviceTest.success && (serviceTest.data as any)?.code && !verificationCode) {
+    verificationCode = (serviceTest.data as any).code;
     console.log(`📱 从服务获取到验证码: ${verificationCode}`);
   }
   

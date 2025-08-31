@@ -138,7 +138,15 @@ async function checkBatchOperationPermission(
 /**
  * 验证批量操作数据
  */
-function validateBatchOperationData(operation: string, data: any): { isValid: boolean; message?: string } {
+interface BatchOperationData {
+  status?: string;
+  role?: string;
+  department?: string;
+  learning_level?: string;
+  certification_status?: string;
+}
+
+function validateBatchOperationData(operation: string, data: BatchOperationData): { isValid: boolean; message?: string } {
   switch (operation) {
     case 'update_status':
       if (!data?.status || !['active', 'inactive', 'suspended'].includes(data.status)) {
@@ -182,13 +190,22 @@ export async function GET(request: NextRequest) {
     // 检查管理员权限
     const rbacResult = await verifyAdminAccess(request);
     if (!rbacResult.success) {
-      return rbacResult.response;
+      return NextResponse.json(
+        { success: false, error: rbacResult.message || '权限验证失败' },
+        { status: 403 }
+      );
     }
 
     // 解析查询参数
     const { searchParams } = new URL(request.url);
     const queryParams = Object.fromEntries(searchParams.entries());
-    
+
+    // 为ids_only请求提供默认的page和limit参数
+    if (queryParams.ids_only === 'true') {
+      queryParams.page = queryParams.page || '1';
+      queryParams.limit = queryParams.limit || '20';
+    }
+
     const {
       page,
       limit,
@@ -243,18 +260,21 @@ export async function GET(request: NextRequest) {
     if (search) {
       query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%,employee_id.ilike.%${search}%`);
     }
-    
+
     if (department) {
       query = query.eq('department', department);
     }
-    
+
     if (role) {
       query = query.eq('role', role);
     }
-    
+
     if (status) {
       // 直接使用 status 字段过滤用户状态
       query = query.eq('status', status);
+    } else {
+      // 默认只显示活跃用户，过滤掉已删除的用户
+      query = query.neq('status', 'inactive');
     }
     
     if (learning_level) {
@@ -323,7 +343,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         data: {
-          user_ids: users?.map(user => user.id) || [],
+          user_ids: users?.map((user: any) => user.id) || [],
           total: users?.length || 0
         }
       });
@@ -422,7 +442,10 @@ export async function POST(request: NextRequest) {
     // 检查管理员权限
     const rbacResult = await verifyAdminAccess(request);
     if (!rbacResult.success) {
-      return rbacResult.response;
+      return NextResponse.json(
+        { success: false, error: rbacResult.message || '权限验证失败' },
+        { status: 403 }
+      );
     }
 
     const body = await request.json();
@@ -526,7 +549,10 @@ export async function PUT(request: NextRequest) {
     // 检查管理员权限
     const rbacResult = await verifyAdminAccess(request);
     if (!rbacResult.success) {
-      return rbacResult.response;
+      return NextResponse.json(
+        { success: false, error: rbacResult.message || '权限验证失败' },
+        { status: 403 }
+      );
     }
 
     const body = await request.json();
@@ -534,7 +560,7 @@ export async function PUT(request: NextRequest) {
 
     // 检查批量操作权限
     const batchPermissionResult = await checkBatchOperationPermission(
-      rbacResult.user.role,
+      (rbacResult.user as any)?.role || 'user',
       operation,
       user_ids
     );
@@ -547,7 +573,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // 验证批量操作数据
-    const dataValidationResult = validateBatchOperationData(operation, data);
+    const dataValidationResult = validateBatchOperationData(operation, data || {});
     if (!dataValidationResult.isValid) {
       return NextResponse.json(
         { error: dataValidationResult.message || '数据验证失败' },
@@ -555,7 +581,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    let updateData: Record<string, unknown> = {
+    const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString()
     };
 
@@ -694,8 +720,8 @@ export async function PUT(request: NextRequest) {
     // 记录批量操作日志
     const logData = {
       operation_type: 'batch_operation',
-      operator_id: rbacResult.user.id,
-      operator_role: rbacResult.user.role,
+      operator_id: (rbacResult.user as any)?.id || 'unknown',
+      operator_role: (rbacResult.user as any)?.role || 'unknown',
       operation: operation,
       affected_user_count: result?.length || 0,
       affected_user_ids: user_ids,
@@ -743,15 +769,15 @@ export async function PUT(request: NextRequest) {
     try {
       const errorLogData = {
         operation_type: 'batch_operation',
-        operator_id: rbacResult?.user?.id,
-        operator_role: rbacResult?.user?.role,
-        operation: operation || 'unknown',
+        operator_id: 'unknown',
+        operator_role: 'unknown',
+        operation: 'unknown',
         affected_user_count: 0,
-        affected_user_ids: user_ids || [],
+        affected_user_ids: [],
         operation_description: '批量操作失败',
-        operation_data: data,
-        ip_address: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
-        user_agent: request.headers.get('user-agent') || 'unknown',
+        operation_data: {},
+        ip_address: 'unknown',
+        user_agent: 'unknown',
         success: false,
         error_message: error instanceof Error ? error.message : '未知错误'
       };

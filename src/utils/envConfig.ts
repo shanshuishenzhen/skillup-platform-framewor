@@ -171,8 +171,8 @@ class EnvConfigManager extends EventEmitter {
         required: true,
         type: 'string',
         pattern: /^https?:\/\/.+/,
-        validator: (value: string) => {
-          if (!value.includes('supabase')) {
+        validator: (value: unknown) => {
+          if (typeof value !== 'string' || !value.includes('supabase')) {
             return '必须是有效的Supabase URL';
           }
           return true;
@@ -182,8 +182,8 @@ class EnvConfigManager extends EventEmitter {
         required: true,
         type: 'string',
         min: 100,
-        validator: (value: string) => {
-          if (!value.startsWith('eyJ')) {
+        validator: (value: unknown) => {
+          if (typeof value !== 'string' || !value.startsWith('eyJ')) {
             return '必须是有效的Supabase匿名密钥';
           }
           return true;
@@ -193,8 +193,8 @@ class EnvConfigManager extends EventEmitter {
         required: true,
         type: 'string',
         min: 100,
-        validator: (value: string) => {
-          if (!value.startsWith('eyJ')) {
+        validator: (value: unknown) => {
+          if (typeof value !== 'string' || !value.startsWith('eyJ')) {
             return '必须是有效的Supabase服务角色密钥';
           }
           return true;
@@ -204,8 +204,8 @@ class EnvConfigManager extends EventEmitter {
         required: true,
         type: 'string',
         min: 32,
-        validator: (value: string) => {
-          if (!/^[a-fA-F0-9]{64}$/.test(value)) {
+        validator: (value: unknown) => {
+          if (typeof value !== 'string' || !/^[a-fA-F0-9]{64}$/.test(value)) {
             return '必须是64位十六进制字符串';
           }
           return true;
@@ -348,7 +348,7 @@ class EnvConfigManager extends EventEmitter {
           }
           break;
         case 'boolean':
-          if (!['true', 'false', '1', '0'].includes(value.toLowerCase())) {
+          if (typeof value !== 'string' || !['true', 'false', '1', '0'].includes(value.toLowerCase())) {
             return `环境变量 ${key} 必须是布尔值 (true/false/1/0)`;
           }
           break;
@@ -372,7 +372,7 @@ class EnvConfigManager extends EventEmitter {
     }
     
     // 正则表达式验证
-    if (rule.pattern && !rule.pattern.test(value)) {
+    if (rule.pattern && typeof value === 'string' && !rule.pattern.test(value)) {
       return `环境变量 ${key} 格式不正确`;
     }
     

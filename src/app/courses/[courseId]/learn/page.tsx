@@ -4,8 +4,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, BookOpen, Clock, CheckCircle, PlayCircle } from 'lucide-react';
 import VideoPlayer from '@/components/VideoPlayer';
-import { getCourseById, getCourseChapters } from '@/services/courseService';
-import { useLearningProgress } from '@/hooks/useLearningProgress';
+import { getCourseById, getCourseChapters, type Course, type Chapter } from '@/services/courseService';
+import { useLearningProgress, type CourseProgress, type LearningProgress } from '@/hooks/useLearningProgress';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
@@ -20,18 +20,18 @@ export default function CourseLearnPage() {
   const courseId = params.courseId as string;
 
   // 状态管理
-  const [course, setCourse] = useState<Record<string, unknown> | null>(null);
-  const [currentLesson, setCurrentLesson] = useState<Record<string, unknown> | null>(null);
-  const [lessons, setLessons] = useState<Array<Record<string, unknown>>>([]);
+  const [course, setCourse] = useState<Course | null>(null);
+  const [currentLesson, setCurrentLesson] = useState<Chapter | null>(null);
+  const [lessons, setLessons] = useState<Chapter[]>([]);
   const {
     getLessonProgress: fetchLessonProgress,
-    getCourseProgress: fetchCourseProgress,
-    saveLearningProgress,
-    markLessonCompleted
+    getCourseProgress,
+    saveProgress,
+    markLessonCompleted,
   } = useLearningProgress();
   
-  const [courseProgress, setCourseProgress] = useState<Record<string, unknown> | null>(null);
-  const [lessonProgress, setLessonProgress] = useState<Record<string, unknown> | null>(null);
+  const [courseProgress, setCourseProgress] = useState<CourseProgress | null>(null);
+  const [lessonProgress, setLessonProgress] = useState<LearningProgress | null>(null);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -52,28 +52,28 @@ export default function CourseLearnPage() {
           getCourseChapters(courseId)
         ]);
 
-        if (!courseData.success || !lessonsData.success) {
+        if (!courseData || !lessonsData) {
           toast.error('加载课程信息失败');
           router.push('/courses');
           return;
         }
 
-        setCourse(courseData.data);
-        setLessons(lessonsData.data);
+        setCourse(courseData);
+        setLessons(lessonsData);
 
         // 加载课程进度
-        const progressResult = await fetchCourseProgress(user.id, courseId);
-        if (progressResult.success) {
-          setCourseProgress(progressResult.data);
+        const progressResult = await getCourseProgress(courseId);
+        if (progressResult) {
+          setCourseProgress(progressResult);
         }
 
-        // 设置当前课时（优先选择未完成的课时）
-        const uncompletedLesson = lessonsData.data.find((lesson: Record<string, unknown>) => {
-          const progress = progressResult.data?.lessons?.find((p: Record<string, unknown>) => p.lessonId === lesson.id);
-          return !progress?.isCompleted;
-        });
+        // 设置当前课时（选择第一个课时或最后观看的课时）
+        const lastWatchedLesson = progressResult?.lastWatchedLessonId 
+          ? lessonsData.find((lesson: Chapter) => lesson.id === progressResult.lastWatchedLessonId)
+          : null;
+        const uncompletedLesson = lastWatchedLesson || lessonsData[0];
         
-        const initialLesson = uncompletedLesson || lessonsData.data[0];
+        const initialLesson = uncompletedLesson || lessonsData[0];
         if (initialLesson) {
           await selectLesson(initialLesson);
         }
@@ -88,13 +88,13 @@ export default function CourseLearnPage() {
     };
 
     initializeCourse();
-  }, [courseId, user, fetchCourseProgress, router, selectLesson]);
+  }, [courseId, user, getCourseProgress, router]);
 
   /**
    * 选择课时
    * @param lesson 选中的课时对象
    */
-  const selectLesson = useCallback(async (lesson: Record<string, unknown>) => {
+  const selectLesson = useCallback(async (lesson: Chapter) => {
     if (!user) return;
 
     try {
@@ -102,13 +102,12 @@ export default function CourseLearnPage() {
 
       // 加载该课时的学习进度
       const progressResult = await fetchLessonProgress(
-        user.id,
         courseId,
         lesson.id
       );
 
-      if (progressResult.success) {
-        setLessonProgress(progressResult.data);
+      if (progressResult) {
+        setLessonProgress(progressResult);
       } else {
         setLessonProgress(null);
       }
@@ -130,26 +129,31 @@ export default function CourseLearnPage() {
     if (!user || !currentLesson) return;
 
     try {
-      const result = await saveLearningProgress({
-        userId: user.id,
+      const result = await saveProgress(
         courseId,
-        lessonId: currentLesson.id,
-        currentTime: progress.currentTime,
-        duration: progress.duration,
-        progressPercentage: (progress.currentTime / progress.duration) * 100,
-        completed: progress.isCompleted
-      });
+        currentLesson.id,
+        progress.currentTime,
+        progress.duration,
+        progress.isCompleted
+      );
 
-      if (result.success) {
-        setLessonProgress(result.data);
+      if (result) {
+        // 重新获取课时进度
+        const progressResult = await fetchLessonProgress(
+          courseId,
+          currentLesson.id
+        );
+        if (progressResult) {
+          setLessonProgress(progressResult);
+        }
         
         // 如果课时完成，标记为已完成并更新课程进度
         if (progress.isCompleted) {
-          await markLessonCompleted(user.id, courseId, currentLesson.id);
+          await markLessonCompleted(courseId, currentLesson.id);
           
-          const courseProgressResult = await fetchCourseProgress(user.id, courseId);
-          if (courseProgressResult.success) {
-            setCourseProgress(courseProgressResult.data);
+          const courseProgressResult = await getCourseProgress(courseId);
+          if (courseProgressResult) {
+            setCourseProgress(courseProgressResult);
           }
           
           toast.success('课时学习完成！');
@@ -191,8 +195,8 @@ export default function CourseLearnPage() {
    * @returns 进度百分比
    */
   const getLessonProgress = (lessonId: string): number => {
-    const progress = courseProgress?.lessons?.find((p: Record<string, unknown>) => p.lessonId === lessonId);
-    return (progress?.progressPercentage as number) || 0;
+    // 基于课程整体进度计算单个课时进度
+    return courseProgress ? courseProgress.overallProgress : 0;
   };
 
   /**
@@ -201,8 +205,8 @@ export default function CourseLearnPage() {
    * @returns 是否已完成
    */
   const isLessonCompleted = (lessonId: string): boolean => {
-    const progress = courseProgress?.lessons?.find((p: Record<string, unknown>) => p.lessonId === lessonId);
-    return (progress?.isCompleted as boolean) || false;
+    // 检查当前课时进度是否为已完成状态
+    return lessonProgress?.isCompleted || false;
   };
 
   if (loading) {
@@ -253,7 +257,7 @@ export default function CourseLearnPage() {
           <div className="flex items-center space-x-4">
             {courseProgress && (
               <div className="text-sm text-gray-600">
-                进度: {Math.round(courseProgress.progressPercentage)}%
+                进度: {Math.round(courseProgress.overallProgress)}%
               </div>
             )}
             <button
@@ -273,13 +277,22 @@ export default function CourseLearnPage() {
             {/* 视频播放器 */}
             <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-6">
               <VideoPlayer
-                src={currentLesson.video_url}
+                src={currentLesson.videos?.[0]?.videoUrl || ''}
                 title={currentLesson.title}
-                userId={user.id}
                 courseId={courseId}
                 lessonId={currentLesson.id}
-                initialProgress={lessonProgress}
-                onProgressUpdate={handleProgressUpdate}
+                initialTime={lessonProgress?.currentTimeSeconds || 0}
+                onProgressChange={(currentTime: number, duration: number) => {
+                  handleProgressUpdate({
+                    currentTime,
+                    duration,
+                    isCompleted: currentTime >= duration * 0.95 // 播放95%以上视为完成
+                  });
+                }}
+                onLessonComplete={() => {
+                  // 课时完成回调
+                  console.log('课时完成:', currentLesson.id);
+                }}
               />
             </div>
 
@@ -297,7 +310,7 @@ export default function CourseLearnPage() {
                     </div>
                     <div className="flex items-center">
                       <PlayCircle className="h-4 w-4 mr-1" />
-                      {currentLesson.order} / {lessons.length}
+                      {currentLesson.orderIndex} / {lessons.length}
                     </div>
                   </div>
                 </div>
@@ -329,12 +342,12 @@ export default function CourseLearnPage() {
               <div className="mt-2">
                 <div className="flex justify-between text-sm text-gray-600 mb-1">
                   <span>整体进度</span>
-                  <span>{Math.round(courseProgress.progressPercentage)}%</span>
+                  <span>{Math.round(courseProgress.overallProgress)}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div 
                     className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${courseProgress.progressPercentage}%` }}
+                    style={{ width: `${courseProgress.overallProgress}%` }}
                   ></div>
                 </div>
               </div>
@@ -342,7 +355,7 @@ export default function CourseLearnPage() {
           </div>
           
           <div className="overflow-y-auto h-[calc(100%-5rem)]">
-            {lessons.map((lesson: Record<string, unknown>, index: number) => {
+            {lessons.map((lesson: Chapter, index: number) => {
               const progress = getLessonProgress(lesson.id);
               const completed = isLessonCompleted(lesson.id);
               const isCurrent = currentLesson.id === lesson.id;

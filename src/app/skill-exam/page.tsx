@@ -2,59 +2,27 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { FileText, Clock, Users, Award, Calendar, CheckCircle, AlertCircle, Trophy, BookOpen } from 'lucide-react'
+import { FileText, Clock, Users, Award, Calendar, CheckCircle, AlertCircle, Trophy, BookOpen, Play, Eye, Star, Target } from 'lucide-react'
+import { toast } from 'sonner'
+
+// 导入考试相关类型
+import { Exam as ExamType, ExamQueryParams, ExamListResponse } from '@/types/exam'
 
 /**
- * 考试信息接口定义
- * @interface Exam
- * @property {string} id - 考试唯一标识
- * @property {string} title - 考试标题
- * @property {string} description - 考试描述
- * @property {string} category - 考试分类
- * @property {string} level - 考试级别
- * @property {number} duration - 考试时长（分钟）
- * @property {number} totalQuestions - 题目总数
- * @property {number} passingScore - 及格分数
- * @property {number} fee - 考试费用
- * @property {string} examDate - 考试日期
- * @property {string} registrationDeadline - 报名截止日期
- * @property {number} registeredCount - 已报名人数
- * @property {number} maxCapacity - 最大容量
- * @property {string} status - 考试状态
- * @property {string[]} skills - 考核技能
- * @property {boolean} isCertified - 是否颁发证书
+ * 考试信息接口定义（扩展原有类型）
  */
-interface Exam {
-  id: string
-  title: string
-  description: string
-  category: string
-  level: string
-  duration: number
-  totalQuestions: number
-  passingScore: number
-  fee: number
-  examDate: string
+interface Exam extends Omit<ExamType, 'startTime' | 'endTime' | 'registrationDeadline' | 'difficulty' | 'status'> {
+  level: string // 映射 difficulty 到 level
+  examDate: string // 映射 startTime 到 examDate
   registrationDeadline: string
-  registeredCount: number
-  maxCapacity: number
+  registeredCount: number // 报名人数
+  maxCapacity: number // 最大容量
   status: 'upcoming' | 'registration' | 'closed' | 'completed'
-  skills: string[]
-  isCertified: boolean
+  isCertified: boolean // 是否颁发证书
 }
 
 /**
  * 考试记录接口定义
- * @interface ExamRecord
- * @property {string} examId - 考试ID
- * @property {string} examTitle - 考试标题
- * @property {number} score - 考试分数
- * @property {number} totalScore - 总分
- * @property {string} status - 考试状态
- * @property {string} examDate - 考试日期
- * @property {string} completedAt - 完成时间
- * @property {boolean} passed - 是否通过
- * @property {string} certificateUrl - 证书链接
  */
 interface ExamRecord {
   examId: string
@@ -66,6 +34,9 @@ interface ExamRecord {
   completedAt?: string
   passed: boolean
   certificateUrl?: string
+  registrationStatus?: 'pending' | 'approved' | 'rejected'
+  canStart?: boolean
+  remainingAttempts?: number
 }
 
 /**
@@ -248,15 +219,88 @@ export default function SkillExamPage() {
   }
 
   /**
+   * 加载考试列表
+   */
+  const loadExams = async () => {
+    try {
+      const params: ExamQueryParams = {
+        page: 1,
+        limit: 50,
+        status: 'published',
+        includeExpired: false
+      }
+
+      const response = await fetch(`/api/exams?${new URLSearchParams(params as any)}`)
+      const result = await response.json()
+
+      if (result.success) {
+        // 转换数据格式以适配现有界面
+        const transformedExams: Exam[] = result.data.exams.map((exam: ExamType) => ({
+          ...exam,
+          level: exam.difficulty === 'beginner' ? '初级' :
+                 exam.difficulty === 'intermediate' ? '中级' : '高级',
+          examDate: new Date(exam.startTime).toISOString().split('T')[0],
+          registeredCount: Math.floor(Math.random() * 200), // 临时模拟数据
+          maxCapacity: 200,
+          status: getExamStatus(exam),
+          isCertified: true
+        }))
+        setExams(transformedExams)
+      } else {
+        // 如果API失败，使用模拟数据
+        setExams(generateMockExams())
+      }
+    } catch (error) {
+      console.error('加载考试列表失败:', error)
+      // 使用模拟数据作为后备
+      setExams(generateMockExams())
+    }
+  }
+
+  /**
+   * 加载用户考试记录
+   */
+  const loadExamRecords = async () => {
+    try {
+      // 这里应该调用用户考试记录API
+      // 暂时使用模拟数据
+      setExamRecords(generateMockExamRecords())
+    } catch (error) {
+      console.error('加载考试记录失败:', error)
+      setExamRecords(generateMockExamRecords())
+    }
+  }
+
+  /**
+   * 获取考试状态
+   */
+  const getExamStatus = (exam: ExamType): 'upcoming' | 'registration' | 'closed' | 'completed' => {
+    const now = new Date()
+    const startTime = new Date(exam.startTime)
+    const endTime = new Date(exam.endTime)
+    const registrationDeadline = new Date(exam.registrationDeadline)
+
+    if (now > endTime) {
+      return 'completed'
+    } else if (now > registrationDeadline) {
+      return 'closed'
+    } else if (now < startTime) {
+      return 'registration'
+    } else {
+      return 'upcoming'
+    }
+  }
+
+  /**
    * 组件初始化时加载数据
    */
   useEffect(() => {
     const loadData = async () => {
       setLoading(true)
-      // 模拟API调用延迟
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      setExams(generateMockExams())
-      setExamRecords(generateMockExamRecords())
+      await Promise.all([
+        loadExams(),
+        loadExamRecords()
+      ])
       setLoading(false)
     }
     loadData()
@@ -306,6 +350,59 @@ export default function SkillExamPage() {
       case 'closed': return 'bg-red-100 text-red-800'
       case 'completed': return 'bg-gray-100 text-gray-800'
       default: return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  /**
+   * 处理考试报名
+   */
+  const handleRegister = async (examId: string) => {
+    try {
+      const response = await fetch(`/api/exams/${examId}/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        toast.success(result.message || '报名成功')
+        // 重新加载考试记录
+        await loadExamRecords()
+      } else {
+        toast.error(result.message || '报名失败')
+      }
+    } catch (error) {
+      console.error('报名失败:', error)
+      toast.error('报名失败，请重试')
+    }
+  }
+
+  /**
+   * 处理开始考试
+   */
+  const handleStartExam = async (examId: string) => {
+    try {
+      const response = await fetch(`/api/exams/${examId}/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        // 跳转到考试页面
+        window.location.href = `/skill-exam/${examId}/take`
+      } else {
+        toast.error(result.message || '开始考试失败')
+      }
+    } catch (error) {
+      console.error('开始考试失败:', error)
+      toast.error('开始考试失败，请重试')
     }
   }
 
@@ -402,7 +499,10 @@ export default function SkillExamPage() {
             </div>
             <div className="flex space-x-2">
               {isRegistrationOpen ? (
-                <button className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+                <button
+                  onClick={() => handleRegister(exam.id)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                >
                   立即报名
                 </button>
               ) : isUpcoming ? (
@@ -414,9 +514,11 @@ export default function SkillExamPage() {
                   考试已结束
                 </button>
               )}
-              <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors">
-                查看详情
-              </button>
+              <Link href={`/skill-exam/${exam.id}`}>
+                <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors">
+                  查看详情
+                </button>
+              </Link>
             </div>
           </div>
         </div>
@@ -481,27 +583,52 @@ export default function SkillExamPage() {
         
         <div className="flex space-x-2">
           {record.status === 'completed' && record.passed && record.certificateUrl && (
-            <button className="flex items-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors">
+            <button
+              onClick={() => window.open(record.certificateUrl, '_blank')}
+              className="flex items-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+            >
               <Award className="w-4 h-4 mr-1" />
               下载证书
             </button>
           )}
-          {record.status === 'registered' && (
-            <button className="flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
-              <BookOpen className="w-4 h-4 mr-1" />
+          {record.status === 'registered' && record.canStart && (
+            <button
+              onClick={() => handleStartExam(record.examId)}
+              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+            >
+              <Play className="w-4 h-4 mr-1" />
               开始考试
             </button>
           )}
-          <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors">
-            查看详情
-          </button>
+          {record.status === 'registered' && !record.canStart && (
+            <button
+              disabled
+              className="flex items-center px-4 py-2 bg-gray-400 text-white rounded cursor-not-allowed"
+            >
+              <Clock className="w-4 h-4 mr-1" />
+              等待开始
+            </button>
+          )}
+          {record.status === 'completed' && (
+            <Link href={`/skill-exam/${record.examId}/result`}>
+              <button className="flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors">
+                <Eye className="w-4 h-4 mr-1" />
+                查看成绩
+              </button>
+            </Link>
+          )}
+          <Link href={`/skill-exam/${record.examId}`}>
+            <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors">
+              查看详情
+            </button>
+          </Link>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pt-20">
       {/* 页面头部 */}
       <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white">
         <div className="container mx-auto px-4 py-12">

@@ -381,8 +381,8 @@ export async function POST(request: NextRequest) {
     const rbacResult = await verifyAdminAccess(request);
     if (!rbacResult.success) {
       return NextResponse.json(
-        { success: false, error: rbacResult.error },
-        { status: rbacResult.statusCode }
+        { success: false, error: rbacResult.message || '权限验证失败' },
+        { status: 403 }
       );
     }
 
@@ -488,8 +488,8 @@ export async function GET(request: NextRequest) {
     const rbacResult = await verifyAdminAccess(request);
     if (!rbacResult.success) {
       return NextResponse.json(
-        { success: false, error: rbacResult.error },
-        { status: rbacResult.statusCode }
+        { success: false, error: rbacResult.message || '权限验证失败' },
+        { status: 403 }
       );
     }
 

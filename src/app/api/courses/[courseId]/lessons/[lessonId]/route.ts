@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { courseService } from '@/services/courseService';
+import courseService from '@/services/courseService';
 import { verifyToken } from '@/services/userService';
 
 /**
@@ -30,7 +30,7 @@ export async function GET(
       const userResult = await verifyToken(token);
       
       if (userResult.success && userResult.data) {
-        userId = userResult.data.id;
+        userId = (userResult.data as any).id;
       }
     }
     
@@ -41,7 +41,7 @@ export async function GET(
     // const userId = 'user123';
     
     // 获取课时详情
-    const lessonResult = await courseService.getLessonById(courseId, lessonId);
+    const lessonResult = await (courseService as any).getLessonById(courseId, lessonId);
     
     if (!lessonResult.success) {
       return NextResponse.json(

@@ -260,7 +260,7 @@ export default function UserDetail({ userId, onClose, onUpdate, mode = 'view' }:
   /**
    * 格式化用户状态
    */
-  const formatUserStatus = (status: string): JSX.Element => {
+  const formatUserStatus = (status: string): React.ReactElement => {
     const statuses = {
       active: { text: '活跃', color: 'text-green-600 bg-green-100' },
       inactive: { text: '非活跃', color: 'text-gray-600 bg-gray-100' },

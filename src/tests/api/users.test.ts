@@ -41,10 +41,7 @@ jest.mock('jsonwebtoken');
 jest.mock('bcryptjs');
 jest.mock('crypto');
 
-// Mock 类型定义
-interface MockedModule<T> {
-  [K in keyof T]: T[K] extends (...args: unknown[]) => unknown ? jest.MockedFunction<T[K]> : T[K];
-}
+
 
 // 类型定义
 interface User {

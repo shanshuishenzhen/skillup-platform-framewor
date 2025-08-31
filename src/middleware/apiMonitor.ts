@@ -8,7 +8,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { envConfig } from '../config/envConfig';
-import { errorHandler } from '../utils/errorHandler';
+import { errorHandler, ErrorType, ErrorSeverity } from '@/utils/errorHandler';
 import { monitoringService } from '../services/monitoringService';
 import { cacheService } from '../services/cacheService';
 import { EventEmitter } from 'events';
@@ -316,7 +316,7 @@ class ApiMonitor extends EventEmitter {
     requestData.error = {
       message: error.message,
       stack: error.stack,
-      code: error.code
+      code: (error as any).code
     };
 
     // 记录错误监控数据
@@ -360,30 +360,30 @@ class ApiMonitor extends EventEmitter {
   private async recordMetrics(requestData: RequestMonitorData): Promise<void> {
     try {
       // 发送到监控服务
-      await monitoringService.recordApiMetrics({
-        requestId: requestData.id,
+      await monitoringService.insertRecord({
+        id: requestData.id,
+        endpoint: requestData.path,
         method: requestData.method,
-        path: requestData.path,
         statusCode: requestData.statusCode || 0,
-        duration: requestData.duration || 0,
-        timestamp: requestData.startTime,
+        responseTime: requestData.duration || 0,
+        timestamp: new Date(requestData.startTime),
         userId: requestData.userId,
-        ip: requestData.ip,
         userAgent: requestData.userAgent,
-        error: requestData.error,
-        metadata: requestData.metadata,
-        memoryUsage: requestData.memoryUsage,
-        responseSize: requestData.responseSize
+        ip: requestData.ip,
+        requestSize: 0,
+        responseSize: requestData.responseSize || 0,
+        error: requestData.error?.message
       });
       
       // 更新实时统计
       await this.updateRealTimeStats(requestData);
       
     } catch (error) {
-      errorHandler.logError('API监控记录失败', error, {
+      const appError = errorHandler.standardizeError(error, {
         requestId: requestData.id,
-        path: requestData.path
+        endpoint: requestData.path
       });
+      errorHandler.logError(appError);
     }
   }
 
@@ -395,20 +395,22 @@ class ApiMonitor extends EventEmitter {
     const cacheKey = `api_stats_${minute}`;
     
     try {
-      let stats = await cacheService.get(cacheKey) || {
+      const stats: ApiStats = await cacheService.get(cacheKey) || {
         totalRequests: 0,
         successRequests: 0,
         errorRequests: 0,
-        totalResponseTime: 0,
+        averageResponseTime: 0,
         slowRequests: 0,
-        endpoints: {},
-        errors: {},
-        users: {}
+        requestsPerMinute: 0,
+        errorRate: 0,
+        topEndpoints: [],
+        topErrors: [],
+        userActivity: []
       };
       
       // 更新统计
       stats.totalRequests++;
-      stats.totalResponseTime += requestData.duration || 0;
+      const duration = requestData.duration || 0;
       
       if (requestData.statusCode && requestData.statusCode < 400) {
         stats.successRequests++;
@@ -416,34 +418,53 @@ class ApiMonitor extends EventEmitter {
         stats.errorRequests++;
       }
       
-      if (requestData.duration && requestData.duration > this.config.slowRequestThreshold) {
+      if (duration > this.config.slowRequestThreshold) {
         stats.slowRequests++;
       }
       
+      // 计算平均响应时间
+      stats.averageResponseTime = ((stats.averageResponseTime * (stats.totalRequests - 1)) + duration) / stats.totalRequests;
+      
+      // 计算错误率
+      stats.errorRate = stats.errorRequests / stats.totalRequests;
+      
       // 更新端点统计
       const endpoint = `${requestData.method} ${requestData.path}`;
-      if (!stats.endpoints[endpoint]) {
-        stats.endpoints[endpoint] = { count: 0, totalTime: 0 };
+      const existingEndpoint = stats.topEndpoints.find(e => e.path === endpoint);
+      if (existingEndpoint) {
+        existingEndpoint.count++;
+        existingEndpoint.averageTime = ((existingEndpoint.averageTime * (existingEndpoint.count - 1)) + duration) / existingEndpoint.count;
+      } else {
+        stats.topEndpoints.push({ path: endpoint, count: 1, averageTime: duration });
       }
-      stats.endpoints[endpoint].count++;
-      stats.endpoints[endpoint].totalTime += requestData.duration || 0;
       
       // 更新错误统计
       if (requestData.error) {
         const errorKey = requestData.error.message || 'Unknown Error';
-        stats.errors[errorKey] = (stats.errors[errorKey] || 0) + 1;
+        const existingError = stats.topErrors.find(e => e.error === errorKey);
+        if (existingError) {
+          existingError.count++;
+        } else {
+          stats.topErrors.push({ error: errorKey, count: 1 });
+        }
       }
       
       // 更新用户统计
       if (requestData.userId) {
-        stats.users[requestData.userId] = (stats.users[requestData.userId] || 0) + 1;
+        const existingUser = stats.userActivity.find(u => u.userId === requestData.userId);
+        if (existingUser) {
+          existingUser.requestCount++;
+        } else {
+          stats.userActivity.push({ userId: requestData.userId, requestCount: 1 });
+        }
       }
       
       // 缓存统计数据（5分钟过期）
-      await cacheService.set(cacheKey, stats, 300);
+      await cacheService.set(cacheKey, stats, { ttl: 300 });
       
     } catch (error) {
-      errorHandler.logError('更新实时统计失败', error);
+      const appError = errorHandler.standardizeError(error);
+      errorHandler.logError(appError);
     }
   }
 
@@ -451,15 +472,25 @@ class ApiMonitor extends EventEmitter {
    * 处理慢请求
    */
   private handleSlowRequest(requestData: RequestMonitorData): void {
-    errorHandler.logWarning('检测到慢请求', {
-      requestId: requestData.id,
-      method: requestData.method,
-      path: requestData.path,
-      duration: requestData.duration,
-      threshold: this.config.slowRequestThreshold,
-      userId: requestData.userId,
-      memoryUsage: requestData.memoryUsage
-    });
+    const slowRequestError = errorHandler.createError(
+      ErrorType.INTERNAL_ERROR,
+      `Slow request detected: ${requestData.path} took ${requestData.duration}ms`,
+      {
+        severity: ErrorSeverity.LOW,
+        context: {
+          endpoint: requestData.path,
+          method: requestData.method,
+          userId: requestData.userId,
+          timestamp: new Date(),
+          additionalData: {
+            responseTime: requestData.duration,
+            statusCode: requestData.statusCode
+          }
+        }
+      }
+    );
+    
+    errorHandler.logError(slowRequestError);
     
     // 发出慢请求事件
     this.emit('slowRequest', requestData);
@@ -469,13 +500,17 @@ class ApiMonitor extends EventEmitter {
    * 处理错误请求
    */
   private handleErrorRequest(requestData: RequestMonitorData): void {
-    errorHandler.logError('API请求错误', requestData.error || new Error(`HTTP ${requestData.statusCode}`), {
+    const appError = errorHandler.standardizeError(requestData.error || new Error(`HTTP ${requestData.statusCode}`), {
       requestId: requestData.id,
+      endpoint: requestData.path,
       method: requestData.method,
-      path: requestData.path,
-      statusCode: requestData.statusCode,
-      userId: requestData.userId
+      userId: requestData.userId,
+      timestamp: new Date(),
+      additionalData: {
+        statusCode: requestData.statusCode
+      }
     });
+    errorHandler.logError(appError);
     
     // 发出错误请求事件
     this.emit('errorRequest', requestData);
@@ -513,13 +548,14 @@ class ApiMonitor extends EventEmitter {
       };
       
       // 缓存实时指标
-      await cacheService.set('realtime_metrics', metrics, 120);
+      await cacheService.set('realtime_metrics', metrics, { ttl: 120 });
       
       // 发出实时指标事件
       this.emit('realTimeMetrics', metrics);
       
     } catch (error) {
-      errorHandler.logError('收集实时指标失败', error);
+      const appError = errorHandler.standardizeError(error);
+      errorHandler.logError(appError);
     }
   }
 
@@ -566,7 +602,8 @@ class ApiMonitor extends EventEmitter {
       }
       
     } catch (error) {
-      errorHandler.logError('检查告警条件失败', error);
+      const appError = errorHandler.standardizeError(error);
+      errorHandler.logError(appError);
     }
   }
 
@@ -585,7 +622,8 @@ class ApiMonitor extends EventEmitter {
     
     this.alertCooldowns.set(cooldownKey, now);
     
-    errorHandler.logError(`API监控告警: ${alertType}`, new Error('监控告警'), data);
+    const appError = errorHandler.standardizeError(new Error('监控告警'), data);
+    errorHandler.logError(appError);
     
     // 发出告警事件
     this.emit('alert', { type: alertType, data, timestamp: now });
@@ -710,7 +748,8 @@ class ApiMonitor extends EventEmitter {
       return stats;
       
     } catch (error) {
-      errorHandler.logError('获取API统计失败', error);
+      const appError = errorHandler.standardizeError(error);
+      errorHandler.logError(appError);
       throw error;
     }
   }
@@ -722,7 +761,8 @@ class ApiMonitor extends EventEmitter {
     try {
       return await cacheService.get('realtime_metrics');
     } catch (error) {
-      errorHandler.logError('获取实时指标失败', error);
+      const appError = errorHandler.standardizeError(error);
+      errorHandler.logError(appError);
       return null;
     }
   }
@@ -758,7 +798,7 @@ class ApiMonitor extends EventEmitter {
     
     // 移除敏感字段
     const sensitiveFields = ['password', 'token', 'secret', 'key', 'apiKey', 'accessToken'];
-    const sanitized = { ...body };
+    const sanitized: Record<string, unknown> = { ...body as Record<string, unknown> };
     
     for (const field of sensitiveFields) {
       if (sanitized[field]) {
@@ -845,7 +885,8 @@ class ApiMonitor extends EventEmitter {
         }
       };
     } catch (error) {
-      errorHandler.logError('获取仪表板数据失败', error);
+      const appError = errorHandler.standardizeError(error);
+      errorHandler.logError(appError);
       throw error;
     }
   }
@@ -893,4 +934,5 @@ class ApiMonitor extends EventEmitter {
 
 // 导出单例实例
 export const apiMonitor = new ApiMonitor();
-export { ApiMonitor, ApiMonitorConfig, RequestMonitorData, ApiStats, RealTimeMetrics };
+export { ApiMonitor };
+export type { ApiMonitorConfig, RequestMonitorData, ApiStats, RealTimeMetrics };

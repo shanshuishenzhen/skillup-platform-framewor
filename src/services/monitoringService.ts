@@ -655,10 +655,10 @@ export class MonitoringService {
   public async exportData(query: StatsQuery, format: 'json' | 'csv' | 'xlsx'): Promise<ExportData> {
     try {
       const records = await this.queryRecords(query);
-      
-      return {
-        format,
-        data: records,
+    
+    return {
+      format,
+      data: records.map(record => ({ ...record })),
         metadata: {
           generatedAt: new Date(),
           totalRecords: records.length,

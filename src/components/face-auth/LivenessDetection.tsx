@@ -102,7 +102,7 @@ const LivenessDetection: React.FC<LivenessDetectionProps> = ({
       console.error('摄像头初始化失败:', error);
       onError('无法访问摄像头，请检查权限设置');
     }
-  }, [onError, startDetection]);
+  }, [onError]);
 
   /**
    * 开始活体检测
@@ -130,7 +130,7 @@ const LivenessDetection: React.FC<LivenessDetectionProps> = ({
     detectionIntervalRef.current = setInterval(() => {
       performDetection();
     }, 200); // 每200ms检测一次
-  }, [timeout, onError, performDetection]);
+  }, [timeout, onError]);
 
   /**
    * 执行检测
@@ -174,7 +174,7 @@ const LivenessDetection: React.FC<LivenessDetectionProps> = ({
     }
 
     setLastFrameData(currentFrameData);
-  }, [isInitialized, detectionSteps, currentStepIndex, detectBlink, detectHeadTurn, detectNod]);
+  }, [isInitialized, detectionSteps, currentStepIndex]);
 
   /**
    * 检测眨眼
@@ -217,7 +217,7 @@ const LivenessDetection: React.FC<LivenessDetectionProps> = ({
       
       return newHistory;
     });
-  }, [lastFrameData, completeCurrentStep, calculateRegionDifference]);
+  }, [lastFrameData]);
 
   /**
    * 检测头部转动
@@ -251,7 +251,7 @@ const LivenessDetection: React.FC<LivenessDetectionProps> = ({
         completeCurrentStep();
       }, 1000);
     }
-  }, [lastFrameData, completeCurrentStep, calculateRegionDifference]);
+  }, [lastFrameData]);
 
   /**
    * 检测点头
@@ -279,7 +279,7 @@ const LivenessDetection: React.FC<LivenessDetectionProps> = ({
         completeCurrentStep();
       }, 1000);
     }
-  }, [lastFrameData, completeCurrentStep, calculateRegionDifference]);
+  }, [lastFrameData]);
 
   /**
    * 计算区域像素差异
@@ -345,7 +345,7 @@ const LivenessDetection: React.FC<LivenessDetectionProps> = ({
         completeDetection(true);
       }
     }, 500);
-  }, [currentStepIndex, detectionSteps.length, setDetectionHistory]);
+  }, [currentStepIndex, detectionSteps.length]);
 
   /**
    * 完成检测

@@ -5,23 +5,31 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken';
+import * as jwt from 'jsonwebtoken';
+import type { SignOptions } from 'jsonwebtoken';
 import { supabase } from '@/lib/supabase';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
-const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
+const JWT_SECRET: string = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_REFRESH_SECRET: string = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key';
+const JWT_EXPIRES_IN: string = process.env.JWT_EXPIRES_IN || '1h';
+const JWT_REFRESH_EXPIRES_IN: string = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
 
 /**
  * 验证refresh token的有效性
  * @param refreshToken - 刷新token
  * @returns 解码后的用户信息或null
  */
-function verifyRefreshToken(refreshToken: string): any {
+interface DecodedToken {
+  userId: string;
+  type: string;
+  iat?: number;
+  exp?: number;
+}
+
+function verifyRefreshToken(refreshToken: string): DecodedToken | null {
   try {
-    const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
-    console.log('🔍 Refresh token验证成功:', { userId: (decoded as any).userId, type: (decoded as any).type });
+    const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET) as DecodedToken;
+    console.log('🔍 Refresh token验证成功:', { userId: decoded.userId, type: decoded.type });
     return decoded;
   } catch (error) {
     console.error('❌ Refresh token验证失败:', error);
@@ -37,16 +45,15 @@ function verifyRefreshToken(refreshToken: string): any {
  * @returns 新的访问token
  */
 function generateAccessToken(userId: string, userType: string, userRole: string): string {
-  const token = jwt.sign(
-    { 
-      userId, 
-      userType,
-      role: userRole,
-      type: 'access'
-    },
-    JWT_SECRET,
-    { expiresIn: JWT_EXPIRES_IN }
-  );
+  const payload = { 
+    userId, 
+    userType,
+    role: userRole,
+    type: 'access'
+  };
+  const secret = JWT_SECRET;
+  const options: SignOptions = { expiresIn: JWT_EXPIRES_IN as any };
+  const token = jwt.sign(payload, secret, options);
   console.log('🔑 生成新的访问token:', { userId, userType, role: userRole });
   return token;
 }
@@ -57,14 +64,13 @@ function generateAccessToken(userId: string, userType: string, userRole: string)
  * @returns 新的刷新token
  */
 function generateRefreshToken(userId: string): string {
-  return jwt.sign(
-    { 
-      userId,
-      type: 'refresh'
-    },
-    JWT_REFRESH_SECRET,
-    { expiresIn: JWT_REFRESH_EXPIRES_IN }
-  );
+  const payload = { 
+    userId,
+    type: 'refresh'
+  };
+  const secret = JWT_REFRESH_SECRET;
+  const options: SignOptions = { expiresIn: JWT_REFRESH_EXPIRES_IN as any };
+  return jwt.sign(payload, secret, options);
 }
 
 /**

@@ -166,7 +166,7 @@ export async function saveLearningProgress(
             code: 'SAVE_PROGRESS_FAILED',
             statusCode: 500,
             severity: ErrorSeverity.HIGH,
-            context: { userId, courseId, lessonId, additionalData: { error: dbResult.error } }
+            context: { userId, additionalData: { courseId, lessonId, error: dbResult.error } }
           }
         );
       }
@@ -203,7 +203,7 @@ export async function saveLearningProgress(
         code: 'SAVE_PROGRESS_ERROR',
         statusCode: 500,
         severity: ErrorSeverity.HIGH,
-        context: { userId, courseId, lessonId },
+        context: { userId, additionalData: { courseId, lessonId } },
         originalError: error instanceof Error ? error : undefined
       }
     );
@@ -251,7 +251,7 @@ export async function getLearningProgress(
               code: 'GET_PROGRESS_FAILED',
               statusCode: 500,
               severity: ErrorSeverity.MEDIUM,
-              context: { userId, courseId, lessonId, additionalData: { error } }
+              context: { userId, additionalData: { courseId, lessonId, error } }
             }
           );
         }
@@ -268,7 +268,7 @@ export async function getLearningProgress(
               code: 'GET_COURSE_PROGRESS_FAILED',
               statusCode: 500,
               severity: ErrorSeverity.MEDIUM,
-              context: { userId, courseId, additionalData: { error } }
+              context: { userId, additionalData: { courseId, error } }
             }
           );
         }
@@ -305,7 +305,7 @@ export async function getLearningProgress(
         message: '获取学习进度成功'
       };
     } else {
-      const progressList: LearningProgress[] = result.map(item => ({
+      const progressList: LearningProgress[] = result.map((item: any) => ({
         id: item.id,
         userId: item.user_id,
         courseId: item.course_id,
@@ -335,7 +335,7 @@ export async function getLearningProgress(
         code: 'GET_PROGRESS_ERROR',
         statusCode: 500,
         severity: ErrorSeverity.MEDIUM,
-        context: { userId, courseId, lessonId },
+        context: { userId, additionalData: { courseId, lessonId } },
         originalError: error instanceof Error ? error : undefined
       }
     );
@@ -375,7 +375,7 @@ export async function getCourseProgress(
             code: 'GET_COURSE_PROGRESS_FAILED',
             statusCode: 500,
             severity: ErrorSeverity.MEDIUM,
-            context: { userId, courseId, additionalData: { error: progressError } }
+            context: { userId, additionalData: { courseId, error: progressError } }
           }
         );
       }
@@ -395,7 +395,7 @@ export async function getCourseProgress(
             code: 'GET_COURSE_INFO_FAILED',
             statusCode: 500,
             severity: ErrorSeverity.MEDIUM,
-            context: { courseId, additionalData: { error: courseError } }
+            context: { userId, additionalData: { courseId, error: courseError } }
           }
         );
       }
@@ -436,7 +436,7 @@ export async function getCourseProgress(
         code: 'GET_COURSE_PROGRESS_ERROR',
         statusCode: 500,
         severity: ErrorSeverity.MEDIUM,
-        context: { userId, courseId },
+        context: { userId, additionalData: { courseId } },
         originalError: error instanceof Error ? error : undefined
       }
     );
@@ -597,7 +597,7 @@ export async function markLessonCompleted(
             code: 'MARK_LESSON_COMPLETED_FAILED',
             statusCode: 500,
             severity: ErrorSeverity.MEDIUM,
-            context: { userId, courseId, lessonId, additionalData: { error } }
+            context: { userId, additionalData: { courseId, lessonId, error } }
           }
         );
       }
@@ -618,7 +618,7 @@ export async function markLessonCompleted(
         code: 'MARK_LESSON_COMPLETED_ERROR',
         statusCode: 500,
         severity: ErrorSeverity.MEDIUM,
-        context: { userId, courseId, lessonId },
+        context: { userId, additionalData: { courseId, lessonId } },
         originalError: error instanceof Error ? error : undefined
       }
     );
@@ -667,7 +667,7 @@ export async function resetLessonProgress(
             code: 'RESET_LESSON_PROGRESS_FAILED',
             statusCode: 500,
             severity: ErrorSeverity.MEDIUM,
-            context: { userId, courseId, lessonId, additionalData: { error } }
+            context: { userId, additionalData: { courseId, lessonId, error } }
           }
         );
       }
@@ -688,7 +688,7 @@ export async function resetLessonProgress(
         code: 'RESET_LESSON_PROGRESS_ERROR',
         statusCode: 500,
         severity: ErrorSeverity.MEDIUM,
-        context: { userId, courseId, lessonId },
+        context: { userId, additionalData: { courseId, lessonId } },
         originalError: error instanceof Error ? error : undefined
       }
     );

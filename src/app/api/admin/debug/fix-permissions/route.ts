@@ -112,12 +112,14 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('修复用户权限时发生错误:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorType = error instanceof Error ? error.constructor.name : 'Unknown';
     return NextResponse.json({
       success: false,
-      error: '服务器内部错误: ' + error.message,
+      error: '服务器内部错误: ' + errorMessage,
       debug: {
-        errorType: error.constructor.name,
-        errorMessage: error.message
+        errorType,
+        errorMessage
       }
     }, { status: 500 });
   }

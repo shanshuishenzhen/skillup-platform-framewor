@@ -3,8 +3,7 @@
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { RefreshCw, Users, Calendar } from 'lucide-react'
-import { aiDataGeneratorService } from '@/services/aiDataGeneratorService'
-import type { VirtualCommittee } from '@/types/virtual'
+import { aiDataGeneratorService, type VirtualCommittee } from '@/services/aiDataGeneratorService'
 
 export default function CommitteesPage() {
   const [committees, setCommittees] = useState<VirtualCommittee[]>([])
@@ -33,7 +32,7 @@ export default function CommitteesPage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pt-20">
       {/* 页面头部 */}
       <div className="bg-white border-b">
         <div className="container mx-auto px-4 py-8">

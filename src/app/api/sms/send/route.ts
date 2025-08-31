@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { sendVerificationCode } from '@/services/smsService';
-import { ErrorHandler, AppError, ErrorType } from '@/utils/errorHandler';
+import { createErrorResponse, AppError, ErrorType } from '@/utils/errorHandler';
 
 // 请求体接口定义
 interface SendSmsRequest {
@@ -91,16 +91,30 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendSmsRe
 
   } catch (error) {
     if (error instanceof AppError) {
-      return ErrorHandler.handleApiError(error);
+      return NextResponse.json(
+        {
+          success: false,
+          message: error.message
+        },
+        { status: error.statusCode }
+      );
     }
     
     const apiError = new AppError(
-      ErrorType.API_ERROR,
+      ErrorType.EXTERNAL_API_ERROR,
       '短信发送服务异常',
-      error instanceof Error ? error.message : '未知错误'
+      {
+        originalError: error instanceof Error ? error : undefined
+      }
     );
     
-    return ErrorHandler.handleApiError(apiError);
+    return NextResponse.json(
+      {
+        success: false,
+        message: apiError.message
+      },
+      { status: apiError.statusCode }
+    );
   }
 }
 

@@ -13,8 +13,8 @@
  */
 
 import { logger } from '../utils/logger';
-import { supabaseClient } from '../utils/supabase';
-import { envConfig } from '../utils/envConfig';
+import { createServerClient } from '../utils/supabase';
+import { getEnvConfig } from '../utils/envConfig';
 import { cacheService } from './cacheService';
 
 // 类型定义
@@ -164,14 +164,15 @@ export class AnalyticsService {
   private flushTimer: NodeJS.Timeout | null = null;
 
   constructor(config?: Partial<AnalyticsConfig>) {
+    const envConfig = getEnvConfig();
     this.config = {
       enableAnalytics: envConfig?.analytics?.enabled || true,
       batchSize: envConfig?.analytics?.batchSize || 100,
       flushInterval: envConfig?.analytics?.flushInterval || 5000,
       retentionDays: envConfig?.analytics?.retentionDays || 365,
-      enableRealTime: envConfig?.analytics?.enableRealTime || true,
-      enablePrediction: envConfig?.analytics?.enablePrediction || false,
-      sampleRate: envConfig?.analytics?.sampleRate || 1.0,
+      enableRealTime: true,
+      enablePrediction: false,
+      sampleRate: 1.0,
       ...config
     };
 
@@ -209,7 +210,7 @@ export class AnalyticsService {
         await this.flush();
       }
     } catch (error) {
-      logger.error('Failed to track event', error);
+      logger.error('Failed to track event', { error: error instanceof Error ? error.message : String(error) });
     }
   }
 
@@ -234,7 +235,7 @@ export class AnalyticsService {
         await this.flush();
       }
     } catch (error) {
-      logger.error('Failed to record metric', error);
+      logger.error('Failed to record metric', { error: error instanceof Error ? error.message : String(error) });
     }
   }
 
@@ -246,14 +247,15 @@ export class AnalyticsService {
       const cacheKey = `analytics:query:${JSON.stringify(query)}`;
       const cached = await cacheService.get(cacheKey);
       if (cached) {
-        return cached;
+        return cached as AnalyticsResult;
       }
 
-      let metricsQuery = supabaseClient
+      const supabase = createServerClient();
+      let metricsQuery = supabase
         .from('analytics_metrics')
         .select('*');
 
-      let eventsQuery = supabaseClient
+      let eventsQuery = supabase
         .from('analytics_events')
         .select('*');
 
@@ -289,10 +291,10 @@ export class AnalyticsService {
       ]);
 
       if (metricsResult.error) {
-        logger.error('Failed to query metrics', metricsResult.error);
+        logger.error('Failed to query metrics', { error: metricsResult.error });
       }
       if (eventsResult.error) {
-        logger.error('Failed to query events', eventsResult.error);
+        logger.error('Failed to query events', { error: eventsResult.error });
       }
 
       const metrics = metricsResult.data || [];
@@ -320,7 +322,7 @@ export class AnalyticsService {
 
       return result;
     } catch (error) {
-      logger.error('Failed to query analytics data', error);
+      logger.error('Failed to query analytics data', { error: error instanceof Error ? error.message : String(error) });
       throw error;
     }
   }
@@ -333,7 +335,7 @@ export class AnalyticsService {
       const cacheKey = `analytics:dashboard:${timeRange}`;
       const cached = await cacheService.get(cacheKey);
       if (cached) {
-        return cached;
+        return cached as DashboardData;
       }
 
       const endDate = new Date();
@@ -380,7 +382,7 @@ export class AnalyticsService {
 
       return dashboardData;
     } catch (error) {
-      logger.error('Failed to get dashboard data', error);
+      logger.error('Failed to get dashboard data', { error: error instanceof Error ? error.message : String(error) });
       throw error;
     }
   }
@@ -393,13 +395,14 @@ export class AnalyticsService {
       const cacheKey = `analytics:learning:${userId || 'all'}:${timeRange}`;
       const cached = await cacheService.get(cacheKey);
       if (cached) {
-        return cached;
+        return cached as LearningAnalytics;
       }
 
       const endDate = new Date();
       const startDate = this.getStartDate(endDate, timeRange);
 
-      let query = supabaseClient
+      const supabase = createServerClient();
+      let query = supabase
         .from('learning_analytics')
         .select('*')
         .gte('created_at', startDate.toISOString())
@@ -412,7 +415,7 @@ export class AnalyticsService {
       const { data, error } = await query;
 
       if (error) {
-        logger.error('Failed to get learning analytics', error);
+        logger.error('Failed to get learning analytics', { error });
         throw error;
       }
 
@@ -423,7 +426,7 @@ export class AnalyticsService {
 
       return analytics;
     } catch (error) {
-      logger.error('Failed to get learning analytics', error);
+      logger.error('Failed to get learning analytics', { error: error instanceof Error ? error.message : String(error) });
       throw error;
     }
   }
@@ -436,13 +439,14 @@ export class AnalyticsService {
       const cacheKey = `analytics:behavior:${userId || 'all'}:${timeRange}`;
       const cached = await cacheService.get(cacheKey);
       if (cached) {
-        return cached;
+        return cached as UserBehaviorAnalytics;
       }
 
       const endDate = new Date();
       const startDate = this.getStartDate(endDate, timeRange);
 
-      let query = supabaseClient
+      const supabase = createServerClient();
+      let query = supabase
         .from('user_behavior')
         .select('*')
         .gte('timestamp', startDate.toISOString())
@@ -455,7 +459,7 @@ export class AnalyticsService {
       const { data, error } = await query;
 
       if (error) {
-        logger.error('Failed to get user behavior analytics', error);
+        logger.error('Failed to get user behavior analytics', { error });
         throw error;
       }
 
@@ -466,7 +470,7 @@ export class AnalyticsService {
 
       return analytics;
     } catch (error) {
-      logger.error('Failed to get user behavior analytics', error);
+      logger.error('Failed to get user behavior analytics', { error: error instanceof Error ? error.message : String(error) });
       throw error;
     }
   }
@@ -483,14 +487,15 @@ export class AnalyticsService {
       const cacheKey = `analytics:prediction:${metric}:${timeRange}`;
       const cached = await cacheService.get(cacheKey);
       if (cached) {
-        return cached;
+        return cached as PredictionResult;
       }
 
       // 获取历史数据
       const endDate = new Date();
       const startDate = this.getStartDate(endDate, timeRange);
 
-      const { data, error } = await supabaseClient
+      const supabase = createServerClient();
+      const { data, error } = await supabase
         .from('analytics_metrics')
         .select('*')
         .eq('name', metric)
@@ -499,7 +504,7 @@ export class AnalyticsService {
         .order('timestamp', { ascending: true });
 
       if (error) {
-        logger.error('Failed to get historical data for prediction', error);
+        logger.error('Failed to get historical data for prediction', { error });
         throw error;
       }
 
@@ -518,7 +523,7 @@ export class AnalyticsService {
 
       return result;
     } catch (error) {
-      logger.error('Failed to generate prediction', error);
+      logger.error('Failed to generate prediction', { error: error instanceof Error ? error.message : String(error) });
       throw error;
     }
   }
@@ -557,7 +562,7 @@ export class AnalyticsService {
         size: Buffer.byteLength(data, 'utf8')
       };
     } catch (error) {
-      logger.error('Failed to export analytics data', error);
+      logger.error('Failed to export analytics data', { error: error instanceof Error ? error.message : String(error) });
       throw error;
     }
   }
@@ -570,7 +575,7 @@ export class AnalyticsService {
       const result = await this.query(query);
       return result.aggregations;
     } catch (error) {
-      logger.error('Failed to aggregate data', error);
+      logger.error('Failed to aggregate data', { error: error instanceof Error ? error.message : String(error) });
       throw error;
     }
   }
@@ -590,9 +595,11 @@ export class AnalyticsService {
       this.metricBuffer = [];
       this.eventBuffer = [];
 
+      const supabase = createServerClient();
+
       // 保存指标数据
       if (metrics.length > 0) {
-        const { error: metricsError } = await supabaseClient
+        const { error: metricsError } = await supabase
           .from('analytics_metrics')
           .insert(metrics.map(metric => ({
             name: metric.name,
@@ -604,7 +611,7 @@ export class AnalyticsService {
           })));
 
         if (metricsError) {
-          logger.error('Failed to save metrics', metricsError);
+          logger.error('Failed to save metrics', { error: metricsError });
           // 重新添加到缓冲区
           this.metricBuffer.unshift(...metrics);
         }
@@ -612,7 +619,7 @@ export class AnalyticsService {
 
       // 保存事件数据
       if (events.length > 0) {
-        const { error: eventsError } = await supabaseClient
+        const { error: eventsError } = await supabase
           .from('analytics_events')
           .insert(events.map(event => ({
             event: event.event,
@@ -623,13 +630,13 @@ export class AnalyticsService {
           })));
 
         if (eventsError) {
-          logger.error('Failed to save events', eventsError);
+          logger.error('Failed to save events', { error: eventsError });
           // 重新添加到缓冲区
           this.eventBuffer.unshift(...events);
         }
       }
     } catch (error) {
-      logger.error('Failed to flush analytics data', error);
+      logger.error('Failed to flush analytics data', { error: error instanceof Error ? error.message : String(error) });
     }
   }
 
@@ -656,7 +663,7 @@ export class AnalyticsService {
    * 处理聚合
    */
   private processAggregations(
-    metrics: AnalyticsEvent[], 
+    metrics: MetricData[], 
     aggregation?: AggregationType, 
     groupBy?: string[]
   ): Record<string, number> {
@@ -672,17 +679,17 @@ export class AnalyticsService {
     for (const [key, values] of Object.entries(grouped)) {
       switch (aggregation) {
         case 'sum':
-          result[key] = values.reduce((sum: number, item: AnalyticsEvent) => sum + (item.value || 0), 0);
+          result[key] = values.reduce((sum: number, item: MetricData) => sum + (item.value || 0), 0);
           break;
         case 'avg':
           result[key] = values.length > 0 ? 
-            values.reduce((sum: number, item: AnalyticsEvent) => sum + (item.value || 0), 0) / values.length : 0;
+            values.reduce((sum: number, item: MetricData) => sum + (item.value || 0), 0) / values.length : 0;
           break;
         case 'min':
-          result[key] = Math.min(...values.map((item: AnalyticsEvent) => item.value || 0));
+          result[key] = Math.min(...values.map((item: MetricData) => item.value || 0));
           break;
         case 'max':
-          result[key] = Math.max(...values.map((item: AnalyticsEvent) => item.value || 0));
+          result[key] = Math.max(...values.map((item: MetricData) => item.value || 0));
           break;
         case 'count':
           result[key] = values.length;
@@ -696,21 +703,21 @@ export class AnalyticsService {
   /**
    * 分组数据
    */
-  private groupBy(data: AnalyticsEvent[], keys: string[]): Record<string, AnalyticsEvent[]> {
+  private groupBy(data: MetricData[], keys: string[]): Record<string, MetricData[]> {
     return data.reduce((groups, item) => {
-      const key = keys.map(k => item[k]).join('_');
+      const key = keys.map(k => (item as any)[k]).join('_');
       if (!groups[key]) {
         groups[key] = [];
       }
       groups[key].push(item);
       return groups;
-    }, {});
+    }, {} as Record<string, MetricData[]>);
   }
 
   /**
    * 处理指标数据
    */
-  private processMetrics(metrics: AnalyticsEvent[]): Record<string, number> {
+  private processMetrics(metrics: MetricData[]): Record<string, number> {
     const result: Record<string, number> = {};
     
     for (const metric of metrics) {
@@ -726,7 +733,7 @@ export class AnalyticsService {
   /**
    * 计算趋势
    */
-  private calculateTrends(metrics: AnalyticsEvent[], events: AnalyticsEvent[]): {
+  private calculateTrends(metrics: MetricData[], events: EventData[]): {
     metricsGrowth: number;
     eventsGrowth: number;
     seasonality: Record<string, number>;
@@ -734,7 +741,7 @@ export class AnalyticsService {
     // 简单趋势计算实现
     return {
       metricsGrowth: this.calculateGrowthRate(metrics),
-      eventsGrowth: this.calculateGrowthRate(events),
+      eventsGrowth: this.calculateEventGrowthRate(events),
       seasonality: this.detectSeasonality(metrics)
     };
   }
@@ -742,10 +749,10 @@ export class AnalyticsService {
   /**
    * 计算增长率
    */
-  private calculateGrowthRate(data: AnalyticsEvent[]): number {
+  private calculateGrowthRate(data: MetricData[]): number {
     if (data.length < 2) return 0;
     
-    const sorted = data.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    const sorted = data.sort((a, b) => new Date(a.timestamp || new Date()).getTime() - new Date(b.timestamp || new Date()).getTime());
     const first = sorted[0];
     const last = sorted[sorted.length - 1];
     
@@ -755,14 +762,33 @@ export class AnalyticsService {
   }
 
   /**
+   * 计算事件增长率
+   */
+  private calculateEventGrowthRate(data: EventData[]): number {
+    if (data.length < 2) return 0;
+    
+    // 按时间排序
+    const sorted = data.sort((a, b) => new Date(a.timestamp || new Date()).getTime() - new Date(b.timestamp || new Date()).getTime());
+    
+    // 计算时间段内的事件数量变化
+    const midPoint = Math.floor(sorted.length / 2);
+    const firstHalf = sorted.slice(0, midPoint).length;
+    const secondHalf = sorted.slice(midPoint).length;
+    
+    if (firstHalf === 0) return 0;
+    
+    return ((secondHalf - firstHalf) / firstHalf) * 100;
+  }
+
+  /**
    * 检测季节性
    */
-  private detectSeasonality(data: AnalyticsEvent[]): Record<string, number> {
+  private detectSeasonality(data: MetricData[]): Record<string, number> {
     // 简单的季节性检测
     const hourly: Record<string, number> = {};
     
     for (const item of data) {
-      const hour = new Date(item.timestamp).getHours();
+      const hour = new Date(item.timestamp || new Date()).getHours();
       hourly[hour] = (hourly[hour] || 0) + (item.value || 0);
     }
     
@@ -772,7 +798,7 @@ export class AnalyticsService {
   /**
    * 生成洞察
    */
-  private generateInsights(metrics: AnalyticsEvent[], events: AnalyticsEvent[], trends: {
+  private generateInsights(metrics: MetricData[], events: EventData[], trends: {
     metricsGrowth: number;
     eventsGrowth: number;
     seasonality: Record<string, number>;
@@ -910,7 +936,7 @@ export class AnalyticsService {
   /**
    * 处理学习数据
    */
-  private processLearningData(data: AnalyticsEvent[]): LearningAnalytics {
+  private processLearningData(data: EventData[]): LearningAnalytics {
     // 模拟学习分析数据处理
     return {
       courseProgress: {
@@ -953,7 +979,7 @@ export class AnalyticsService {
   /**
    * 处理行为数据
    */
-  private processBehaviorData(data: AnalyticsEvent[]): UserBehaviorAnalytics {
+  private processBehaviorData(data: EventData[]): UserBehaviorAnalytics {
     // 模拟用户行为分析数据处理
     return {
       sessionData: {
@@ -1009,7 +1035,7 @@ export class AnalyticsService {
   /**
    * 执行线性回归预测
    */
-  private performLinearRegression(data: AnalyticsEvent[]): Array<{
+  private performLinearRegression(data: MetricData[]): Array<{
     date: Date;
     value: number;
     confidence: number;
@@ -1022,14 +1048,14 @@ export class AnalyticsService {
     }
 
     // 计算趋势
-    const sorted = data.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    const sorted = data.sort((a, b) => new Date(a.timestamp || new Date()).getTime() - new Date(b.timestamp || new Date()).getTime());
     const firstValue = sorted[0].value || 0;
     const lastValue = sorted[sorted.length - 1].value || 0;
-    const timeSpan = new Date(sorted[sorted.length - 1].timestamp).getTime() - new Date(sorted[0].timestamp).getTime();
+    const timeSpan = new Date(sorted[sorted.length - 1].timestamp || new Date()).getTime() - new Date(sorted[0].timestamp || new Date()).getTime();
     const slope = (lastValue - firstValue) / timeSpan;
 
     // 生成未来7天的预测
-    const lastDate = new Date(sorted[sorted.length - 1].timestamp);
+    const lastDate = new Date(sorted[sorted.length - 1].timestamp || new Date());
     for (let i = 1; i <= 7; i++) {
       const futureDate = new Date(lastDate.getTime() + i * 24 * 60 * 60 * 1000);
       const predictedValue = lastValue + slope * (i * 24 * 60 * 60 * 1000);

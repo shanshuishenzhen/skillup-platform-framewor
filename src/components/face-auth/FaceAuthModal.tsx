@@ -93,6 +93,8 @@ const FaceAuthModal: React.FC<FaceAuthModalProps> = ({
   // 状态管理
   const [currentStep, setCurrentStep] = useState<AuthStep>('intro');
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [livenessResult, setLivenessResult] = useState<boolean | null>(null);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [authResult, setAuthResult] = useState<AuthResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -305,7 +307,6 @@ const FaceAuthModal: React.FC<FaceAuthModalProps> = ({
           {/* 活体检测步骤 */}
           {currentStep === 'liveness' && capturedImage && (
             <LivenessDetection
-              capturedImage={capturedImage}
               onComplete={handleLivenessComplete}
               onError={(error) => setError(error)}
             />

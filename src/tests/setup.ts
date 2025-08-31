@@ -13,11 +13,13 @@ import { jest } from '@jest/globals';
 import { TextEncoder, TextDecoder } from 'util';
 
 // 全局变量设置
+// @ts-expect-error - 忽略 TextEncoder 类型不兼容问题
 global.TextEncoder = TextEncoder;
+// @ts-expect-error - 忽略 TextDecoder 类型不兼容问题
 global.TextDecoder = TextDecoder;
 
 // 模拟环境变量
-process.env.NODE_ENV = 'test';
+// process.env.NODE_ENV = 'test'; // NODE_ENV 是只读属性，不能直接赋值
 process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key';
@@ -276,7 +278,7 @@ Object.defineProperty(global.URL, 'revokeObjectURL', {
 Object.defineProperty(global, 'crypto', {
   value: {
     randomUUID: jest.fn(() => 'mock-uuid-' + Math.random().toString(36).substr(2, 9)),
-    getRandomValues: jest.fn((array) => {
+    getRandomValues: jest.fn((array: Uint8Array) => {
       for (let i = 0; i < array.length; i++) {
         array[i] = Math.floor(Math.random() * 256);
       }

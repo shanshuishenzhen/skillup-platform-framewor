@@ -397,7 +397,7 @@ describe('评价服务模块', () => {
     });
 
     it('应该初始化数据库和缓存连接', () => {
-      expect(require('@supabase/supabase-js').createClient).toHaveBeenCalled();
+      expect(jest.mocked(createClient)).toHaveBeenCalled();
       expect(mockRedis.createClient).toHaveBeenCalled();
     });
   });

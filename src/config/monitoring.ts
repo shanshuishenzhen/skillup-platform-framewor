@@ -31,7 +31,7 @@ export interface MonitoringEnvironmentConfig {
  * 获取当前环境的监控配置
  */
 export function getMonitoringConfig(): MonitoringEnvironmentConfig {
-  const environment = process.env.NODE_ENV || 'development';
+  const environment = (process.env.NODE_ENV || 'development') as 'development' | 'production' | 'test' | 'staging';
   const provider = (process.env.MONITORING_PROVIDER as MonitoringProvider) || MonitoringProvider.CUSTOM;
   
   const baseConfig: MonitoringConfig = {
@@ -143,9 +143,9 @@ export function getSentryConfig() {
     profilesSampleRate: parseFloat(process.env.SENTRY_PROFILES_SAMPLE_RATE || '0.1'),
     beforeSend: (event: Record<string, unknown>) => {
       // 过滤敏感信息
-      if (event.request?.headers) {
-        delete event.request.headers.authorization;
-        delete event.request.headers.cookie;
+      if ((event.request as any)?.headers) {
+        delete (event.request as any).headers.authorization;
+        delete (event.request as any).headers.cookie;
       }
       return event;
     }

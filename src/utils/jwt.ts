@@ -11,6 +11,8 @@ export interface JWTPayload {
   userId: string;
   /** 用户手机号 */
   phone: string;
+  /** 用户邮箱 */
+  email?: string;
   /** 用户角色 */
   role: string;
   /** 用户权限 */
@@ -380,8 +382,8 @@ export function formatJWTTokenInfo(token: string): string {
     const payload = parseJWTToken(token);
     if (!payload) return 'Invalid token';
     
-    const issuedAt = new Date(payload.iat * 1000).toLocaleString();
-    const expiresAt = new Date(payload.exp * 1000).toLocaleString();
+    const issuedAt = new Date((payload.iat || 0) * 1000).toLocaleString();
+    const expiresAt = new Date((payload.exp || 0) * 1000).toLocaleString();
     const remainingTime = getJWTTokenRemainingTime(token);
     
     return `Token Info:

@@ -46,6 +46,21 @@ interface UploadResult {
 }
 
 /**
+ * 文件信息接口
+ * @interface FileInfo
+ * @property {string} size - 文件大小
+ * @property {string} contentType - 文件类型
+ * @property {string} lastModified - 最后修改时间
+ * @property {string} etag - 文件ETag
+ */
+interface FileInfo {
+  size: string
+  contentType: string
+  lastModified: string
+  etag: string
+}
+
+/**
  * 阿里云OSS客户端类
  * 提供文件上传、下载、删除等操作
  */
@@ -106,7 +121,7 @@ class AliCloudOSS {
         url: result.url,
         key: uniqueKey,
         etag: result.res.headers.etag,
-        size: result.res.size || 0
+        size: (result.res as any).size || 0
       }
     } catch (error) {
       console.error('OSS文件上传失败:', error)
@@ -162,16 +177,6 @@ class AliCloudOSS {
     } catch (error) {
       return false
     }
-  }
-
-  /**
-   * 文件信息类型
-   */
-  type FileInfo = {
-    size: string
-    contentType: string
-    lastModified: string
-    etag: string
   }
 
   /**
@@ -242,7 +247,7 @@ const createOSSClient = (): AliCloudOSS => {
 
 // 导出OSS客户端实例和类
 export { AliCloudOSS, createOSSClient }
-export type { OSSConfig, UploadOptions, UploadResult }
+export type { OSSConfig, UploadOptions, UploadResult, FileInfo }
 
 // 默认导出OSS客户端实例
 export default createOSSClient

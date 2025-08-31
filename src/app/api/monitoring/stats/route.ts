@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { monitoringService } from '@/services/monitoringService';
-import { StatsQuery, EndpointStats, UserUsageStats, ExportData } from '@/types/monitoring';
+import { StatsQuery, EndpointStats, UserUsageStats, ExportData, ApiCallRecord } from '@/types/monitoring';
 import * as XLSX from 'xlsx';
 
 /**
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       query.startDate = new Date(query.endDate.getTime() - 24 * 60 * 60 * 1000);
     }
 
-    let result: EndpointStats[] | UserUsageStats[] | ExportData;
+    let result: EndpointStats[] | UserUsageStats[] | ExportData | ApiCallRecord[];
 
     switch (statsType) {
       case 'records':
@@ -96,7 +96,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             headers.set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
             headers.set('Content-Disposition', `attachment; filename="monitoring-stats-${timestamp}.xlsx"`);
             const xlsxBuffer = convertToXLSX(exportData.data, exportData.metadata);
-            return new NextResponse(xlsxBuffer, { headers });
+            return new NextResponse(new Uint8Array(xlsxBuffer), { headers });
             
           default:
             headers.set('Content-Type', 'application/json');
@@ -205,7 +205,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           query.endDate = new Date(query.endDate);
         }
 
-        let result: EndpointStats[] | UserUsageStats[] | ExportData;
+        let result: EndpointStats[] | UserUsageStats[] | ExportData | ApiCallRecord[];
 
         switch (operation) {
           case 'records':
@@ -380,14 +380,14 @@ function sanitizeQuery(query: Record<string, unknown>): StatsQuery {
   const sanitized: StatsQuery = {};
   
   // 验证和转换日期
-  if (query.startDate) {
+  if (query.startDate && (typeof query.startDate === 'string' || typeof query.startDate === 'number' || query.startDate instanceof Date)) {
     const startDate = new Date(query.startDate);
     if (!isNaN(startDate.getTime())) {
       sanitized.startDate = startDate;
     }
   }
   
-  if (query.endDate) {
+  if (query.endDate && (typeof query.endDate === 'string' || typeof query.endDate === 'number' || query.endDate instanceof Date)) {
     const endDate = new Date(query.endDate);
     if (!isNaN(endDate.getTime())) {
       sanitized.endDate = endDate;
@@ -408,8 +408,8 @@ function sanitizeQuery(query: Record<string, unknown>): StatsQuery {
   }
   
   // 验证枚举字段
-  if (query.groupBy && ['hour', 'day', 'week', 'month'].includes(query.groupBy)) {
-    sanitized.groupBy = query.groupBy;
+  if (query.groupBy && typeof query.groupBy === 'string' && ['hour', 'day', 'week', 'month'].includes(query.groupBy)) {
+    sanitized.groupBy = query.groupBy as 'hour' | 'day' | 'week' | 'month';
   }
   
   // 验证数字字段

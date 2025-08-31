@@ -78,13 +78,11 @@ expect.extend({
 
 // 声明自定义匹配器类型
 declare global {
-  namespace jest {
-    interface Matchers<R> {
-      toBeValidUUID(): R;
-      toBeValidEmail(): R;
-      toBeValidPhoneNumber(): R;
-      toHaveValidTimestamp(): R;
-    }
+  interface CustomMatchers<R = unknown> {
+    toBeValidUUID(): R;
+    toBeValidEmail(): R;
+    toBeValidPhoneNumber(): R;
+    toHaveValidTimestamp(): R;
   }
 }
 

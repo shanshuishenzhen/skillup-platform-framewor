@@ -64,11 +64,11 @@ export async function POST(req: NextRequest) {
     if (validatedData.ai_generated && validatedData.ai_prompt) {
       try {
         console.log('使用AI生成课程内容...');
-        const aiGeneratedCourse = await aiService.generateCourse(validatedData.ai_prompt, {
-          difficulty: validatedData.difficulty_level,
-          category: validatedData.category,
-          duration: validatedData.duration_hours
-        });
+        const aiGeneratedCourse = await aiService.generateCourse(
+          validatedData.ai_prompt,
+          validatedData.difficulty_level,
+          `分类: ${validatedData.category}, 时长: ${validatedData.duration_hours}小时`
+        );
         
         // 合并AI生成的内容和用户提供的数据
         courseData = {

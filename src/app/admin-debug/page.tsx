@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, ChangeEvent } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -105,7 +105,7 @@ export default function AdminDebugPage() {
       }
     } catch (error) {
       console.error('调试过程中发生错误:', error);
-      setDebugResults({ error: error.message });
+      setDebugResults({ error: error instanceof Error ? error.message : String(error) });
     } finally {
       setIsLoading(false);
       setCurrentStep('');
@@ -144,7 +144,7 @@ export default function AdminDebugPage() {
     } catch (error) {
       return {
         success: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
         message: '登录API请求失败'
       };
     }
@@ -173,7 +173,7 @@ export default function AdminDebugPage() {
     } catch (error) {
       return {
         success: false,
-        error: 'JWT token解析失败: ' + error.message
+        error: 'JWT token解析失败: ' + (error instanceof Error ? error.message : String(error))
       };
     }
   };
@@ -196,7 +196,7 @@ export default function AdminDebugPage() {
     } catch (error) {
       return {
         success: false,
-        error: '数据库角色检查失败: ' + error.message
+        error: '数据库角色检查失败: ' + (error instanceof Error ? error.message : String(error))
       };
     }
   };
@@ -224,7 +224,7 @@ export default function AdminDebugPage() {
     } catch (error) {
       return {
         success: false,
-        error: '权限验证API请求失败: ' + error.message
+        error: '权限验证API请求失败: ' + (error instanceof Error ? error.message : String(error))
       };
     }
   };
@@ -254,7 +254,7 @@ export default function AdminDebugPage() {
     } catch (error) {
       return {
         success: false,
-        error: '前端逻辑检查失败: ' + error.message
+        error: '前端逻辑检查失败: ' + (error instanceof Error ? error.message : String(error))
       };
     }
   };
@@ -287,7 +287,7 @@ export default function AdminDebugPage() {
         alert('权限修复失败: ' + data.error);
       }
     } catch (error) {
-      alert('权限修复过程中发生错误: ' + error.message);
+      alert('权限修复过程中发生错误: ' + (error instanceof Error ? error.message : String(error)));
     } finally {
       setIsLoading(false);
       setCurrentStep('');
@@ -433,7 +433,7 @@ export default function AdminDebugPage() {
             <Input
               id="phone"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setPhone(e.target.value)}
               placeholder="请输入管理员手机号"
             />
           </div>
@@ -443,7 +443,7 @@ export default function AdminDebugPage() {
               id="password"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
               placeholder="请输入密码"
             />
           </div>
