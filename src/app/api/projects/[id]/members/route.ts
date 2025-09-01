@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { MemberRole } from '@/types/project';
+import { MemberRole } from '@/types/oa';
 
 // 初始化 Supabase 客户端
 const supabase = createClient(

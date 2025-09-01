@@ -214,7 +214,7 @@ export async function POST(request: NextRequest) {
             throw new Error(`获取用户权限失败: ${userError.message}`);
           }
 
-          let currentPermissions = user.exam_permissions || [];
+          const currentPermissions = user.exam_permissions || [];
           
           if (action === 'grant') {
             // 添加权限

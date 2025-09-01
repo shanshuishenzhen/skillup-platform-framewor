@@ -271,7 +271,7 @@ export default function AdminGuide() {
                   
                   <div>
                     <div className="flex items-center mb-2">
-                      <Image className="h-4 w-4 text-orange-600 mr-2" />
+                      <Image className="h-4 w-4 text-orange-600 mr-2" alt="Image file type icon" />
                       <span className="font-medium text-green-700">图片文件</span>
                     </div>
                     <p className="text-sm text-green-600 ml-6">

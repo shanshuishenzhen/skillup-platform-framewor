@@ -10,10 +10,10 @@ export async function GET(request: NextRequest) {
   try {
     // 验证用户身份
     const authResult = await verifyAdminAccess(request, ['user', 'admin', 'expert', 'student']);
-    if (!authResult.success) {
+    if (!authResult.success || !authResult.user) {
       return NextResponse.json(
-        { error: authResult.error },
-        { status: authResult.status }
+        { message: authResult.message || '用户未经授权' },
+        { status: 403 }
       );
     }
 
@@ -109,10 +109,10 @@ export async function POST(request: NextRequest) {
   try {
     // 验证用户身份
     const authResult = await verifyAdminAccess(request, ['user', 'admin', 'expert', 'student']);
-    if (!authResult.success) {
+    if (!authResult.success || !authResult.user) {
       return NextResponse.json(
-        { error: authResult.error },
-        { status: authResult.status }
+        { message: authResult.message || '用户未经授权' },
+        { status: 403 }
       );
     }
 

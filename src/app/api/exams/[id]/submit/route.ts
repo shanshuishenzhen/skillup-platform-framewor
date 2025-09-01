@@ -14,7 +14,8 @@ import { z } from 'zod';
 const SubmitAnswerSchema = z.object({
   questionId: z.string().min(1, '题目ID不能为空'),
   answer: z.union([z.string(), z.array(z.string())]),
-  timeSpent: z.number().min(0, '答题时间不能为负数')
+  timeSpent: z.number().min(0, '答题时间不能为负数'),
+  submittedAt: z.string()
 });
 
 // 提交考试验证模式
@@ -53,10 +54,10 @@ export async function POST(
 
     // 验证用户身份
     const authResult = await verifyAdminAccess(request, ['student', 'teacher', 'admin']);
-    if (!authResult.success) {
+    if (!authResult.success || !authResult.user) {
       return NextResponse.json(
-        { success: false, message: authResult.error },
-        { status: authResult.status }
+        { success: false, message: authResult.message || '用户未经授权' },
+        { status: 403 }
       );
     }
 
@@ -86,7 +87,7 @@ export async function POST(
 
     // 检查考试尝试是否存在且属于当前用户
     const attempt = await examService.getExamAttemptById(submitData.attemptId);
-    if (!attempt || attempt.userId !== user.id || attempt.examId !== examId) {
+    if (!attempt || attempt.userId !== user.userId || attempt.examId !== examId) {
       return NextResponse.json({
         success: false,
         message: '无效的考试尝试'
@@ -112,7 +113,7 @@ export async function POST(
     }
 
     // 提交考试
-    const result = await examService.submitExam(submitData, user.id);
+    const result = await examService.submitExam(submitData, user.userId);
 
     return NextResponse.json({
       success: true,
@@ -150,10 +151,10 @@ export async function PUT(
 
     // 验证用户身份
     const authResult = await verifyAdminAccess(request, ['student', 'teacher', 'admin']);
-    if (!authResult.success) {
+    if (!authResult.success || !authResult.user) {
       return NextResponse.json(
-        { success: false, message: authResult.error },
-        { status: authResult.status }
+        { success: false, message: authResult.message || '用户未经授权' },
+        { status: 403 }
       );
     }
 
@@ -173,7 +174,7 @@ export async function PUT(
     const answerData: SubmitAnswerRequest = validationResult.data;
 
     // 获取进行中的考试尝试
-    const attempt = await examService.getOngoingExamAttempt(examId, user.id);
+    const attempt = await examService.getOngoingExamAttempt(examId, user.userId);
     if (!attempt) {
       return NextResponse.json({
         success: false,
@@ -219,17 +220,17 @@ export async function GET(
 
     // 验证用户身份
     const authResult = await verifyAdminAccess(request, ['student', 'teacher', 'admin']);
-    if (!authResult.success) {
+    if (!authResult.success || !authResult.user) {
       return NextResponse.json(
-        { success: false, message: authResult.error },
-        { status: authResult.status }
+        { success: false, message: authResult.message || '用户未经授权' },
+        { status: 403 }
       );
     }
 
     const { user } = authResult;
 
     // 获取进行中的考试尝试
-    const attempt = await examService.getOngoingExamAttempt(examId, user.id);
+    const attempt = await examService.getOngoingExamAttempt(examId, user.userId);
     if (!attempt) {
       return NextResponse.json({
         success: false,

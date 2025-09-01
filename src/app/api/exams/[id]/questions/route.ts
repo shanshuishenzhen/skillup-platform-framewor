@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { examService } from '@/services/examService';
-import { verifyAdminAccess } from '@/middleware/rbac';
+import { verifyAdminAccess, UserRole } from '@/middleware/rbac';
 import { CreateQuestionRequest } from '@/types/exam';
 import { z } from 'zod';
 
@@ -100,10 +100,10 @@ export async function POST(
 
     // 验证管理员权限
     const authResult = await verifyAdminAccess(request, ['admin', 'teacher']);
-    if (!authResult.success) {
+    if (!authResult.success || !authResult.user) {
       return NextResponse.json(
-        { success: false, message: authResult.error },
-        { status: authResult.status }
+        { success: false, message: authResult.message || '用户未经授权' },
+        { status: 403 }
       );
     }
 
@@ -135,7 +135,7 @@ export async function POST(
     }
 
     // 检查权限（只有创建者或管理员可以添加题目）
-    if (user.role !== 'admin' && exam.createdBy !== user.id) {
+    if (user.role !== UserRole.ADMIN && exam.createdBy !== user.userId) {
       return NextResponse.json({
         success: false,
         message: '没有权限为此考试添加题目'
@@ -143,7 +143,7 @@ export async function POST(
     }
 
     // 创建题目
-    const question = await examService.createQuestion(questionData, user.id);
+    const question = await examService.createQuestion(questionData, user.userId);
 
     return NextResponse.json({
       success: true,
@@ -181,10 +181,10 @@ export async function PUT(
 
     // 验证管理员权限
     const authResult = await verifyAdminAccess(request, ['admin', 'teacher']);
-    if (!authResult.success) {
+    if (!authResult.success || !authResult.user) {
       return NextResponse.json(
-        { success: false, message: authResult.error },
-        { status: authResult.status }
+        { success: false, message: authResult.message || '用户未经授权' },
+        { status: 403 }
       );
     }
 
@@ -209,7 +209,7 @@ export async function PUT(
     }
 
     // 检查权限
-    if (user.role !== 'admin' && exam.createdBy !== user.id) {
+    if (user.role !== UserRole.ADMIN && exam.createdBy !== user.userId) {
       return NextResponse.json({
         success: false,
         message: '没有权限为此考试添加题目'
@@ -217,7 +217,7 @@ export async function PUT(
     }
 
     // 批量创建题目
-    const results = await examService.batchCreateQuestions(examId, questions, user.id);
+    const results = await examService.batchCreateQuestions(examId, questions, user.userId);
 
     return NextResponse.json({
       success: true,
@@ -257,8 +257,8 @@ export async function DELETE(
     const authResult = await verifyAdminAccess(request, ['admin']);
     if (!authResult.success) {
       return NextResponse.json(
-        { success: false, message: authResult.error },
-        { status: authResult.status }
+        { success: false, message: authResult.message || '用户未经授权' },
+        { status: 403 }
       );
     }
 

@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { examService } from '@/services/examService';
-import { verifyAdminAccess } from '@/middleware/rbac';
+import { verifyAdminAccess, UserRole } from '@/middleware/rbac';
 import { UpdateExamRequest } from '@/types/exam';
 import { z } from 'zod';
 
@@ -68,8 +68,8 @@ export async function GET(
     let userId: string | undefined;
     try {
       const authResult = await verifyAdminAccess(request, ['admin', 'teacher', 'student']);
-      if (authResult.success) {
-        userId = authResult.user.id;
+      if (authResult.success && authResult.user) {
+        userId = authResult.user.userId;
       }
     } catch {
       // 忽略认证错误，允许匿名访问公开考试
@@ -125,10 +125,10 @@ export async function PUT(
 
     // 验证管理员权限
     const authResult = await verifyAdminAccess(request, ['admin', 'teacher']);
-    if (!authResult.success) {
+    if (!authResult.success || !authResult.user) {
       return NextResponse.json(
-        { success: false, message: authResult.error },
-        { status: authResult.status }
+        { success: false, message: authResult.message || '用户未经授权' },
+        { status: 403 }
       );
     }
 
@@ -157,7 +157,7 @@ export async function PUT(
     }
 
     // 检查权限（只有创建者或管理员可以修改）
-    if (user.role !== 'admin' && existingExam.createdBy !== user.id) {
+    if (user.role !== UserRole.ADMIN && existingExam.createdBy !== user.userId) {
       return NextResponse.json({
         success: false,
         message: '没有权限修改此考试'
@@ -165,7 +165,7 @@ export async function PUT(
     }
 
     // 更新考试
-    const updatedExam = await examService.updateExam(id, updateData, user.id);
+    const updatedExam = await examService.updateExam(id, updateData, user.userId);
 
     return NextResponse.json({
       success: true,
@@ -203,10 +203,10 @@ export async function DELETE(
 
     // 验证管理员权限
     const authResult = await verifyAdminAccess(request, ['admin', 'teacher']);
-    if (!authResult.success) {
+    if (!authResult.success || !authResult.user) {
       return NextResponse.json(
-        { success: false, message: authResult.error },
-        { status: authResult.status }
+        { success: false, message: authResult.message || '用户未经授权' },
+        { status: 403 }
       );
     }
 
@@ -222,7 +222,7 @@ export async function DELETE(
     }
 
     // 检查权限（只有创建者或管理员可以删除）
-    if (user.role !== 'admin' && existingExam.createdBy !== user.id) {
+    if (user.role !== UserRole.ADMIN && existingExam.createdBy !== user.userId) {
       return NextResponse.json({
         success: false,
         message: '没有权限删除此考试'
@@ -239,7 +239,7 @@ export async function DELETE(
     }
 
     // 删除考试
-    await examService.deleteExam(id, user.id);
+    await examService.deleteExam(id, user.userId);
 
     return NextResponse.json({
       success: true,

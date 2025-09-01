@@ -31,10 +31,10 @@ export async function POST(
 
     // 验证用户身份
     const authResult = await verifyAdminAccess(request, ['student', 'teacher', 'admin']);
-    if (!authResult.success) {
+    if (!authResult.success || !authResult.user) {
       return NextResponse.json(
-        { success: false, message: authResult.error },
-        { status: authResult.status }
+        { success: false, message: authResult.message || '用户未经授权' },
+        { status: 403 }
       );
     }
 
@@ -68,7 +68,7 @@ export async function POST(
     }
 
     // 检查是否已经报名
-    const existingRegistration = await examService.getExamRegistration(examId, user.id);
+    const existingRegistration = await examService.getExamRegistration(examId, user.userId);
     if (existingRegistration) {
       if (existingRegistration.status === 'approved') {
         return NextResponse.json({
@@ -84,7 +84,7 @@ export async function POST(
     }
 
     // 检查用户资格
-    const eligibility = await examService.checkExamEligibility(examId, user.id);
+    const eligibility = await examService.checkExamEligibility(examId, user.userId);
     if (!eligibility.eligible) {
       return NextResponse.json({
         success: false,
@@ -94,7 +94,7 @@ export async function POST(
     }
 
     // 创建报名记录
-    const registration = await examService.registerForExam(examId, user.id);
+    const registration = await examService.registerForExam(examId, user.userId);
 
     return NextResponse.json({
       success: true,
@@ -132,17 +132,17 @@ export async function DELETE(
 
     // 验证用户身份
     const authResult = await verifyAdminAccess(request, ['student', 'teacher', 'admin']);
-    if (!authResult.success) {
+    if (!authResult.success || !authResult.user) {
       return NextResponse.json(
-        { success: false, message: authResult.error },
-        { status: authResult.status }
+        { success: false, message: authResult.message || '用户未经授权' },
+        { status: 403 }
       );
     }
 
     const { user } = authResult;
 
     // 检查报名记录是否存在
-    const registration = await examService.getExamRegistration(examId, user.id);
+    const registration = await examService.getExamRegistration(examId, user.userId);
     if (!registration) {
       return NextResponse.json({
         success: false,
@@ -172,7 +172,7 @@ export async function DELETE(
     }
 
     // 检查是否已经参加考试
-    const attempts = await examService.getUserExamAttempts(examId, user.id);
+    const attempts = await examService.getUserExamAttempts(examId, user.userId);
     if (attempts.length > 0) {
       return NextResponse.json({
         success: false,
@@ -181,7 +181,7 @@ export async function DELETE(
     }
 
     // 取消报名
-    await examService.cancelExamRegistration(examId, user.id);
+    await examService.cancelExamRegistration(examId, user.userId);
 
     return NextResponse.json({
       success: true,
@@ -218,20 +218,20 @@ export async function GET(
 
     // 验证用户身份
     const authResult = await verifyAdminAccess(request, ['student', 'teacher', 'admin']);
-    if (!authResult.success) {
+    if (!authResult.success || !authResult.user) {
       return NextResponse.json(
-        { success: false, message: authResult.error },
-        { status: authResult.status }
+        { success: false, message: authResult.message || '用户未经授权' },
+        { status: 403 }
       );
     }
 
     const { user } = authResult;
 
     // 获取报名记录
-    const registration = await examService.getExamRegistration(examId, user.id);
+    const registration = await examService.getExamRegistration(examId, user.userId);
     
     // 检查考试资格
-    const eligibility = await examService.checkExamEligibility(examId, user.id);
+    const eligibility = await examService.checkExamEligibility(examId, user.userId);
 
     return NextResponse.json({
       success: true,

@@ -90,9 +90,9 @@ export async function POST(request: NextRequest) {
   try {
     // 验证管理员权限（允许管理员和教师创建考试）
     const authResult = await verifyAdminAccess(request, ['admin', 'teacher']);
-    if (!authResult.success) {
+    if (!authResult.success || !authResult.user) {
       return NextResponse.json(
-        { success: false, message: authResult.message },
+        { success: false, message: authResult.message || '用户未经授权' },
         { status: 403 }
       );
     }
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
     const examData: CreateExamRequest = validationResult.data;
 
     // 创建考试
-    const exam = await examService.createExam(examData, user.id);
+    const exam = await examService.createExam(examData, user.userId);
 
     return NextResponse.json({
       success: true,

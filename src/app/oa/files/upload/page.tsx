@@ -72,7 +72,7 @@ export default function FileUploadPage() {
     const ext = filename.split('.').pop()?.toLowerCase();
     
     if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext || '')) {
-      return <Image className="h-6 w-6 text-green-600" />;
+      return <Image className="h-6 w-6 text-green-600" alt="Image file icon" />;
     }
     if (['mp4', 'avi', 'mov', 'wmv', 'flv'].includes(ext || '')) {
       return <Video className="h-6 w-6 text-red-600" />;

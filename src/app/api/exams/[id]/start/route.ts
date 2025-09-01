@@ -30,10 +30,10 @@ export async function POST(
 
     // 验证用户身份
     const authResult = await verifyAdminAccess(request, ['student', 'teacher', 'admin']);
-    if (!authResult.success) {
+    if (!authResult.success || !authResult.user) {
       return NextResponse.json(
-        { success: false, message: authResult.error },
-        { status: authResult.status }
+        { success: false, message: authResult.message || '用户未经授权' },
+        { status: 403 }
       );
     }
 
@@ -77,7 +77,7 @@ export async function POST(
     }
 
     // 检查报名状态
-    const registration = await examService.getExamRegistration(examId, user.id);
+    const registration = await examService.getExamRegistration(examId, user.userId);
     if (!registration || registration.status !== 'approved') {
       return NextResponse.json({
         success: false,
@@ -86,7 +86,7 @@ export async function POST(
     }
 
     // 检查考试资格
-    const eligibility = await examService.checkExamEligibility(examId, user.id);
+    const eligibility = await examService.checkExamEligibility(examId, user.userId);
     if (!eligibility.canStart) {
       return NextResponse.json({
         success: false,
@@ -99,7 +99,7 @@ export async function POST(
     }
 
     // 检查是否有进行中的考试
-    const ongoingAttempt = await examService.getOngoingExamAttempt(examId, user.id);
+    const ongoingAttempt = await examService.getOngoingExamAttempt(examId, user.userId);
     if (ongoingAttempt) {
       // 返回现有的考试会话
       const questions = await examService.getExamQuestions(examId, false); // 不包含答案
@@ -123,7 +123,7 @@ export async function POST(
     const ipAddress = forwardedFor?.split(',')[0] || realIp || 'unknown';
 
     // 创建新的考试尝试
-    const attempt = await examService.startExam(examId, user.id, {
+    const attempt = await examService.startExam(examId, user.userId, {
       userAgent,
       ipAddress,
       screenResolution: '', // 前端会通过WebSocket发送
@@ -176,17 +176,17 @@ export async function GET(
 
     // 验证用户身份
     const authResult = await verifyAdminAccess(request, ['student', 'teacher', 'admin']);
-    if (!authResult.success) {
+    if (!authResult.success || !authResult.user) {
       return NextResponse.json(
-        { success: false, message: authResult.error },
-        { status: authResult.status }
+        { success: false, message: authResult.message || '用户未经授权' },
+        { status: 403 }
       );
     }
 
     const { user } = authResult;
 
     // 检查是否有进行中的考试
-    const ongoingAttempt = await examService.getOngoingExamAttempt(examId, user.id);
+    const ongoingAttempt = await examService.getOngoingExamAttempt(examId, user.userId);
     
     if (!ongoingAttempt) {
       return NextResponse.json({

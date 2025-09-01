@@ -176,7 +176,7 @@ export default function SimpleFileManager({ currentUser }: SimpleFileManagerProp
   const getFileIcon = (type: string) => {
     switch (type) {
       case 'document': return <FileText className="w-5 h-5 text-blue-500" />;
-      case 'image': return <Image className="w-5 h-5 text-green-500" />;
+      case 'image': return <Image className="w-5 h-5 text-green-500" alt="Image file type icon" />;
       case 'video': return <Video className="w-5 h-5 text-purple-500" />;
       case 'audio': return <Music className="w-5 h-5 text-orange-500" />;
       case 'archive': return <Archive className="w-5 h-5 text-yellow-500" />;
