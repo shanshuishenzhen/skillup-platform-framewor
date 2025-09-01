@@ -1,22 +1,24 @@
 // /src/services/aiDataGeneratorService.ts
 
-// DeepSeek API 客户端 - 使用兼容OpenAI的接口
-interface DeepSeekClient {
-  chat: {
-    completions: {
-      create: (params: any) => Promise<any>;
-    };
-  };
-}
+/**
+ * DeepSeek API 客户端 - 使用兼容OpenAI的接口
+ * @typedef {Object} DeepSeekClient
+ * @property {Object} chat - 聊天接口
+ * @property {Object} chat.completions - 聊天完成接口
+ * @property {Function} chat.completions.create - 创建聊天完成
+ */
 
 // DeepSeek API 实现
-class DeepSeekAPI implements DeepSeekClient {
-  private apiKey: string;
-  private baseURL: string;
-  private timeout: number;
-  private maxRetries: number;
-
-  constructor(config: { apiKey: string; baseURL?: string; timeout?: number; maxRetries?: number }) {
+class DeepSeekAPI {
+  /**
+   * 构造函数
+   * @param {Object} config - 配置对象
+   * @param {string} config.apiKey - API密钥
+   * @param {string} [config.baseURL] - 基础URL
+   * @param {number} [config.timeout] - 超时时间
+   * @param {number} [config.maxRetries] - 最大重试次数
+   */
+  constructor(config) {
     this.apiKey = config.apiKey;
     this.baseURL = config.baseURL || 'https://api.deepseek.com/v1';
     this.timeout = config.timeout || 30000;
@@ -25,7 +27,12 @@ class DeepSeekAPI implements DeepSeekClient {
 
   chat = {
     completions: {
-      create: async (params: any) => {
+      /**
+       * 创建聊天完成
+       * @param {Object} params - 参数对象
+       * @returns {Promise<Object>} API响应
+       */
+      create: async (params) => {
         const response = await fetch(`${this.baseURL}/chat/completions`, {
           method: 'POST',
           headers: {
@@ -57,254 +64,226 @@ import {
   createError,
   RetryConfig
 } from '../utils/errorHandler';
-import type { VirtualTalent } from '../types/virtual';
+// import type { VirtualTalent } from '../types/virtual';
 
 /**
  * AI数据生成服务配置接口
+ * @typedef {Object} AIDataGeneratorConfig
+ * @property {string} apiKey - API密钥
+ * @property {string} [baseURL] - 基础URL
+ * @property {number} [timeout] - 超时时间
+ * @property {number} [maxRetries] - 最大重试次数
+ * @property {string} [model] - 模型名称
  */
-export interface AIDataGeneratorConfig {
-  apiKey: string;
-  baseURL?: string;
-  timeout?: number;
-  maxRetries?: number;
-  model?: string;
-}
 
 /**
  * 课程数据接口
+ * @typedef {Object} VirtualCourse
+ * @property {string} id - 课程ID
+ * @property {string} title - 课程标题
+ * @property {string} description - 课程描述
+ * @property {Object} instructor - 讲师信息
+ * @property {number} price - 价格
+ * @property {number} [originalPrice] - 原价
+ * @property {string} duration - 时长
+ * @property {'beginner'|'intermediate'|'advanced'} level - 难度级别
+ * @property {string} category - 分类
+ * @property {string[]} tags - 标签
+ * @property {number} rating - 评分
+ * @property {number} studentsCount - 学生数量
+ * @property {number} lessonsCount - 课程数量
+ * @property {string} thumbnail - 缩略图
+ * @property {string[]} features - 特性
+ * @property {Object[]} curriculum - 课程大纲
+ * @property {string} createdAt - 创建时间
+ * @property {string} updatedAt - 更新时间
  */
-export interface VirtualCourse {
-  id: string;
-  title: string;
-  description: string;
-  instructor: {
-    name: string;
-    avatar: string;
-    bio: string;
-    rating: number;
-  };
-  price: number;
-  originalPrice?: number;
-  duration: string;
-  level: 'beginner' | 'intermediate' | 'advanced';
-  category: string;
-  tags: string[];
-  rating: number;
-  studentsCount: number;
-  lessonsCount: number;
-  thumbnail: string;
-  features: string[];
-  curriculum: {
-    title: string;
-    duration: string;
-    lessons: string[];
-  }[];
-  createdAt: string;
-  updatedAt: string;
-}
+export const VirtualCourse = {
+  // 这是一个类型定义，不需要实际属性
+};
 
 /**
  * 用户数据接口
+ * @typedef {Object} VirtualUser
+ * @property {string} id - 用户ID
+ * @property {string} name - 用户名
+ * @property {string} avatar - 头像
+ * @property {string} email - 邮箱
+ * @property {'student'|'instructor'|'admin'} role - 角色
+ * @property {string} bio - 简介
+ * @property {string} location - 位置
+ * @property {string} joinDate - 加入日期
+ * @property {number} coursesCompleted - 完成课程数
+ * @property {number} totalStudyTime - 总学习时间
+ * @property {string[]} achievements - 成就
+ * @property {string[]} skills - 技能
+ * @property {number} [rating] - 评分
+ * @property {number} [reviewsCount] - 评价数量
  */
-export interface VirtualUser {
-  id: string;
-  name: string;
-  avatar: string;
-  email: string;
-  role: 'student' | 'instructor' | 'admin';
-  bio: string;
-  location: string;
-  joinDate: string;
-  coursesCompleted: number;
-  totalStudyTime: number;
-  achievements: string[];
-  skills: string[];
-  rating?: number;
-  reviewsCount?: number;
-}
 
 /**
  * 新闻数据接口
+ * @typedef {Object} VirtualNews
+ * @property {string} id - 新闻ID
+ * @property {string} title - 标题
+ * @property {string} content - 内容
+ * @property {string} summary - 摘要
+ * @property {Object} author - 作者信息
+ * @property {string} publishedAt - 发布时间
+ * @property {string} category - 分类
+ * @property {string[]} tags - 标签
+ * @property {string} thumbnail - 缩略图
+ * @property {number} readTime - 阅读时间
+ * @property {number} views - 浏览量
+ * @property {number} likes - 点赞数
+ * @property {number} comments - 评论数
+ * @property {boolean} featured - 是否推荐
+ * @property {'published'|'draft'|'archived'} status - 状态
  */
-export interface VirtualNews {
-  id: string;
-  title: string;
-  content: string;
-  summary: string;
-  author: {
-    name: string;
-    avatar: string;
-    title: string;
-  };
-  publishedAt: string;
-  category: string;
-  tags: string[];
-  thumbnail: string;
-  readTime: number;
-  views: number;
-  likes: number;
-  comments: number;
-  featured: boolean;
-  status: 'published' | 'draft' | 'archived';
-}
 
 /**
  * 培训项目数据接口
+ * @typedef {Object} VirtualTraining
+ * @property {string} id - 培训ID
+ * @property {string} title - 标题
+ * @property {string} description - 描述
+ * @property {'online'|'offline'|'hybrid'} type - 类型
+ * @property {string} duration - 时长
+ * @property {string} startDate - 开始日期
+ * @property {string} endDate - 结束日期
+ * @property {string} [location] - 位置
+ * @property {Object} instructor - 讲师信息
+ * @property {number} price - 价格
+ * @property {number} capacity - 容量
+ * @property {number} enrolled - 已报名
+ * @property {string} category - 分类
+ * @property {'beginner'|'intermediate'|'advanced'} level - 级别
+ * @property {string[]} features - 特性
+ * @property {string[]} requirements - 要求
+ * @property {string[]} outcomes - 结果
+ * @property {Object[]} schedule - 时间表
+ * @property {string} image - 图片
  */
-export interface VirtualTraining {
-  id: string;
-  title: string;
-  description: string;
-  type: 'online' | 'offline' | 'hybrid';
-  duration: string;
-  startDate: string;
-  endDate: string;
-  location?: string;
-  instructor: {
-    name: string;
-    avatar: string;
-    title: string;
-    company: string;
-  };
-  price: number;
-  capacity: number;
-  enrolled: number;
-  category: string;
-  level: 'beginner' | 'intermediate' | 'advanced';
-  features: string[];
-  requirements: string[];
-  outcomes: string[];
-  schedule: {
-    date: string;
-    time: string;
-    topic: string;
-  }[];
-  image: string;
-}
+export const VirtualTraining = {
+  // 这是一个类型定义，不需要实际属性
+};
 
 /**
  * 品牌数据接口
+ * @typedef {Object} VirtualBrand
+ * @property {string} id - 品牌ID
+ * @property {string} name - 品牌名称
+ * @property {string} logo - 品牌logo
+ * @property {string} description - 描述
+ * @property {string} industry - 行业
+ * @property {string} website - 网站
+ * @property {number} foundedYear - 成立年份
+ * @property {string} employees - 员工数
+ * @property {string} location - 位置
+ * @property {Object} partnership - 合作关系
+ * @property {string[]} achievements - 成就
+ * @property {string[]} services - 服务
  */
-export interface VirtualBrand {
-  id: string;
-  name: string;
-  logo: string;
-  description: string;
-  industry: string;
-  website: string;
-  foundedYear: number;
-  employees: string;
-  location: string;
-  partnership: {
-    type: 'strategic' | 'technology' | 'training' | 'certification';
-    since: string;
-    description: string;
-  };
-  achievements: string[];
-  services: string[];
-}
 
 /**
  * 委员会数据接口
+ * @typedef {Object} VirtualCommittee
+ * @property {string} id - 委员会ID
+ * @property {string} name - 委员会名称
+ * @property {string} description - 描述
+ * @property {string} image - 图片
+ * @property {number} memberCount - 成员数量
+ * @property {string[]} activities - 活动
+ * @property {number} establishedYear - 成立年份
+ * @property {string} category - 分类
+ * @property {Object} chairman - 主席信息
+ * @property {string[]} objectives - 目标
+ * @property {string[]} achievements - 成就
  */
-export interface VirtualCommittee {
-  id: string;
-  name: string;
-  description: string;
-  image: string;
-  memberCount: number;
-  activities: string[];
-  establishedYear: number;
-  category: string;
-  chairman: {
-    name: string;
-    avatar: string;
-    title: string;
-    company: string;
-  };
-  objectives: string[];
-  achievements: string[];
-}
 
 /**
  * 委员会成员数据接口
+ * @typedef {Object} VirtualCommitteeMember
+ * @property {string} id - 成员ID
+ * @property {string} name - 姓名
+ * @property {string} avatar - 头像
+ * @property {string} title - 职位
+ * @property {string} company - 公司
+ * @property {string} role - 角色
+ * @property {string} bio - 简介
+ * @property {string[]} expertise - 专长
+ * @property {number} experience - 经验
+ * @property {string[]} education - 教育背景
+ * @property {string[]} achievements - 成就
+ * @property {Object} contact - 联系方式
  */
-export interface VirtualCommitteeMember {
-  id: string;
-  name: string;
-  avatar: string;
-  title: string;
-  company: string;
-  role: string;
-  bio: string;
-  expertise: string[];
-  experience: number;
-  education: string[];
-  achievements: string[];
-  contact: {
-    email: string;
-    linkedin?: string;
-    twitter?: string;
-  };
-}
 
 /**
  * 活动数据接口
+ * @typedef {Object} VirtualEvent
+ * @property {string} id - 活动ID
+ * @property {string} title - 标题
+ * @property {string} description - 描述
+ * @property {'conference'|'workshop'|'seminar'|'networking'|'webinar'} type - 类型
+ * @property {string} startDate - 开始日期
+ * @property {string} endDate - 结束日期
+ * @property {string} startTime - 开始时间
+ * @property {string} endTime - 结束时间
+ * @property {Object} location - 位置信息
+ * @property {Object} organizer - 组织者信息
+ * @property {Object[]} speakers - 演讲者列表
+ * @property {Object[]} agenda - 议程
+ * @property {number} price - 价格
+ * @property {number} capacity - 容量
+ * @property {number} registered - 已注册
+ * @property {string} category - 分类
+ * @property {string[]} tags - 标签
+ * @property {string} thumbnail - 缩略图
+ * @property {string[]} features - 特性
+ * @property {string[]} requirements - 要求
  */
-export interface VirtualEvent {
-  id: string;
-  title: string;
-  description: string;
-  type: 'conference' | 'workshop' | 'seminar' | 'networking' | 'webinar';
-  startDate: string;
-  endDate: string;
-  startTime: string;
-  endTime: string;
-  location: {
-    type: 'online' | 'offline' | 'hybrid';
-    venue?: string;
-    address?: string;
-    city: string;
-  };
-  organizer: {
-    name: string;
-    logo: string;
-    contact: string;
-  };
-  speakers: {
-    name: string;
-    avatar: string;
-    title: string;
-    company: string;
-    topic: string;
-  }[];
-  agenda: {
-    time: string;
-    title: string;
-    speaker?: string;
-    duration: number;
-  }[];
-  price: number;
-  capacity: number;
-  registered: number;
-  category: string;
-  tags: string[];
-  thumbnail: string;
-  features: string[];
-  requirements: string[];
-}
 
 /**
  * AI数据生成服务类
  * @class AIDataGeneratorService
  */
 class AIDataGeneratorService {
-  private deepseek: DeepSeekClient | null = null;
-  private config: AIDataGeneratorConfig;
-  private isInitialized = false;
-  private dataCache = new Map<string, unknown>();
-  private cacheExpiry = new Map<string, number>();
-  private readonly CACHE_DURATION = 5 * 60 * 1000; // 5分钟缓存
+  /**
+   * @private
+   * @type {DeepSeekClient|null}
+   */
+  deepseek = null;
+  
+  /**
+   * @private
+   * @type {AIDataGeneratorConfig}
+   */
+  config;
+  
+  /**
+   * @private
+   * @type {boolean}
+   */
+  isInitialized = false;
+  
+  /**
+   * @private
+   * @type {Map<string, unknown>}
+   */
+  dataCache = new Map();
+  
+  /**
+   * @private
+   * @type {Map<string, number>}
+   */
+  cacheExpiry = new Map();
+  
+  /**
+   * @private
+   * @readonly
+   * @type {number}
+   */
+  CACHE_DURATION = 5 * 60 * 1000; // 5分钟缓存
 
   constructor() {
     this.config = {
@@ -320,7 +299,7 @@ class AIDataGeneratorService {
    * 初始化DeepSeek客户端
    * @private
    */
-  private initialize(): void {
+  initialize() {
     if (this.isInitialized) return;
 
     if (!this.config.apiKey) {
@@ -346,10 +325,10 @@ class AIDataGeneratorService {
   /**
    * 获取缓存数据
    * @private
-   * @param key 缓存键
-   * @returns 缓存的数据或null
+   * @param {string} key - 缓存键
+   * @returns {*|null} 缓存的数据或null
    */
-  private getCachedData<T>(key: string): T | null {
+  getCachedData(key) {
     const expiry = this.cacheExpiry.get(key);
     if (expiry && Date.now() > expiry) {
       this.dataCache.delete(key);
@@ -357,16 +336,16 @@ class AIDataGeneratorService {
       return null;
     }
     const cached = this.dataCache.get(key);
-    return cached ? (cached as T) : null;
+    return cached ? cached : null;
   }
 
   /**
    * 设置缓存数据
    * @private
-   * @param key 缓存键
-   * @param data 要缓存的数据
+   * @param {string} key - 缓存键
+   * @param {*} data - 要缓存的数据
    */
-  private setCachedData<T>(key: string, data: T): void {
+  setCachedData(key, data) {
     this.dataCache.set(key, data);
     this.cacheExpiry.set(key, Date.now() + this.CACHE_DURATION);
   }
@@ -374,19 +353,19 @@ class AIDataGeneratorService {
   /**
    * 生成随机ID
    * @private
-   * @returns 随机ID字符串
+   * @returns {string} 随机ID字符串
    */
-  private generateId(): string {
+  generateId() {
     return Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
   }
 
   /**
    * 生成随机日期
    * @private
-   * @param daysAgo 多少天前（负数表示未来）
-   * @returns ISO日期字符串
+   * @param {number} daysAgo - 多少天前（负数表示未来）
+   * @returns {string} ISO日期字符串
    */
-  private generateRandomDate(daysAgo: number = 30): string {
+  generateRandomDate(daysAgo = 30) {
     const date = new Date();
     date.setDate(date.getDate() - Math.floor(Math.random() * daysAgo));
     return date.toISOString();
@@ -395,11 +374,11 @@ class AIDataGeneratorService {
   /**
    * 生成图片URL
    * @private
-   * @param prompt 图片描述
-   * @param size 图片尺寸
-   * @returns 图片URL
+   * @param {string} prompt - 图片描述
+   * @param {string} size - 图片尺寸
+   * @returns {string} 图片URL
    */
-  private generateImageUrl(prompt: string, size: string = 'square'): string {
+  generateImageUrl(prompt, size = 'square') {
     const encodedPrompt = encodeURIComponent(prompt);
     return `https://trae-api-sg.mchost.guru/api/ide/v1/text_to_image?prompt=${encodedPrompt}&image_size=${size}`;
   }
@@ -407,18 +386,18 @@ class AIDataGeneratorService {
   /**
    * 使用AI生成数据
    * @private
-   * @param prompt AI提示词
-   * @param fallbackData 降级数据
-   * @returns 生成的数据
+   * @param {string} prompt - AI提示词
+   * @param {*} fallbackData - 降级数据
+   * @returns {Promise<*>} 生成的数据
    */
-  private async generateWithAI<T>(prompt: string, fallbackData: T): Promise<T> {
+  async generateWithAI(prompt, fallbackData) {
     if (!this.deepseek) {
       return fallbackData;
     }
 
     try {
       const response = await this.deepseek.chat.completions.create({
-        model: this.config.model!,
+        model: this.config.model,
         messages: [
           {
             role: 'system',
@@ -454,27 +433,27 @@ class AIDataGeneratorService {
 
   /**
    * 生成课程数据
-   * @param count 生成数量
-   * @param category 课程分类
-   * @returns Promise<VirtualCourse[]> 课程数组
+   * @param {number} count - 生成数量
+   * @param {string} [category] - 课程分类
+   * @returns {Promise<VirtualCourse[]>} 课程数组
    */
-  async generateCourses(count: number = 6, category?: string): Promise<VirtualCourse[]> {
+  async generateCourses(count = 6, category) {
     this.initialize();
     
     const cacheKey = `courses_${count}_${category || 'all'}`;
-    const cached = this.getCachedData<VirtualCourse[]>(cacheKey);
+    const cached = this.getCachedData(cacheKey);
     if (cached) return cached;
 
     const categories = ['前端开发', '后端开发', '数据科学', '人工智能', '产品设计', '项目管理', '数字营销', '云计算'];
-    const levels = ['beginner', 'intermediate', 'advanced'] as const;
+    const levels = ['beginner', 'intermediate', 'advanced'];
     
-    const courses: VirtualCourse[] = [];
+    const courses = [];
     
     for (let i = 0; i < count; i++) {
       const courseCategory = category || categories[Math.floor(Math.random() * categories.length)];
       const level = levels[Math.floor(Math.random() * levels.length)];
       
-      const fallbackCourse: VirtualCourse = {
+      const fallbackCourse = {
         id: this.generateId(),
         title: `${courseCategory}实战训练营`,
         description: `深入学习${courseCategory}的核心技能，通过实际项目提升专业能力。`,
@@ -578,28 +557,28 @@ class AIDataGeneratorService {
 
   /**
    * 生成用户数据
-   * @param count 生成数量
-   * @param role 用户角色
-   * @returns Promise<VirtualUser[]> 用户数组
+   * @param {number} count - 生成数量
+   * @param {'student'|'instructor'|'admin'} [role] - 用户角色
+   * @returns {Promise<VirtualUser[]>} 用户数组
    */
-  async generateUsers(count: number = 10, role?: 'student' | 'instructor' | 'admin'): Promise<VirtualUser[]> {
+  async generateUsers(count = 10, role) {
     this.initialize();
     
     const cacheKey = `users_${count}_${role || 'all'}`;
-    const cached = this.getCachedData<VirtualUser[]>(cacheKey);
+    const cached = this.getCachedData(cacheKey);
     if (cached) return cached;
 
-    const roles = ['student', 'instructor', 'admin'] as const;
+    const roles = ['student', 'instructor', 'admin'];
     const cities = ['北京', '上海', '广州', '深圳', '杭州', '成都', '武汉', '西安'];
     const skills = ['JavaScript', 'Python', 'React', 'Vue', 'Node.js', 'Java', 'Go', 'Docker', 'Kubernetes', 'AWS'];
     
-    const users: VirtualUser[] = [];
+    const users = [];
     
     for (let i = 0; i < count; i++) {
       const userRole = role || roles[Math.floor(Math.random() * roles.length)];
       const city = cities[Math.floor(Math.random() * cities.length)];
       
-      const fallbackUser: VirtualUser = {
+      const fallbackUser = {
         id: this.generateId(),
         name: `${['张', '李', '王', '刘', '陈', '杨', '赵', '黄'][Math.floor(Math.random() * 8)]}${['明', '华', '强', '伟', '敏', '丽', '娟', '芳'][Math.floor(Math.random() * 8)]}`,
         avatar: this.generateImageUrl('professional person portrait', 'square'),
@@ -625,25 +604,25 @@ class AIDataGeneratorService {
 
   /**
    * 生成新闻数据
-   * @param count 生成数量
-   * @param category 新闻分类
-   * @returns Promise<VirtualNews[]> 新闻数组
+   * @param {number} count - 生成数量
+   * @param {string} [category] - 新闻分类
+   * @returns {Promise<VirtualNews[]>} 新闻数组
    */
-  async generateNews(count: number = 8, category?: string): Promise<VirtualNews[]> {
+  async generateNews(count = 8, category) {
     this.initialize();
     
     const cacheKey = `news_${count}_${category || 'all'}`;
-    const cached = this.getCachedData<VirtualNews[]>(cacheKey);
+    const cached = this.getCachedData(cacheKey);
     if (cached) return cached;
 
     const categories = ['技术前沿', '行业动态', '教育资讯', '职场发展', '创业创新', '数字化转型'];
     
-    const news: VirtualNews[] = [];
+    const news = [];
     
     for (let i = 0; i < count; i++) {
       const newsCategory = category || categories[Math.floor(Math.random() * categories.length)];
       
-      const fallbackNews: VirtualNews = {
+      const fallbackNews = {
         id: this.generateId(),
         title: `${newsCategory}：最新发展趋势与机遇分析`,
         summary: `深入分析${newsCategory}领域的最新发展动态，为从业者提供有价值的洞察和建议。`,
@@ -662,7 +641,7 @@ class AIDataGeneratorService {
         likes: Math.floor(Math.random() * 500) + 10,
         comments: Math.floor(Math.random() * 100) + 5,
         featured: Math.random() > 0.7,
-        status: 'published' as const
+        status: 'published'
       };
 
       news.push(fallbackNews);
@@ -674,23 +653,23 @@ class AIDataGeneratorService {
 
   /**
    * 生成培训项目数据
-   * @param count 生成数量
-   * @param type 培训类型
-   * @returns Promise<VirtualTraining[]> 培训项目数组
+   * @param {number} count - 生成数量
+   * @param {'online'|'offline'|'hybrid'} [type] - 培训类型
+   * @returns {Promise<VirtualTraining[]>} 培训项目数组
    */
-  async generateTrainings(count: number = 6, type?: 'online' | 'offline' | 'hybrid'): Promise<VirtualTraining[]> {
+  async generateTrainings(count = 6, type) {
     this.initialize();
     
     const cacheKey = `trainings_${count}_${type || 'all'}`;
-    const cached = this.getCachedData<VirtualTraining[]>(cacheKey);
+    const cached = this.getCachedData(cacheKey);
     if (cached) return cached;
 
-    const types = ['online', 'offline', 'hybrid'] as const;
+    const types = ['online', 'offline', 'hybrid'];
     const categories = ['技能提升', '管理培训', '技术认证', '职业发展', '团队建设', '创新思维'];
-    const levels = ['beginner', 'intermediate', 'advanced'] as const;
+    const levels = ['beginner', 'intermediate', 'advanced'];
     const cities = ['北京', '上海', '广州', '深圳', '杭州', '成都'];
     
-    const trainings: VirtualTraining[] = [];
+    const trainings = [];
     
     for (let i = 0; i < count; i++) {
       const trainingType = type || types[Math.floor(Math.random() * types.length)];
@@ -703,7 +682,7 @@ class AIDataGeneratorService {
       const endDate = new Date(startDate);
       endDate.setDate(endDate.getDate() + Math.floor(Math.random() * 14) + 1);
       
-      const fallbackTraining: VirtualTraining = {
+      const fallbackTraining = {
         id: this.generateId(),
         title: `${category}专业培训班`,
         description: `专业的${category}培训课程，帮助学员快速提升相关技能和能力。`,
@@ -750,23 +729,23 @@ class AIDataGeneratorService {
 
   /**
    * 生成品牌数据
-   * @param count 生成数量
-   * @param industry 行业类型
-   * @returns Promise<VirtualBrand[]> 品牌数组
+   * @param {number} count - 生成数量
+   * @param {string} [industry] - 行业类型
+   * @returns {Promise<VirtualBrand[]>} 品牌数组
    */
-  async generateBrands(count: number = 8, industry?: string): Promise<VirtualBrand[]> {
+  async generateBrands(count = 8, industry) {
     this.initialize();
     
     const cacheKey = `brands_${count}_${industry || 'all'}`;
-    const cached = this.getCachedData<VirtualBrand[]>(cacheKey);
+    const cached = this.getCachedData(cacheKey);
     if (cached) return cached;
 
     const industries = ['科技', '教育', '金融', '医疗', '制造', '零售', '咨询', '媒体'];
-    const partnershipTypes = ['strategic', 'technology', 'training', 'certification'] as const;
+    const partnershipTypes = ['strategic', 'technology', 'training', 'certification'];
     const employeeRanges = ['50-100人', '100-500人', '500-1000人', '1000-5000人', '5000+人'];
     const cities = ['北京', '上海', '广州', '深圳', '杭州', '成都', '武汉', '西安'];
     
-    const brands: VirtualBrand[] = [];
+    const brands = [];
     
     for (let i = 0; i < count; i++) {
       const brandIndustry = industry || industries[Math.floor(Math.random() * industries.length)];
@@ -774,7 +753,7 @@ class AIDataGeneratorService {
       const employees = employeeRanges[Math.floor(Math.random() * employeeRanges.length)];
       const city = cities[Math.floor(Math.random() * cities.length)];
       
-      const fallbackBrand: VirtualBrand = {
+      const fallbackBrand = {
         id: this.generateId(),
         name: `${brandIndustry}创新科技有限公司`,
         logo: this.generateImageUrl(`${brandIndustry} company logo`, 'square'),
@@ -802,14 +781,14 @@ class AIDataGeneratorService {
 
   /**
    * 生成委员会数据
-   * @param count 生成数量
-   * @returns Promise<VirtualCommittee[]> 委员会数组
+   * @param {number} count - 生成数量
+   * @returns {Promise<VirtualCommittee[]>} 委员会数组
    */
-  async generateCommittees(count: number = 8): Promise<VirtualCommittee[]> {
+  async generateCommittees(count = 8) {
     this.initialize();
     
     const cacheKey = `committees_${count}`;
-    const cached = this.getCachedData<VirtualCommittee[]>(cacheKey);
+    const cached = this.getCachedData(cacheKey);
     if (cached) return cached;
 
     const categories = ['技术创新', '产品发展', '教育培训', '标准制定', '行业研究', '质量管理'];
@@ -818,13 +797,13 @@ class AIDataGeneratorService {
       '质量认证', '创新项目评审', '行业报告发布', '专业论坛', '技术咨询'
     ];
     
-    const committees: VirtualCommittee[] = [];
+    const committees = [];
     
     for (let i = 0; i < count; i++) {
       const category = categories[Math.floor(Math.random() * categories.length)];
       const committeeActivities = activities.slice(0, Math.floor(Math.random() * 4) + 3);
       
-      const fallbackCommittee: VirtualCommittee = {
+      const fallbackCommittee = {
         id: this.generateId(),
         name: `${category}专业委员会`,
         description: `致力于${category}领域的专业发展，推动行业标准制定和技术创新。`,
@@ -862,14 +841,14 @@ class AIDataGeneratorService {
 
   /**
    * 生成委员会成员数据
-   * @param count 生成数量
-   * @returns Promise<VirtualCommitteeMember[]> 委员会成员数组
+   * @param {number} count - 生成数量
+   * @returns {Promise<VirtualCommitteeMember[]>} 委员会成员数组
    */
-  async generateCommitteeMembers(count: number = 12): Promise<VirtualCommitteeMember[]> {
+  async generateCommitteeMembers(count = 12) {
     this.initialize();
     
     const cacheKey = `committee_members_${count}`;
-    const cached = this.getCachedData<VirtualCommitteeMember[]>(cacheKey);
+    const cached = this.getCachedData(cacheKey);
     if (cached) return cached;
 
     const titles = ['首席技术官', '技术总监', '产品总监', '研发总监', '架构师', '高级工程师'];
@@ -878,7 +857,7 @@ class AIDataGeneratorService {
     const expertise = ['人工智能', '云计算', '大数据', '区块链', '物联网', '网络安全', '移动开发', '前端技术'];
     const education = ['计算机科学硕士', '软件工程博士', '信息技术学士', '数据科学硕士'];
     
-    const members: VirtualCommitteeMember[] = [];
+    const members = [];
     
     for (let i = 0; i < count; i++) {
       const title = titles[Math.floor(Math.random() * titles.length)];
@@ -887,7 +866,7 @@ class AIDataGeneratorService {
       const memberExpertise = expertise.slice(0, Math.floor(Math.random() * 3) + 2);
       const memberEducation = education.slice(0, Math.floor(Math.random() * 2) + 1);
       
-      const fallbackMember: VirtualCommitteeMember = {
+      const fallbackMember = {
         id: this.generateId(),
         name: `${['张', '李', '王', '刘', '陈', '杨', '赵', '黄'][Math.floor(Math.random() * 8)]}${['明', '华', '强', '伟', '敏', '丽', '娟', '芳'][Math.floor(Math.random() * 8)]}`,
         avatar: this.generateImageUrl('professional executive portrait', 'square'),
@@ -915,23 +894,23 @@ class AIDataGeneratorService {
 
   /**
    * 生成活动数据
-   * @param count 生成数量
-   * @param type 活动类型
-   * @returns Promise<VirtualEvent[]> 活动数组
+   * @param {number} count - 生成数量
+   * @param {string} type - 活动类型
+   * @returns {Promise<VirtualEvent[]>} 活动数组
    */
-  async generateEvents(count: number = 6, type?: 'conference' | 'workshop' | 'seminar' | 'networking' | 'webinar'): Promise<VirtualEvent[]> {
+  async generateEvents(count = 6, type) {
     this.initialize();
     
     const cacheKey = `events_${count}_${type || 'all'}`;
-    const cached = this.getCachedData<VirtualEvent[]>(cacheKey);
+    const cached = this.getCachedData(cacheKey);
     if (cached) return cached;
 
-    const types = ['conference', 'workshop', 'seminar', 'networking', 'webinar'] as const;
+    const types = ['conference', 'workshop', 'seminar', 'networking', 'webinar'];
     const categories = ['技术大会', '产品发布', '行业峰会', '创新论坛', '培训研讨', '网络交流'];
     const cities = ['北京', '上海', '广州', '深圳', '杭州', '成都'];
     const venues = ['国际会议中心', '科技园会议厅', '创新中心', '大学礼堂', '酒店会议室'];
     
-    const events: VirtualEvent[] = [];
+    const events = [];
     
     for (let i = 0; i < count; i++) {
       const eventType = type || types[Math.floor(Math.random() * types.length)];
@@ -946,7 +925,7 @@ class AIDataGeneratorService {
         endDate.setDate(endDate.getDate() + Math.floor(Math.random() * 3) + 1);
       }
       
-      const fallbackEvent: VirtualEvent = {
+      const fallbackEvent = {
         id: this.generateId(),
         title: `2024年${category}`,
         description: `汇聚行业精英，分享最新技术趋势和实践经验的专业${category}。`,
@@ -1013,15 +992,15 @@ class AIDataGeneratorService {
 
   /**
    * 生成人才数据
-   * @param count 生成数量
-   * @param category 人才分类
-   * @returns Promise<VirtualTalent[]> 人才数组
+   * @param {number} count - 生成数量
+   * @param {string} category - 人才分类
+   * @returns {Promise<VirtualTalent[]>} 人才数组
    */
-  async generateTalents(count: number = 8, category?: string): Promise<VirtualTalent[]> {
+  async generateTalents(count = 8, category) {
     this.initialize();
     
     const cacheKey = `talents_${count}_${category || 'all'}`;
-    const cached = this.getCachedData<VirtualTalent[]>(cacheKey);
+    const cached = this.getCachedData(cacheKey);
     if (cached) return cached;
 
     const categories = ['UI设计', '包装设计', '室内设计', '广告创意', '工业设计', '平面设计', '形象设计', '摄影'];
@@ -1037,12 +1016,12 @@ class AIDataGeneratorService {
       '摄影': ['摄影技巧', 'Lightroom', 'Photoshop', '商业摄影', '人像摄影', '后期处理']
     };
     
-    const talents: VirtualTalent[] = [];
+    const talents = [];
     
     for (let i = 0; i < count; i++) {
       const talentCategory = category || categories[Math.floor(Math.random() * categories.length)];
       const title = titles[Math.floor(Math.random() * titles.length)];
-      const talentSkills = skills[talentCategory as keyof typeof skills] || skills['UI设计'];
+      const talentSkills = skills[talentCategory] || skills['UI设计'];
       const selectedSkills = talentSkills.slice(0, Math.floor(Math.random() * 4) + 3);
       
       const experience = Math.floor(Math.random() * 10) + 2;
@@ -1055,7 +1034,7 @@ class AIDataGeneratorService {
         `国际${talentCategory}竞赛获奖作品`
       ].slice(0, Math.floor(Math.random() * 3) + 2);
       
-      const fallbackTalent: VirtualTalent = {
+      const fallbackTalent = {
         id: this.generateId(),
         name: `${['张', '李', '王', '刘', '陈', '杨', '赵', '黄', '周', '吴'][Math.floor(Math.random() * 10)]}${['设计', '创意', '艺术', '美学', '视觉'][Math.floor(Math.random() * 5)]}${['师', '家', '专家'][Math.floor(Math.random() * 3)]}`,
         title: `${title} - ${talentCategory}`,
@@ -1088,16 +1067,16 @@ class AIDataGeneratorService {
   /**
    * 清除所有缓存
    */
-  clearCache(): void {
+  clearCache() {
     this.dataCache.clear();
     this.cacheExpiry.clear();
   }
 
   /**
    * 检查服务状态
-   * @returns Promise<boolean> 服务是否可用
+   * @returns {Promise<boolean>} 服务是否可用
    */
-  async checkServiceHealth(): Promise<boolean> {
+  async checkServiceHealth() {
     try {
       this.initialize();
       return this.isInitialized;

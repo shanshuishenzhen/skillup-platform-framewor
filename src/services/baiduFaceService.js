@@ -18,181 +18,82 @@ import * as crypto from 'crypto';
 
 /**
  * 百度人脸识别API响应基础接口
+ * @typedef {Object} BaiduApiResponse
+ * @property {number} [error_code] - 错误代码
+ * @property {string} [error_msg] - 错误信息
+ * @property {number} log_id - 日志ID
+ * @property {number} timestamp - 时间戳
+ * @property {number} cached - 缓存标识
+ * @property {Object} [result] - 结果数据
  */
-export interface BaiduApiResponse {
-  error_code?: number;
-  error_msg?: string;
-  log_id: number;
-  timestamp: number;
-  cached: number;
-  result?: Record<string, unknown>;
-}
-
-/**
- * 百度人脸识别API响应接口（别名）
- */
-export type BaiduFaceApiResponse = BaiduApiResponse;
 
 /**
  * 人脸检测结果接口
+ * @typedef {Object} FaceDetectionResult
+ * @property {number} face_num - 人脸数量
+ * @property {Array} face_list - 人脸列表
  */
-export interface FaceDetectionResult {
-  face_num: number;
-  face_list: Array<{
-    face_token: string;
-    location: {
-      left: number;
-      top: number;
-      width: number;
-      height: number;
-      rotation: number;
-    };
-    face_probability: number;
-    angle: {
-      yaw: number;
-      pitch: number;
-      roll: number;
-    };
-    age: number;
-    beauty: number;
-    expression: {
-      type: string;
-      probability: number;
-    };
-    face_shape: {
-      type: string;
-      probability: number;
-    };
-    gender: {
-      type: string;
-      probability: number;
-    };
-    glasses: {
-      type: string;
-      probability: number;
-    };
-    landmark: Array<{
-      x: number;
-      y: number;
-    }>;
-    landmark72: Array<{
-      x: number;
-      y: number;
-    }>;
-    landmark150: Array<{
-      x: number;
-      y: number;
-    }>;
-    quality: {
-      occlusion: {
-        left_eye: number;
-        right_eye: number;
-        nose: number;
-        mouth: number;
-        left_cheek: number;
-        right_cheek: number;
-        chin_contour: number;
-      };
-      blur: number;
-      illumination: number;
-      completeness: number;
-    };
-  }>;
-}
+
 
 /**
  * 人脸比对结果接口
+ * @typedef {Object} FaceMatchResult
+ * @property {number} score - 相似度分数
+ * @property {Array} face_list - 人脸列表
  */
-export interface FaceMatchResult {
-  score: number;
-  face_list: Array<{
-    face_token: string;
-  }>;
-}
-
-
 
 /**
  * 活体检测结果接口
+ * @typedef {Object} LivenessResult
+ * @property {number} face_liveness - 活体检测分数
+ * @property {Object} thresholds - 阈值
  */
-export interface LivenessResult {
-  face_liveness: number;
-  thresholds: {
-    frr_1e4: number;
-    frr_1e3: number;
-    frr_1e2: number;
-  };
-}
 
 /**
  * 人脸检测响应接口
+ * @typedef {Object} FaceDetectionResponse
+ * @property {boolean} success - 是否成功
+ * @property {string} message - 消息
+ * @property {string} [faceToken] - 人脸令牌
+ * @property {number} [faceCount] - 人脸数量
+ * @property {Object} [quality] - 质量信息
  */
-export interface FaceDetectionResponse {
-  success: boolean;
-  message: string;
-  faceToken?: string;
-  faceCount?: number;
-  quality?: {
-    blur: number;
-    illumination: number;
-    completeness: number;
-    occlusion: {
-      left_eye: number;
-      right_eye: number;
-      nose: number;
-      mouth: number;
-    };
-  };
-}
 
 /**
  * 人脸比对响应接口
+ * @typedef {Object} FaceCompareResult
+ * @property {boolean} success - 是否成功
+ * @property {string} message - 消息
+ * @property {number} [score] - 相似度分数
+ * @property {boolean} [isMatch] - 是否匹配
  */
-export interface FaceCompareResult {
-  success: boolean;
-  message: string;
-  score?: number;
-  isMatch?: boolean;
-}
 
 /**
  * 人脸注册响应接口
+ * @typedef {Object} FaceRegisterResult
+ * @property {boolean} success - 是否成功
+ * @property {string} message - 消息
+ * @property {string} [faceToken] - 人脸令牌
  */
-export interface FaceRegisterResult {
-  success: boolean;
-  message: string;
-  faceToken?: string;
-}
 
 /**
  * 人脸搜索响应接口
+ * @typedef {Object} FaceSearchResult
+ * @property {boolean} success - 是否成功
+ * @property {string} message - 消息
+ * @property {Array} [userList] - 用户列表
  */
-export interface FaceSearchResult {
-  success: boolean;
-  message: string;
-  userList?: Array<{
-    userId: string;
-    score: number;
-    groupId: string;
-  }>;
-}
 
 /**
  * 人脸特征模板接口
+ * @typedef {Object} FaceTemplate
+ * @property {string} face_token - 人脸令牌
+ * @property {Array} landmark - 关键点
+ * @property {Array} landmark72 - 72个关键点
+ * @property {Object} quality - 质量信息
+ * @property {number} timestamp - 时间戳
+ * @property {string} version - 版本
  */
-export interface FaceTemplate {
-  face_token: string;
-  landmark: Array<{ x: number; y: number }>;
-  landmark72: Array<{ x: number; y: number }>;
-  quality: {
-    blur: number;
-    illumination: number;
-    completeness: number;
-    occlusion: Record<string, number>;
-  };
-  timestamp: number;
-  version: string;
-}
 
 /**
  * 百度人脸识别服务错误类（保持向后兼容）
@@ -200,10 +101,10 @@ export interface FaceTemplate {
  */
 export class BaiduFaceServiceError extends AppError {
   constructor(
-    message: string,
-    code?: string,
-    statusCode?: number,
-    originalError?: Error | unknown
+    message,
+    code,
+    statusCode,
+    originalError
   ) {
     super(ErrorType.FACE_RECOGNITION_ERROR, message, {
       code,
@@ -220,14 +121,14 @@ export class BaiduFaceServiceError extends AppError {
  * 百度AI人脸识别服务类
  */
 class BaiduFaceService {
-  private apiKey: string;
-  private secretKey: string;
-  private accessToken: string | null = null;
-  private tokenExpireTime: number = 0;
-  private readonly baseUrl = 'https://aip.baidubce.com';
-  private readonly authUrl = 'https://aip.baidubce.com/oauth/2.0/token';
-
   constructor() {
+    this.apiKey = '';
+    this.secretKey = '';
+    this.accessToken = null;
+    this.tokenExpireTime = 0;
+    this.baseUrl = 'https://aip.baidubce.com';
+    this.authUrl = 'https://aip.baidubce.com/oauth/2.0/token';
+
     const envConfig = getEnvConfig();
     this.apiKey = envConfig.baidu.apiKey;
     this.secretKey = envConfig.baidu.secretKey;
@@ -248,9 +149,9 @@ class BaiduFaceService {
   /**
    * 获取访问令牌
    * @private
-   * @returns Promise<string> 访问令牌
+   * @returns {Promise<string>} 访问令牌
    */
-  private async getAccessToken(): Promise<string> {
+  async getAccessToken() {
     // 检查token是否过期
     if (this.accessToken && Date.now() < this.tokenExpireTime) {
       return this.accessToken;
@@ -333,9 +234,9 @@ class BaiduFaceService {
 
   /**
    * 获取人脸识别服务重试配置
-   * @returns 重试配置
+   * @returns {Object} 重试配置
    */
-  private getRetryConfig(): RetryConfig {
+  getRetryConfig() {
     return {
       maxAttempts: 3,
       baseDelay: 1000,
@@ -355,14 +256,11 @@ class BaiduFaceService {
   /**
    * 发送API请求
    * @private
-   * @param endpoint API端点
-   * @param data 请求数据
-   * @returns Promise<BaiduFaceApiResponse> API响应
+   * @param {string} endpoint API端点
+   * @param {Object|Array} data 请求数据
+   * @returns {Promise<Object>} API响应
    */
-  private async makeApiRequest(
-    endpoint: string,
-    data: Record<string, unknown> | unknown[]
-  ): Promise<BaiduFaceApiResponse> {
+  async makeApiRequest(endpoint, data) {
     try {
       const accessToken = await this.getAccessToken();
       const url = `${this.baseUrl}${endpoint}?access_token=${accessToken}`;
@@ -424,17 +322,11 @@ class BaiduFaceService {
 
   /**
    * 人脸检测
-   * @param imageBase64 图像的base64编码（不包含data:image前缀）
-   * @param options 检测选项
-   * @returns Promise<FaceDetectionResult> 检测结果
+   * @param {string} imageBase64 图像的base64编码（不包含data:image前缀）
+   * @param {Object} options 检测选项
+   * @returns {Promise<Object>} 检测结果
    */
-  async detectFace(
-    imageBase64: string,
-    options: {
-      faceField?: string;
-      maxFaceNum?: number;
-    } = {}
-  ): Promise<FaceDetectionResponse> {
+  async detectFace(imageBase64, options = {}) {
     try {
       const requestData = {
         image: imageBase64,
@@ -445,7 +337,7 @@ class BaiduFaceService {
 
       const response = await this.makeApiRequest('/rest/2.0/face/v3/detect', requestData);
 
-      if (!response.result || !response.result.face_list || !(response.result.face_list as any[])?.length) {
+      if (!response.result || !response.result.face_list || !response.result.face_list?.length) {
         return {
           success: false,
           message: '未检测到人脸',
@@ -453,13 +345,13 @@ class BaiduFaceService {
         };
       }
 
-      const face = (response.result.face_list as any[])[0];
+      const face = response.result.face_list[0];
       
       return {
         success: true,
         message: '人脸检测成功',
         faceToken: face.face_token,
-        faceCount: (response.result.face_num as number) || 0,
+        faceCount: response.result.face_num || 0,
         quality: face.quality ? {
           blur: face.quality.blur,
           illumination: face.quality.illumination,
@@ -488,14 +380,11 @@ class BaiduFaceService {
 
   /**
    * 人脸比对
-   * @param imageBase64_1 第一张图像的base64编码
-   * @param imageBase64_2 第二张图像的base64编码
-   * @returns Promise<FaceCompareResult> 比对结果
+   * @param {string} imageBase64_1 第一张图像的base64编码
+   * @param {string} imageBase64_2 第二张图像的base64编码
+   * @returns {Promise<Object>} 比对结果
    */
-  async compareFaces(
-    imageBase64_1: string,
-    imageBase64_2: string
-  ): Promise<FaceCompareResult> {
+  async compareFaces(imageBase64_1, imageBase64_2) {
     try {
       const requestData = [
         {
@@ -521,7 +410,7 @@ class BaiduFaceService {
         };
       }
 
-      const score = response.result.score as number;
+      const score = response.result.score;
       const threshold = 80; // 相似度阈值
       const isMatch = score >= threshold;
 
@@ -547,18 +436,18 @@ class BaiduFaceService {
 
   /**
    * 人脸注册到人脸库
-   * @param imageBase64 图像的base64编码
-   * @param userId 用户ID
-   * @param groupId 用户组ID
-   * @param userInfo 用户信息
-   * @returns Promise<FaceRegisterResult> 注册结果
+   * @param {string} imageBase64 图像的base64编码
+   * @param {string} userId 用户ID
+   * @param {string} [groupId='skillup_users'] 用户组ID
+   * @param {string} [userInfo] 用户信息
+   * @returns {Promise<Object>} 注册结果
    */
   async registerFace(
-    imageBase64: string,
-    userId: string,
-    groupId: string = 'skillup_users',
-    userInfo?: string
-  ): Promise<FaceRegisterResult> {
+    imageBase64,
+    userId,
+    groupId = 'skillup_users',
+    userInfo
+  ) {
     try {
       const requestData = {
         image: imageBase64,
@@ -575,7 +464,7 @@ class BaiduFaceService {
       return {
         success: true,
         message: '人脸注册成功',
-        faceToken: response.result?.face_token as string
+        faceToken: response.result?.face_token
       };
     } catch (error) {
       if (error instanceof AppError) {
@@ -593,14 +482,11 @@ class BaiduFaceService {
 
   /**
    * 删除用户
-   * @param groupId 用户组ID
-   * @param userId 用户ID
-   * @returns Promise<{ success: boolean; message: string }> 删除结果
+   * @param {string} groupId 用户组ID
+   * @param {string} userId 用户ID
+   * @returns {Promise<Object>} 删除结果
    */
-  async deleteUser(
-    groupId: string,
-    userId: string
-  ): Promise<{ success: boolean; message: string }> {
+  async deleteUser(groupId, userId) {
     try {
       const requestData = {
         group_id: groupId,
@@ -629,31 +515,23 @@ class BaiduFaceService {
 
   /**
    * 添加用户（registerFace 的别名）
-   * @param imageBase64 图像的base64编码
-   * @param userId 用户ID
-   * @param groupId 用户组ID
-   * @param userInfo 用户信息
-   * @returns Promise<FaceRegisterResult> 注册结果
+   * @param {string} imageBase64 图像的base64编码
+   * @param {string} userId 用户ID
+   * @param {string} groupId 用户组ID
+   * @param {string} userInfo 用户信息
+   * @returns {Promise<Object>} 注册结果
    */
-  async addUser(
-    imageBase64: string,
-    userId: string,
-    groupId: string = 'skillup_users',
-    userInfo?: string
-  ): Promise<FaceRegisterResult> {
+  async addUser(imageBase64, userId, groupId = 'skillup_users', userInfo) {
     return this.registerFace(imageBase64, userId, groupId, userInfo);
   }
 
   /**
    * 人脸搜索
-   * @param imageBase64 图像的base64编码
-   * @param groupIdList 用户组ID列表
-   * @returns Promise<FaceSearchResult> 搜索结果
+   * @param {string} imageBase64 图像的base64编码
+   * @param {Array} groupIdList 用户组ID列表
+   * @returns {Promise<Object>} 搜索结果
    */
-  async searchFace(
-    imageBase64: string,
-    groupIdList: string[] = ['skillup_users']
-  ): Promise<FaceSearchResult> {
+  async searchFace(imageBase64, groupIdList = ['skillup_users']) {
     try {
       const requestData = {
         image: imageBase64,
@@ -667,14 +545,14 @@ class BaiduFaceService {
 
       const response = await this.makeApiRequest('/rest/2.0/face/v3/search', requestData);
 
-      if (!response.result || !response.result.user_list || !(response.result.user_list as any[])?.length) {
+      if (!response.result || !response.result.user_list || !response.result.user_list?.length) {
         return {
           success: false,
           message: '未找到匹配的人脸'
         };
       }
 
-      const userList = (response.result.user_list as any[]).map((user: any) => ({
+      const userList = response.result.user_list.map((user) => ({
         userId: user.user_id,
         score: user.score,
         groupId: user.group_id
@@ -701,12 +579,10 @@ class BaiduFaceService {
 
   /**
    * 活体检测
-   * @param imageBase64 图像的base64编码
-   * @returns Promise<{ success: boolean; message: string; isLive?: boolean; score?: number }> 活体检测结果
+   * @param {string} imageBase64 图像的base64编码
+   * @returns {Promise<Object>} 活体检测结果
    */
-  async livenessDetection(
-    imageBase64: string
-  ): Promise<{ success: boolean; message: string; isLive?: boolean; score?: number }> {
+  async livenessDetection(imageBase64) {
     try {
       const requestData = {
         image: imageBase64,
@@ -723,7 +599,7 @@ class BaiduFaceService {
       }
 
       // 百度AI活体检测返回的是一个分数，通常大于0.5认为是活体
-      const score = (response.result.score as number) || 0;
+      const score = response.result.score || 0;
       const threshold = 0.5;
       const isLive = score >= threshold;
 
@@ -749,9 +625,9 @@ class BaiduFaceService {
 
   /**
    * 检查服务是否可用
-   * @returns Promise<boolean> 服务是否可用
+   * @returns {Promise<boolean>} 服务是否可用
    */
-  async isServiceAvailable(): Promise<boolean> {
+  async isServiceAvailable() {
     try {
       await this.getAccessToken();
       return true;
@@ -763,10 +639,10 @@ class BaiduFaceService {
 
   /**
    * 生成人脸特征模板
-   * @param imageBase64 图片的base64编码
-   * @returns Promise<string> 加密后的人脸特征模板
+   * @param {string} imageBase64 图片的base64编码
+   * @returns {Promise<string>} 加密后的人脸特征模板
    */
-  async generateFaceTemplate(imageBase64: string): Promise<string> {
+  async generateFaceTemplate(imageBase64) {
     try {
       // 首先进行人脸检测
       const requestData = {
@@ -778,7 +654,7 @@ class BaiduFaceService {
 
       const response = await this.makeApiRequest('/rest/2.0/face/v3/detect', requestData);
 
-      if (!response.result || !response.result.face_list || !(response.result.face_list as any[])?.length) {
+      if (!response.result || !response.result.face_list || !response.result.face_list?.length) {
         throw createError(
           ErrorType.FACE_RECOGNITION_ERROR,
           '未检测到人脸',
@@ -790,7 +666,7 @@ class BaiduFaceService {
         );
       }
 
-      if ((response.result.face_list as any[]).length > 1) {
+      if (response.result.face_list.length > 1) {
         throw createError(
           ErrorType.FACE_RECOGNITION_ERROR,
           '检测到多张人脸，请确保图片中只有一张人脸',
@@ -802,7 +678,7 @@ class BaiduFaceService {
         );
       }
 
-      const face = (response.result.face_list as any[])[0];
+      const face = response.result.face_list[0];
 
       // 检查人脸质量
       if (face.face_probability < 0.8) {
@@ -857,7 +733,7 @@ class BaiduFaceService {
       }
 
       // 生成人脸特征模板
-      const template: FaceTemplate = {
+      const template = {
         face_token: face.face_token,
         landmark: face.landmark || [],
         landmark72: face.landmark72 || [],
@@ -892,10 +768,10 @@ class BaiduFaceService {
 
   /**
    * 加密人脸模板
-   * @param template 人脸模板字符串
-   * @returns string 加密后的模板
+   * @param {string} template 人脸模板字符串
+   * @returns {string} 加密后的模板
    */
-  private encryptTemplate(template: string): string {
+  encryptTemplate(template) {
     try {
       const algorithm = 'aes-256-cbc';
       const secretKey = process.env.FACE_TEMPLATE_SECRET || 'skillup-platform-face-secret-key-2024';
@@ -924,10 +800,10 @@ class BaiduFaceService {
 
   /**
    * 解密人脸模板
-   * @param encryptedTemplate 加密的模板
-   * @returns string 解密后的模板
+   * @param {string} encryptedTemplate 加密的模板字符串
+   * @returns {string} 解密后的模板
    */
-  private decryptTemplate(encryptedTemplate: string): string {
+  decryptTemplate(encryptedTemplate) {
     try {
       const algorithm = 'aes-256-cbc';
       const secretKey = process.env.FACE_TEMPLATE_SECRET || 'skillup-platform-face-secret-key-2024';
@@ -962,21 +838,18 @@ class BaiduFaceService {
 
   /**
    * 验证人脸模板
-   * @param currentImageBase64 当前拍摄的图片
-   * @param storedTemplate 存储的人脸模板
-   * @returns Promise<{ isMatch: boolean; confidence: number; message: string }> 验证结果
+   * @param {string} currentImageBase64 当前图片的base64编码
+   * @param {string} storedTemplate 存储的人脸模板
+   * @returns {Promise<{isMatch: boolean, confidence: number, message: string}>} 验证结果
    */
-  async verifyFaceTemplate(
-    currentImageBase64: string,
-    storedTemplate: string
-  ): Promise<{ isMatch: boolean; confidence: number; message: string }> {
+  async verifyFaceTemplate(currentImageBase64, storedTemplate) {
     try {
       // 解密存储的模板
-      const templateData: FaceTemplate = JSON.parse(this.decryptTemplate(storedTemplate));
+      const templateData = JSON.parse(this.decryptTemplate(storedTemplate));
 
       // 检测当前图片中的人脸
       const currentTemplate = await this.generateFaceTemplate(currentImageBase64);
-      const currentTemplateData: FaceTemplate = JSON.parse(this.decryptTemplate(currentTemplate));
+      const currentTemplateData = JSON.parse(this.decryptTemplate(currentTemplate));
 
       // 计算特征相似度（简化版本，实际应该使用更复杂的算法）
       const confidence = this.calculateTemplateSimilarity(templateData, currentTemplateData);
@@ -1009,11 +882,11 @@ class BaiduFaceService {
 
   /**
    * 计算模板相似度（简化版本）
-   * @param template1 模板1
-   * @param template2 模板2
-   * @returns number 相似度分数 (0-1)
+   * @param {Object} template1 模板1
+   * @param {Object} template2 模板2
+   * @returns {number} 相似度分数 (0-1)
    */
-  private calculateTemplateSimilarity(template1: FaceTemplate, template2: FaceTemplate): number {
+  calculateTemplateSimilarity(template1, template2) {
     try {
       // 检查模板版本兼容性
       if (template1.version !== template2.version) {
@@ -1039,14 +912,11 @@ class BaiduFaceService {
 
   /**
    * 计算关键点相似度
-   * @param landmarks1 关键点1
-   * @param landmarks2 关键点2
-   * @returns number 相似度分数
+   * @param {Array<{x: number, y: number}>} landmarks1 关键点1
+   * @param {Array<{x: number, y: number}>} landmarks2 关键点2
+   * @returns {number} 相似度分数
    */
-  private calculateLandmarkSimilarity(
-    landmarks1: Array<{ x: number; y: number }>,
-    landmarks2: Array<{ x: number; y: number }>
-  ): number {
+  calculateLandmarkSimilarity(landmarks1, landmarks2) {
     if (!landmarks1 || !landmarks2 || landmarks1.length !== landmarks2.length) {
       return 0;
     }
@@ -1068,14 +938,11 @@ class BaiduFaceService {
 
   /**
    * 计算质量指标相似度
-   * @param quality1 质量指标1
-   * @param quality2 质量指标2
-   * @returns number 相似度分数
+   * @param {Object} quality1 质量指标1
+   * @param {Object} quality2 质量指标2
+   * @returns {number} 相似度分数
    */
-  private calculateQualitySimilarity(
-    quality1: FaceTemplate['quality'],
-    quality2: FaceTemplate['quality']
-  ): number {
+  calculateQualitySimilarity(quality1, quality2) {
     const blurSimilarity = 1 - Math.abs(quality1.blur - quality2.blur);
     const illuminationSimilarity = 1 - Math.abs(quality1.illumination - quality2.illumination) / 100;
     const completenessSimilarity = 1 - Math.abs(quality1.completeness - quality2.completeness);

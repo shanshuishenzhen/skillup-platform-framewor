@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,10 +20,10 @@ import oaApi from '@/services/oa-api';
 import { toast } from 'sonner';
 
 /**
- * 新建任务页面组件
+ * 新建任务表单组件
  * @returns JSX.Element
  */
-export default function NewTaskPage() {
+function NewTaskForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const projectId = searchParams.get('project');
@@ -438,5 +438,14 @@ export default function NewTaskPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+// 默认导出组件，用Suspense包装NewTaskForm
+export default function NewTaskPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">加载中...</div>}>
+      <NewTaskForm />
+    </Suspense>
   );
 }

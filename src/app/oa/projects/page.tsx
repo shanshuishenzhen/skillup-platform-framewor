@@ -1,20 +1,22 @@
 /**
- * 项目管理页面
- * 显示所有项目列表，支持搜索、筛选和创建新项目
+ * OA系统 - 项目管理页面
+ * 完整的项目管理功能，包含项目创建、任务分配、进度跟踪等
  */
 
 'use client';
 
-import SimpleProjectManager from '@/components/projects/SimpleProjectManager';
-
+import React from 'react';
+import ProjectManagement from '@/components/projects/ProjectManagement';
 
 export default function ProjectsPage() {
-  // 模拟当前用户数据
+  // 模拟当前用户信息
   const currentUser = {
-    id: 'user-1',
+    id: 'current-user',
     name: '当前用户',
-    email: 'user@example.com'
+    email: 'current@example.com'
   };
 
-  return <SimpleProjectManager currentUser={currentUser} />;
+  return (
+    <ProjectManagement currentUser={currentUser} />
+  );
 }

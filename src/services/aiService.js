@@ -1,34 +1,19 @@
-// /src/services/aiService.ts
+// /src/services/aiService.js
 
-// DeepSeek API 客户端接口定义
-interface DeepSeekClient {
-  chat: {
-    completions: {
-      create(params: {
-        model: string;
-        messages: Array<{ role: string; content: string }>;
-        temperature?: number;
-        max_tokens?: number;
-        stream?: boolean;
-      }): Promise<{
-        choices: Array<{
-          message: {
-            content: string;
-          };
-        }>;
-      }>;
-    };
-  };
-}
-
-// DeepSeek API 客户端实现
-class DeepSeekAPI implements DeepSeekClient {
-  private apiKey: string;
-  private baseURL: string;
-  private timeout: number;
-  private maxRetries: number;
-
-  constructor(config: { apiKey: string; baseURL?: string; timeout?: number; maxRetries?: number }) {
+/**
+ * DeepSeek API 客户端实现
+ * @class DeepSeekAPI
+ */
+class DeepSeekAPI {
+  /**
+   * 构造函数
+   * @param {Object} config 配置对象
+   * @param {string} config.apiKey API密钥
+   * @param {string} [config.baseURL] 基础URL
+   * @param {number} [config.timeout] 超时时间
+   * @param {number} [config.maxRetries] 最大重试次数
+   */
+  constructor(config) {
     this.apiKey = config.apiKey;
     this.baseURL = config.baseURL || 'https://api.deepseek.com';
     this.timeout = config.timeout || 30000;
@@ -37,13 +22,17 @@ class DeepSeekAPI implements DeepSeekClient {
 
   chat = {
     completions: {
-      create: async (params: {
-        model: string;
-        messages: Array<{ role: string; content: string }>;
-        temperature?: number;
-        max_tokens?: number;
-        stream?: boolean;
-      }) => {
+      /**
+       * 创建聊天完成
+       * @param {Object} params 参数对象
+       * @param {string} params.model 模型名称
+       * @param {Array} params.messages 消息数组
+       * @param {number} [params.temperature] 温度参数
+       * @param {number} [params.max_tokens] 最大令牌数
+       * @param {boolean} [params.stream] 是否流式输出
+       * @returns {Promise<Object>} API响应
+       */
+      create: async (params) => {
         const response = await fetch(`${this.baseURL}/v1/chat/completions`, {
           method: 'POST',
           headers: {
@@ -72,31 +61,28 @@ import {
 } from '../utils/errorHandler';
 
 /**
- * AI服务配置接口
+ * AI服务配置对象结构
+ * @typedef {Object} AIServiceConfig
+ * @property {string} apiKey API密钥
+ * @property {string} [baseURL] 基础URL
+ * @property {number} [timeout] 超时时间
+ * @property {number} [maxRetries] 最大重试次数
+ * @property {string} [model] 模型名称
  */
-export interface AIServiceConfig {
-  apiKey: string;
-  baseURL?: string;
-  timeout?: number;
-  maxRetries?: number;
-  model?: string;
-}
 
 /**
- * 课程数据接口
+ * 课程数据对象结构
+ * @typedef {Object} CourseData
+ * @property {string} title 课程标题
+ * @property {string} description 课程描述
+ * @property {Object} instructor 讲师信息
+ * @property {string} instructor.name 讲师姓名
+ * @property {string} instructor.bio 讲师简介
+ * @property {string[]} chapters 章节列表
+ * @property {'beginner'|'intermediate'|'advanced'} difficulty 难度级别
+ * @property {number} duration 预估学习时长（分钟）
+ * @property {string[]} tags 标签列表
  */
-export interface CourseData {
-  title: string;
-  description: string;
-  instructor: {
-    name: string;
-    bio: string;
-  };
-  chapters: string[];
-  difficulty: 'beginner' | 'intermediate' | 'advanced';
-  duration: number; // 预估学习时长（分钟）
-  tags: string[];
-}
 
 /**
  * AI服务错误类（保持向后兼容）
@@ -104,9 +90,9 @@ export interface CourseData {
  */
 export class AIServiceError extends AppError {
   constructor(
-    message: string,
-    code?: string,
-    statusCode?: number
+    message,
+    code,
+    statusCode
   ) {
     super(ErrorType.AI_SERVICE_ERROR, message, {
       code,
@@ -123,11 +109,12 @@ export class AIServiceError extends AppError {
  * @class AIService
  */
 class AIService {
-  private deepseek: DeepSeekClient | null = null;
-  private config: AIServiceConfig;
-  private isInitialized = false;
-
+  /**
+   * 构造函数
+   */
   constructor() {
+    this.deepseek = null;
+    this.isInitialized = false;
     this.config = {
       apiKey: process.env.DEEPSEEK_API_KEY || '',
       baseURL: process.env.DEEPSEEK_BASE_URL,
@@ -141,7 +128,7 @@ class AIService {
    * @private
    * @throws {AIServiceError} 当API密钥未配置时抛出错误
    */
-  private initialize(): void {
+  initialize() {
     if (this.isInitialized) return;
 
     if (!this.config.apiKey) {
@@ -169,9 +156,9 @@ class AIService {
 
   /**
    * 获取AI服务重试配置
-   * @returns 重试配置
+   * @returns {Object} 重试配置
    */
-  private getRetryConfig(): RetryConfig {
+  getRetryConfig() {
     return {
       maxAttempts: this.config.maxRetries || 3,
       baseDelay: 1000,
@@ -191,11 +178,11 @@ class AIService {
   /**
    * 格式化AI响应文本为结构化课程数据
    * @private
-   * @param rawText AI返回的原始文本
-   * @param industry 行业类型
-   * @returns CourseData 格式化后的课程数据
+   * @param {string} rawText AI返回的原始文本
+   * @param {string} industry 行业类型
+   * @returns {CourseData} 格式化后的课程数据
    */
-  private formatCourseData(rawText: string, industry: string): CourseData {
+  formatCourseData(rawText, industry) {
     try {
       // 尝试解析JSON格式的响应
       const jsonMatch = rawText.match(/```json\s*([\s\S]*?)\s*```/);
@@ -210,7 +197,7 @@ class AIService {
       const description = this.extractField(lines, ['描述', 'description', '课程描述']) || `一门关于${industry}的综合性课程`;
       const instructorName = this.extractField(lines, ['讲师', 'instructor', '讲师姓名']) || 'AI讲师';
       const instructorBio = this.extractField(lines, ['简介', 'bio', '讲师简介']) || '经验丰富的专业讲师';
-      const difficulty = this.extractField(lines, ['难度', 'difficulty', '课程难度']) as CourseData['difficulty'] || 'intermediate';
+      const difficulty = this.extractField(lines, ['难度', 'difficulty', '课程难度']) || 'intermediate';
       const duration = this.extractField(lines, ['时长', 'duration', '课程时长']) || '8周';
 
       // 提取章节
@@ -244,11 +231,11 @@ class AIService {
   /**
    * 提取字段值的辅助方法
    * @private
-   * @param lines 文本行数组
-   * @param fieldNames 字段名称数组
-   * @returns string | null 提取的字段值
+   * @param {string[]} lines - 文本行数组
+   * @param {string[]} fieldNames - 字段名称数组
+   * @returns {string|null} 提取的字段值
    */
-  private extractField(lines: string[], fieldNames: string[]): string | null {
+  extractField(lines, fieldNames) {
     for (const fieldName of fieldNames) {
       const line = lines.find(line => 
         line.toLowerCase().includes(fieldName.toLowerCase()) && 
@@ -265,10 +252,10 @@ class AIService {
   /**
    * 验证课程数据的完整性
    * @private
-   * @param data 待验证的课程数据
-   * @returns CourseData 验证后的课程数据
+   * @param {Object} data 待验证的课程数据
+   * @returns {CourseData} 验证后的课程数据
    */
-  private validateCourseData(data: Record<string, unknown>): CourseData {
+  validateCourseData(data) {
     // 解析 duration 字段，支持字符串转数字
     let duration = 480; // 默认8小时（480分钟）
     if (typeof data.duration === 'number') {
@@ -289,14 +276,14 @@ class AIService {
     }
 
     return {
-      title: (data.title as string) || '未命名课程',
-      description: (data.description as string) || '课程描述',
+      title: data.title || '未命名课程',
+      description: data.description || '课程描述',
       instructor: {
-        name: (data.instructor as any)?.name || 'AI讲师',
-        bio: (data.instructor as any)?.bio || '经验丰富的专业讲师'
+        name: data.instructor?.name || 'AI讲师',
+        bio: data.instructor?.bio || '经验丰富的专业讲师'
       },
       chapters: Array.isArray(data.chapters) ? data.chapters : ['基础概念', '实践应用', '高级技巧'],
-      difficulty: ['beginner', 'intermediate', 'advanced'].includes(data.difficulty as string) ? (data.difficulty as CourseData['difficulty']) : 'intermediate',
+      difficulty: ['beginner', 'intermediate', 'advanced'].includes(data.difficulty) ? data.difficulty : 'intermediate',
       duration,
       tags: Array.isArray(data.tags) ? data.tags : []
     };
@@ -305,10 +292,10 @@ class AIService {
   /**
    * 获取默认课程数据
    * @private
-   * @param industry 行业类型
-   * @returns CourseData 默认课程数据
+   * @param {string} industry 行业类型
+   * @returns {CourseData} 默认课程数据
    */
-  private getDefaultCourseData(industry: string): CourseData {
+  getDefaultCourseData(industry) {
     return {
       title: `${industry}专业课程`,
       description: `一门关于${industry}的综合性课程，涵盖基础理论和实践应用。`,
@@ -329,17 +316,17 @@ class AIService {
 
   /**
    * 生成课程内容
-   * @param industry 行业类型
-   * @param difficulty 课程难度
-   * @param customRequirements 自定义要求
-   * @returns Promise<CourseData> 生成的课程数据
+   * @param {string} industry 行业类型
+   * @param {'beginner'|'intermediate'|'advanced'} [difficulty='intermediate'] 课程难度
+   * @param {string} [customRequirements] 自定义要求
+   * @returns {Promise<CourseData>} 生成的课程数据
    * @throws {AIServiceError} 当生成失败时抛出错误
    */
   async generateCourse(
-    industry: string, 
-    difficulty: 'beginner' | 'intermediate' | 'advanced' = 'intermediate',
-    customRequirements?: string
-  ): Promise<CourseData> {
+    industry, 
+    difficulty = 'intermediate',
+    customRequirements
+  ) {
     this.initialize();
 
     if (!this.deepseek) {
@@ -388,7 +375,7 @@ ${customRequirements ? `\n额外要求：${customRequirements}` : ''}
 \`\`\``;
 
     return withRetry(async () => {
-      const response = await this.deepseek!.chat.completions.create({
+      const response = await this.deepseek.chat.completions.create({
         model: 'deepseek-chat',
         messages: [
           {
@@ -423,15 +410,15 @@ ${customRequirements ? `\n额外要求：${customRequirements}` : ''}
 
   /**
    * 优化课程内容
-   * @param courseData 原始课程数据
-   * @param optimizationType 优化类型
-   * @returns Promise<CourseData> 优化后的课程数据
+   * @param {CourseData} courseData 原始课程数据
+   * @param {'engagement'|'clarity'|'structure'|'comprehensive'} [optimizationType='comprehensive'] 优化类型
+   * @returns {Promise<CourseData>} 优化后的课程数据
    * @throws {AIServiceError} 当优化失败时抛出错误
    */
   async optimizeContent(
-    courseData: CourseData,
-    optimizationType: 'engagement' | 'clarity' | 'structure' | 'comprehensive' = 'comprehensive'
-  ): Promise<CourseData> {
+    courseData,
+    optimizationType = 'comprehensive'
+  ) {
     this.initialize();
 
     if (!this.deepseek) {
@@ -468,7 +455,7 @@ ${JSON.stringify(courseData, null, 2)}
 请以相同的JSON格式返回优化后的课程内容。`;
 
     return withRetry(async () => {
-      const response = await this.deepseek!.chat.completions.create({
+      const response = await this.deepseek.chat.completions.create({
         model: 'deepseek-chat',
         messages: [
           {
@@ -503,12 +490,12 @@ ${JSON.stringify(courseData, null, 2)}
 
   /**
    * 检查服务状态
-   * @returns Promise<boolean> 服务是否可用
+   * @returns {Promise<boolean>} 服务是否可用
    */
-  async checkServiceHealth(): Promise<boolean> {
+  async checkServiceHealth() {
     try {
       this.initialize();
-      return this.isInitialized && !!this.openai;
+      return this.isInitialized && !!this.deepseek;
     } catch (error) {
       console.error('AI服务健康检查失败:', error);
       return false;
@@ -521,17 +508,17 @@ const aiService = new AIService();
 
 /**
  * 生成课程内容（向后兼容的函数）
- * @param industry 行业类型
- * @param difficulty 课程难度
- * @param customRequirements 自定义要求
- * @returns Promise<CourseData> 生成的课程数据
+ * @param {string} industry 行业类型
+ * @param {'beginner'|'intermediate'|'advanced'} [difficulty='intermediate'] 课程难度
+ * @param {string} [customRequirements] 自定义要求
+ * @returns {Promise<CourseData>} 生成的课程数据
  * @deprecated 请使用 aiService.generateCourse() 方法
  */
 export async function generateFakeCourse(
-  industry: string,
-  difficulty: 'beginner' | 'intermediate' | 'advanced' = 'intermediate',
-  customRequirements?: string
-): Promise<CourseData> {
+  industry,
+  difficulty = 'intermediate',
+  customRequirements
+) {
   try {
     return await aiService.generateCourse(industry, difficulty, customRequirements);
   } catch (error) {

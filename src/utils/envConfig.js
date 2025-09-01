@@ -5,142 +5,56 @@ import { watch } from 'fs';
 import { join } from 'path';
 
 /**
- * 配置验证规则接口
- * @interface ValidationRule
+ * 配置验证规则
+ * @typedef {Object} ValidationRule
+ * @property {boolean} [required] - 是否必需
+ * @property {'string'|'number'|'boolean'|'array'} [type] - 数据类型
+ * @property {number} [min] - 最小值
+ * @property {number} [max] - 最大值
+ * @property {RegExp} [pattern] - 正则表达式
+ * @property {function} [validator] - 自定义验证函数
  */
-interface ValidationRule {
-  required?: boolean;
-  type?: 'string' | 'number' | 'boolean' | 'array';
-  min?: number;
-  max?: number;
-  pattern?: RegExp;
-  validator?: (value: unknown) => boolean | string;
-}
 
 /**
  * 配置验证规则映射
- * @interface ValidationRules
+ * @typedef {Object.<string, ValidationRule>} ValidationRules
  */
-interface ValidationRules {
-  [key: string]: ValidationRule;
-}
 
 /**
- * 配置变更事件接口
- * @interface ConfigChangeEvent
+ * 配置变更事件
+ * @typedef {Object} ConfigChangeEvent
+ * @property {string} key - 配置键
+ * @property {*} oldValue - 旧值
+ * @property {*} newValue - 新值
+ * @property {Date} timestamp - 时间戳
  */
-interface ConfigChangeEvent {
-  key: string;
-  oldValue: unknown;
-  newValue: unknown;
-  timestamp: Date;
-}
 
 /**
- * 环境变量配置接口
- * @interface EnvConfig
+ * 环境变量配置
+ * @typedef {Object} EnvConfig
+ * @property {Object} supabase - Supabase配置
+ * @property {Object} openai - OpenAI配置
+ * @property {Object} baidu - 百度AI配置
+ * @property {Object} security - 安全配置
+ * @property {Object} app - 应用配置
+ * @property {Object} rateLimit - 限流配置
+ * @property {Object} upload - 文件上传配置
+ * @property {Object} faceRecognition - 人脸识别配置
+ * @property {Object} analytics - 分析配置
+ * @property {Object} audit - 审计配置
+ * @property {Object} redis - Redis配置
  */
-interface EnvConfig {
-  // Supabase配置
-  supabase: {
-    url: string;
-    anonKey: string;
-    serviceRoleKey: string;
-  };
-  
-  // OpenAI配置
-  openai: {
-    apiKey: string;
-    baseURL: string;
-    timeout: number;
-    maxRetries: number;
-    model: string;
-  };
-  
-  // 百度AI配置
-  baidu: {
-    apiKey: string;
-    secretKey: string;
-  };
-  
-  // 安全配置
-  security: {
-    encryptionKey: string;
-    apiSecretKey: string;
-    sessionSecret: string;
-    jwtSecret: string;
-    jwtExpiresIn: string;
-    jwtRefreshExpiresIn: string;
-  };
-  
-  // 应用配置
-  app: {
-    nodeEnv: string;
-    port: number;
-    allowedOrigins: string[];
-  };
-  
-  // 限流配置
-  rateLimit: {
-    windowMs: number;
-    maxRequests: number;
-    faceAuthMax: number;
-  };
-  
-  // 文件上传配置
-  upload: {
-    maxFileSizeMB: number;
-    maxImageSizeMB: number;
-  };
-  
-  // 人脸识别配置
-  faceRecognition: {
-    confidenceThreshold: number;
-    qualityThreshold: number;
-    livenessThreshold: number;
-  };
-  
-  // 分析配置
-  analytics: {
-    enabled: boolean;
-    batchSize: number;
-    flushInterval: number;
-    retentionDays: number;
-  };
-  
-  // 审计配置
-  audit: {
-    enabled: boolean;
-    logLevel: string;
-    retentionDays: number;
-    batchSize: number;
-    flushInterval: number;
-    enableEncryption: boolean;
-    enableCompression: boolean;
-    enableRealTimeAlerts: boolean;
-  };
-  
-  // Redis配置
-  redis: {
-    host: string;
-    port: number;
-    password?: string;
-    db: number;
-    keyPrefix: string;
-  };
-}
+// 移除EnvConfigSchema，使用JSDoc注释即可
 
 /**
  * 环境变量验证错误类
  * @class EnvValidationError
  */
 class EnvValidationError extends Error {
-  constructor(
-    message: string,
-    public missingVars: string[] = []
-  ) {
+  constructor(message, missingVars = []) {
     super(message);
     this.name = 'EnvValidationError';
+    this.missingVars = missingVars;
   }
 }
 
@@ -149,15 +63,14 @@ class EnvValidationError extends Error {
  * @class EnvConfigManager
  */
 class EnvConfigManager extends EventEmitter {
-  private config: EnvConfig | null = null;
-  private isValidated = false;
-  private hotReloadEnabled = false;
-  private envFileWatcher: ReturnType<typeof watch> | null = null;
-  private lastConfigHash: string = '';
-  private validationRules: ValidationRules = {};
-  
   constructor() {
     super();
+    this.config = null;
+    this.isValidated = false;
+    this.hotReloadEnabled = false;
+    this.envFileWatcher = null;
+    this.lastConfigHash = '';
+    this.validationRules = {};
     this.initValidationRules();
   }
   
@@ -165,13 +78,13 @@ class EnvConfigManager extends EventEmitter {
    * 初始化配置验证规则
    * @private
    */
-  private initValidationRules(): void {
+  initValidationRules() {
     this.validationRules = {
       'NEXT_PUBLIC_SUPABASE_URL': {
         required: true,
         type: 'string',
         pattern: /^https?:\/\/.+/,
-        validator: (value: unknown) => {
+        validator: (value) => {
           if (typeof value !== 'string' || !value.includes('supabase')) {
             return '必须是有效的Supabase URL';
           }
@@ -182,7 +95,7 @@ class EnvConfigManager extends EventEmitter {
         required: true,
         type: 'string',
         min: 100,
-        validator: (value: unknown) => {
+        validator: (value) => {
           if (typeof value !== 'string' || !value.startsWith('eyJ')) {
             return '必须是有效的Supabase匿名密钥';
           }
@@ -193,7 +106,7 @@ class EnvConfigManager extends EventEmitter {
         required: true,
         type: 'string',
         min: 100,
-        validator: (value: unknown) => {
+        validator: (value) => {
           if (typeof value !== 'string' || !value.startsWith('eyJ')) {
             return '必须是有效的Supabase服务角色密钥';
           }
@@ -204,7 +117,7 @@ class EnvConfigManager extends EventEmitter {
         required: true,
         type: 'string',
         min: 32,
-        validator: (value: unknown) => {
+        validator: (value) => {
           if (typeof value !== 'string' || !/^[a-fA-F0-9]{64}$/.test(value)) {
             return '必须是64位十六进制字符串';
           }
@@ -251,7 +164,7 @@ class EnvConfigManager extends EventEmitter {
    * @param defaultValue 默认值
    * @returns string 环境变量值
    */
-  private getEnvVar(key: string, defaultValue?: string): string {
+  getEnvVar(key, defaultValue) {
     const value = process.env[key];
     if (value === undefined || value === '') {
       if (defaultValue !== undefined) {
@@ -269,7 +182,7 @@ class EnvConfigManager extends EventEmitter {
    * @param defaultValue 默认值
    * @returns number 环境变量数值
    */
-  private getEnvNumber(key: string, defaultValue?: number): number {
+  getEnvNumber(key, defaultValue) {
     const value = process.env[key];
     if (value === undefined || value === '') {
       if (defaultValue !== undefined) {
@@ -291,7 +204,7 @@ class EnvConfigManager extends EventEmitter {
    * @param defaultValue 默认值
    * @returns boolean 环境变量布尔值
    */
-  private getEnvBoolean(key: string, defaultValue?: boolean): boolean {
+  getEnvBoolean(key, defaultValue) {
     const value = process.env[key];
     if (value === undefined || value === '') {
       if (defaultValue !== undefined) {
@@ -310,7 +223,7 @@ class EnvConfigManager extends EventEmitter {
    * @param rule 验证规则
    * @returns string | null 错误信息或null
    */
-  private validateEnvVar(key: string, value: unknown, rule: ValidationRule): string | null {
+  validateEnvVar(key, value, rule) {
     // 检查必需性
     if (rule.required && (!value || value === '')) {
       return `环境变量 ${key} 是必需的`;
@@ -392,9 +305,9 @@ class EnvConfigManager extends EventEmitter {
    * @private
    * @throws {EnvValidationError} 当有环境变量验证失败时抛出错误
    */
-  private validateAllEnvVars(): void {
-    const errors: string[] = [];
-    const missingVars: string[] = [];
+  validateAllEnvVars() {
+    const errors = [];
+    const missingVars = [];
     
     for (const [key, rule] of Object.entries(this.validationRules)) {
       const value = process.env[key];
@@ -422,8 +335,8 @@ class EnvConfigManager extends EventEmitter {
    * @param requiredVars 必需的环境变量列表
    * @throws {EnvValidationError} 当有环境变量缺失时抛出错误
    */
-  private validateRequiredVars(requiredVars: string[]): void {
-    const missingVars: string[] = [];
+  validateRequiredVars(requiredVars) {
+    const missingVars = [];
     
     for (const varName of requiredVars) {
       const value = process.env[varName];
@@ -445,7 +358,7 @@ class EnvConfigManager extends EventEmitter {
    * @private
    * @returns string 配置哈希值
    */
-  private generateConfigHash(): string {
+  generateConfigHash() {
     const configKeys = Object.keys(this.validationRules).sort();
     const configValues = configKeys.map(key => `${key}=${process.env[key] || ''}`);
     return Buffer.from(configValues.join('|')).toString('base64');
@@ -455,7 +368,7 @@ class EnvConfigManager extends EventEmitter {
    * 启用热重载功能
    * @param envFilePath .env文件路径
    */
-  enableHotReload(envFilePath?: string): void {
+  enableHotReload(envFilePath) {
     if (this.hotReloadEnabled) {
       return;
     }
@@ -481,7 +394,7 @@ class EnvConfigManager extends EventEmitter {
   /**
    * 禁用热重载功能
    */
-  disableHotReload(): void {
+  disableHotReload() {
     if (this.envFileWatcher) {
       this.envFileWatcher.close();
       this.envFileWatcher = null;
@@ -494,7 +407,7 @@ class EnvConfigManager extends EventEmitter {
    * 处理配置变更
    * @private
    */
-  private handleConfigChange(): void {
+  handleConfigChange() {
     try {
       const newConfigHash = this.generateConfigHash();
       
@@ -506,7 +419,7 @@ class EnvConfigManager extends EventEmitter {
         const newConfig = this.loadConfig(false);
         
         // 发出配置变更事件
-        const changeEvent: ConfigChangeEvent = {
+        const changeEvent = {
           key: 'global',
           oldValue: oldConfig,
           newValue: newConfig,
@@ -531,7 +444,7 @@ class EnvConfigManager extends EventEmitter {
    * @returns EnvConfig 环境配置对象
    * @throws {EnvValidationError} 当环境变量验证失败时抛出错误
    */
-  loadConfig(strict: boolean = false, enableValidation: boolean = true): EnvConfig {
+  loadConfig(strict = false, enableValidation = true) {
     if (this.config && this.isValidated) {
       return this.config;
     }
@@ -663,7 +576,7 @@ class EnvConfigManager extends EventEmitter {
    * @param service 服务名称
    * @returns boolean 配置是否完整
    */
-  isServiceConfigured(service: 'openai' | 'baidu' | 'supabase'): boolean {
+  isServiceConfigured(service) {
     if (!this.config) {
       this.loadConfig(false);
     }
@@ -688,14 +601,9 @@ class EnvConfigManager extends EventEmitter {
 
   /**
    * 获取服务配置状态报告
-   * @returns object 配置状态报告
+   * @returns {Object} 配置状态报告
    */
-  getConfigStatus(): {
-    openai: boolean;
-    baidu: boolean;
-    supabase: boolean;
-    overall: boolean;
-  } {
+  getConfigStatus() {
     const openai = this.isServiceConfigured('openai');
     const baidu = this.isServiceConfigured('baidu');
     const supabase = this.isServiceConfigured('supabase');
@@ -710,19 +618,13 @@ class EnvConfigManager extends EventEmitter {
 
   /**
    * 获取配置验证报告
-   * @returns object 详细的验证报告
+   * @returns {Object} 详细的验证报告
    */
-  getValidationReport(): {
-    valid: boolean;
-    errors: string[];
-    warnings: string[];
-    missingRequired: string[];
-    configuredServices: string[];
-  } {
-    const errors: string[] = [];
-    const warnings: string[] = [];
-    const missingRequired: string[] = [];
-    const configuredServices: string[] = [];
+  getValidationReport() {
+    const errors = [];
+    const warnings = [];
+    const missingRequired = [];
+    const configuredServices = [];
     
     // 验证所有环境变量
     for (const [key, rule] of Object.entries(this.validationRules)) {
@@ -740,7 +642,7 @@ class EnvConfigManager extends EventEmitter {
     }
     
     // 检查服务配置状态
-    const services = ['openai', 'baidu', 'supabase'] as const;
+    const services = ['openai', 'baidu', 'supabase'];
     for (const service of services) {
       if (this.isServiceConfigured(service)) {
         configuredServices.push(service);
@@ -758,20 +660,20 @@ class EnvConfigManager extends EventEmitter {
   
   /**
    * 检查环境变量是否存在
-   * @param key 环境变量键名
-   * @returns boolean 是否存在
+   * @param {string} key 环境变量键名
+   * @returns {boolean} 是否存在
    */
-  hasEnvVar(key: string): boolean {
+  hasEnvVar(key) {
     const value = process.env[key];
     return value !== undefined && value !== '';
   }
   
   /**
    * 获取环境变量的安全值（隐藏敏感信息）
-   * @param key 环境变量键名
-   * @returns string 安全的环境变量值
+   * @param {string} key 环境变量键名
+   * @returns {string} 安全的环境变量值
    */
-  getSafeEnvVar(key: string): string {
+  getSafeEnvVar(key) {
     const value = process.env[key];
     if (!value) return '';
     
@@ -791,26 +693,26 @@ class EnvConfigManager extends EventEmitter {
   
   /**
    * 强制重新加载配置
-   * @param enableValidation 是否启用验证
-   * @returns EnvConfig 新的配置对象
+   * @param {boolean} enableValidation 是否启用验证
+   * @returns {Object} 新的配置对象
    */
-  reloadConfig(enableValidation: boolean = true): EnvConfig {
+  reloadConfig(enableValidation = true) {
     this.resetConfig();
     return this.loadConfig(false, enableValidation);
   }
   
   /**
    * 获取热重载状态
-   * @returns boolean 是否启用热重载
+   * @returns {boolean} 是否启用热重载
    */
-  isHotReloadEnabled(): boolean {
+  isHotReloadEnabled() {
     return this.hotReloadEnabled;
   }
   
   /**
    * 重置配置缓存
    */
-  resetConfig(): void {
+  resetConfig() {
     this.config = null;
     this.isValidated = false;
     this.lastConfigHash = '';
@@ -818,9 +720,9 @@ class EnvConfigManager extends EventEmitter {
 
   /**
    * 获取当前配置（如果已加载）
-   * @returns EnvConfig | null 当前配置或null
+   * @returns {Object|null} 当前配置或null
    */
-  getCurrentConfig(): EnvConfig | null {
+  getCurrentConfig() {
     return this.config;
   }
 }
@@ -830,26 +732,26 @@ const envConfigManager = new EnvConfigManager();
 
 /**
  * 获取环境配置的便捷函数
- * @param strict 是否启用严格模式
- * @param enableValidation 是否启用详细验证
- * @returns EnvConfig 环境配置对象
+ * @param {boolean} strict 是否启用严格模式
+ * @param {boolean} enableValidation 是否启用详细验证
+ * @returns {Object} 环境配置对象
  */
-export function getEnvConfig(strict: boolean = false, enableValidation: boolean = true): EnvConfig {
+export function getEnvConfig(strict = false, enableValidation = true) {
   return envConfigManager.loadConfig(strict, enableValidation);
 }
 
 /**
  * 检查服务是否已配置的便捷函数
- * @param service 服务名称
- * @returns boolean 服务是否已配置
+ * @param {string} service 服务名称
+ * @returns {boolean} 服务是否已配置
  */
-export function isServiceConfigured(service: 'openai' | 'baidu' | 'supabase'): boolean {
+export function isServiceConfigured(service) {
   return envConfigManager.isServiceConfigured(service);
 }
 
 /**
  * 获取配置状态的便捷函数
- * @returns object 配置状态报告
+ * @returns {Object} 配置状态报告
  */
 export function getConfigStatus() {
   return envConfigManager.getConfigStatus();
@@ -857,7 +759,7 @@ export function getConfigStatus() {
 
 /**
  * 获取配置验证报告的便捷函数
- * @returns object 详细的验证报告
+ * @returns {Object} 详细的验证报告
  */
 export function getValidationReport() {
   return envConfigManager.getValidationReport();
@@ -865,69 +767,63 @@ export function getValidationReport() {
 
 /**
  * 启用热重载的便捷函数
- * @param envFilePath .env文件路径
+ * @param {string} envFilePath .env文件路径
  */
-export function enableHotReload(envFilePath?: string): void {
+export function enableHotReload(envFilePath) {
   envConfigManager.enableHotReload(envFilePath);
 }
 
 /**
  * 禁用热重载的便捷函数
  */
-export function disableHotReload(): void {
+export function disableHotReload() {
   envConfigManager.disableHotReload();
 }
 
 /**
  * 重新加载配置的便捷函数
- * @param enableValidation 是否启用验证
- * @returns EnvConfig 新的配置对象
+ * @param {boolean} enableValidation 是否启用验证
+ * @returns {Object} 新的配置对象
  */
-export function reloadConfig(enableValidation: boolean = true): EnvConfig {
+export function reloadConfig(enableValidation = true) {
   return envConfigManager.reloadConfig(enableValidation);
 }
 
 /**
  * 检查环境变量是否存在的便捷函数
- * @param key 环境变量键名
- * @returns boolean 是否存在
+ * @param {string} key 环境变量键名
+ * @returns {boolean} 是否存在
  */
-export function hasEnvVar(key: string): boolean {
+export function hasEnvVar(key) {
   return envConfigManager.hasEnvVar(key);
 }
 
 /**
  * 获取环境变量安全值的便捷函数
- * @param key 环境变量键名
- * @returns string 安全的环境变量值
+ * @param {string} key 环境变量键名
+ * @returns {string} 安全的环境变量值
  */
-export function getSafeEnvVar(key: string): string {
+export function getSafeEnvVar(key) {
   return envConfigManager.getSafeEnvVar(key);
 }
 
 /**
  * 监听配置变更事件的便捷函数
- * @param event 事件名称
- * @param listener 事件监听器
+ * @param {string} event 事件名称
+ * @param {Function} listener 事件监听器
  */
-export function onConfigChange(event: 'configChanged' | 'configLoaded' | 'configError', listener: (...args: unknown[]) => void): void {
+export function onConfigChange(event, listener) {
   envConfigManager.on(event, listener);
 }
 
 /**
  * 移除配置变更事件监听器的便捷函数
- * @param event 事件名称
- * @param listener 事件监听器
+ * @param {string} event 事件名称
+ * @param {Function} listener 事件监听器
  */
-export function offConfigChange(event: 'configChanged' | 'configLoaded' | 'configError', listener: (...args: unknown[]) => void): void {
+export function offConfigChange(event, listener) {
   envConfigManager.off(event, listener);
 }
 
-// 导出类型和实例
+// 导出类和实例
 export { envConfigManager, EnvConfigManager, EnvValidationError };
-export type { 
-  EnvConfig, 
-  ValidationRule, 
-  ValidationRules, 
-  ConfigChangeEvent 
-};
