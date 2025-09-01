@@ -12,6 +12,7 @@ import {
   CheckCircle, 
   XCircle, 
   AlertCircle,
+  AlertTriangle,
   Download,
   Share2,
   RotateCcw,

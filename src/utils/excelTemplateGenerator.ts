@@ -324,6 +324,89 @@ export const EXAM_IMPORT_TEMPLATE: ExcelTemplate = {
 };
 
 /**
+ * 试卷导入模板
+ */
+export const EXAM_PAPER_IMPORT_TEMPLATE: ExcelTemplate = {
+  name: '试卷批量导入模板',
+  filename: 'exam_paper_import_template.xlsx',
+  description: '用于批量导入试卷题目和题型分布的Excel模板',
+  version: '1.0',
+  columns: [
+    // 题型分布工作表字段
+    {
+      key: 'question_type',
+      title: '题型',
+      width: 15,
+      required: true,
+      type: 'select',
+      options: ['单选题', '多选题', '判断题', '填空题', '简答题', '论述题'],
+      example: '单选题',
+      description: '题目类型'
+    },
+    {
+      key: 'question_count',
+      title: '题目数量',
+      width: 12,
+      required: true,
+      type: 'number',
+      example: '10',
+      description: '该题型的题目数量',
+      validation: {
+        min: 1,
+        max: 100,
+        message: '题目数量范围：1-100题'
+      }
+    },
+    {
+      key: 'points_per_question',
+      title: '每题分值',
+      width: 12,
+      required: true,
+      type: 'number',
+      example: '5',
+      description: '该题型每题的分值',
+      validation: {
+        min: 0.5,
+        max: 50,
+        message: '分值范围：0.5-50分'
+      }
+    }
+  ],
+  sampleData: [
+    {
+      question_type: '单选题',
+      question_count: 10,
+      points_per_question: 5
+    },
+    {
+      question_type: '多选题',
+      question_count: 5,
+      points_per_question: 8
+    },
+    {
+      question_type: '判断题',
+      question_count: 5,
+      points_per_question: 2
+    }
+  ],
+  instructions: [
+    '1. 本模板包含两个工作表："题型分布"和"试卷题目"',
+    '2. "题型分布"工作表定义各题型的数量和分值',
+    '3. "试卷题目"工作表包含具体的题目内容',
+    '4. 题型分布中的题目数量必须与试卷题目中的实际数量一致',
+    '5. 选择题必须提供选项A、B、C、D',
+    '6. 正确答案格式：单选题填写选项字母(如A)，多选题用逗号分隔(如A,C)',
+    '7. 导入前请删除示例数据'
+  ],
+  notes: [
+    '• 支持题型：单选题、多选题、判断题、填空题、简答题、论述题',
+    '• 单次导入建议不超过200道题目',
+    '• 题目内容支持富文本格式',
+    '• 如有问题请联系系统管理员'
+  ]
+};
+
+/**
  * 学习资源导入模板
  */
 export const RESOURCE_IMPORT_TEMPLATE: ExcelTemplate = {
@@ -412,6 +495,7 @@ export const getAllTemplates = (): ExcelTemplate[] => {
   return [
     USER_IMPORT_TEMPLATE,
     EXAM_IMPORT_TEMPLATE,
+    EXAM_PAPER_IMPORT_TEMPLATE,
     RESOURCE_IMPORT_TEMPLATE
   ];
 };
@@ -423,6 +507,7 @@ export const getTemplateByType = (type: string): ExcelTemplate | null => {
   const templates = {
     'users': USER_IMPORT_TEMPLATE,
     'exams': EXAM_IMPORT_TEMPLATE,
+    'exam-papers': EXAM_PAPER_IMPORT_TEMPLATE,
     'resources': RESOURCE_IMPORT_TEMPLATE
   };
   
@@ -430,9 +515,64 @@ export const getTemplateByType = (type: string): ExcelTemplate | null => {
 };
 
 /**
+ * 生成试卷导入Excel数据结构
+ */
+export const generateExamPaperExcelData = () => {
+  return {
+    filename: 'exam_paper_template.xlsx',
+    sheets: [
+      {
+        name: '题型分布',
+        headers: ['题型', '题目数量', '每题分值'],
+        data: [
+          ['单选题', 10, 5],
+          ['多选题', 5, 8],
+          ['判断题', 5, 2]
+        ],
+        columnWidths: [15, 12, 12]
+      },
+      {
+        name: '试卷题目',
+        headers: ['题目序号', '题型', '题目内容', '选项A', '选项B', '选项C', '选项D', '正确答案', '解析', '难度', '知识点'],
+        data: [
+          [1, '单选题', 'JavaScript中用于声明变量的关键字是？', 'var', 'let', 'const', '以上都是', 'D', 'var、let、const都可以用来声明变量', 'easy', 'JavaScript基础'],
+          [2, '多选题', '以下哪些是JavaScript的数据类型？', 'string', 'number', 'boolean', 'object', 'A,B,C,D', 'JavaScript的基本数据类型包括这些', 'medium', 'JavaScript基础'],
+          [3, '判断题', 'JavaScript是一种编译型语言。', '', '', '', '', 'false', 'JavaScript是解释型语言，不是编译型语言', 'easy', 'JavaScript基础']
+        ],
+        columnWidths: [10, 12, 30, 15, 15, 15, 15, 12, 30, 10, 15]
+      },
+      {
+        name: '导入说明',
+        headers: ['说明事项'],
+        data: [
+          ['1. 本模板包含两个工作表："题型分布"和"试卷题目"'],
+          ['2. "题型分布"工作表定义各题型的数量和分值'],
+          ['3. "试卷题目"工作表包含具体的题目内容'],
+          ['4. 题型分布中的题目数量必须与试卷题目中的实际数量一致'],
+          ['5. 选择题必须提供选项A、B、C、D'],
+          ['6. 正确答案格式：单选题填写选项字母(如A)，多选题用逗号分隔(如A,C)'],
+          ['7. 导入前请删除示例数据'],
+          [''],
+          ['注意事项:'],
+          ['• 支持题型：单选题、多选题、判断题、填空题、简答题、论述题'],
+          ['• 单次导入建议不超过200道题目'],
+          ['• 题目内容支持富文本格式'],
+          ['• 如有问题请联系系统管理员']
+        ]
+      }
+    ]
+  };
+};
+
+/**
  * 生成Excel数据结构
  */
 export const generateExcelData = (template: ExcelTemplate) => {
+  // 如果是试卷导入模板，使用专门的生成函数
+  if (template === EXAM_PAPER_IMPORT_TEMPLATE) {
+    return generateExamPaperExcelData();
+  }
+  
   return {
     filename: template.filename,
     sheets: [

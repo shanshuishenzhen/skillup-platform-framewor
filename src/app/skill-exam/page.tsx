@@ -80,15 +80,18 @@ export default function SkillExamPage() {
       };
       
       const response = await ExamService.getExams(queryParams);
-      setExams(response.exams);
-      setTotalPages(Math.ceil(response.total / 12));
+      const examsList = response?.exams || [];
+      const totalCount = response?.total || 0;
+      
+      setExams(examsList);
+      setTotalPages(Math.ceil(totalCount / 12));
       
       // 更新统计信息
       setStats({
-        total: response.total,
-        ongoing: response.exams.filter(e => e.status === ExamStatus.ONGOING).length,
-        completed: response.exams.filter(e => e.status === ExamStatus.FINISHED).length,
-        upcoming: response.exams.filter(e => e.status === ExamStatus.DRAFT).length
+        total: totalCount,
+        ongoing: examsList.filter(e => e.status === ExamStatus.ONGOING).length,
+        completed: examsList.filter(e => e.status === ExamStatus.FINISHED).length,
+        upcoming: examsList.filter(e => e.status === ExamStatus.DRAFT).length
       });
       
     } catch (error) {
