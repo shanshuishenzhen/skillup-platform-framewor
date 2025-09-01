@@ -1,55 +1,55 @@
 @echo off
 chcp 65001 >nul
-title SkillUp Platform - 一键启动
+title SkillUp Platform - Startup
 
 echo.
-echo ╔══════════════════════════════════════════════════════════════╗
-echo ║                                                              ║
-echo ║    🚀 SkillUp Platform - 一键启动                            ║
-echo ║                                                              ║
-echo ║    智能在线学习平台快速启动工具                               ║
-echo ║                                                              ║
-echo ╚══════════════════════════════════════════════════════════════╝
+echo ===============================================================
+echo.
+echo    SkillUp Platform - Quick Start
+echo.
+echo    Intelligent Online Learning Platform Startup Tool
+echo.
+echo ===============================================================
 echo.
 
-REM 检查Node.js是否安装
+REM Check if Node.js is installed
 where node >nul 2>nul
 if %errorlevel% neq 0 (
-    echo ❌ 未检测到Node.js，请先安装Node.js
-    echo 下载地址: https://nodejs.org/
+    echo Error: Node.js not detected, please install Node.js first
+    echo Download: https://nodejs.org/
     pause
     exit /b 1
 )
 
-REM 检查npm是否安装
+REM Check if npm is installed
 where npm >nul 2>nul
 if %errorlevel% neq 0 (
-    echo ❌ 未检测到npm，请检查Node.js安装
+    echo Error: npm not detected, please check Node.js installation
     pause
     exit /b 1
 )
 
-REM 显示版本信息
-echo 📋 环境信息:
+REM Display version information
+echo Environment Information:
 node --version
 npm --version
 echo.
 
-REM 检查package.json是否存在
+REM Check if package.json exists
 if not exist "package.json" (
-    echo ❌ 未找到package.json文件，请确保在项目根目录运行
+    echo Error: package.json not found, please run from project root directory
     pause
     exit /b 1
 )
 
-REM 运行启动脚本
-echo 🚀 启动应用...
+REM Run startup script
+echo Starting application...
 echo.
 node start.js
 
-REM 如果启动失败，暂停以查看错误信息
+REM If startup fails, pause to view error information
 if %errorlevel% neq 0 (
     echo.
-    echo ❌ 启动失败，请检查错误信息
+    echo Error: Startup failed, please check error information
     pause
 )
