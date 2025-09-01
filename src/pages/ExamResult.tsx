@@ -23,7 +23,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 
 /**
  * 题目类型枚举
@@ -125,8 +125,8 @@ interface ExamStatistics {
  * 显示考试完成后的详细成绩和分析
  */
 const ExamResult: React.FC = () => {
-  const { examId, attemptId } = useParams<{ examId: string; attemptId: string }>();
-  const navigate = useNavigate();
+  const router = useRouter();
+  const { examId, attemptId } = router.query as { examId: string; attemptId: string };
   
   const [result, setResult] = useState<ExamResult | null>(null);
   const [statistics, setStatistics] = useState<ExamStatistics | null>(null);
@@ -272,7 +272,7 @@ const ExamResult: React.FC = () => {
     } catch (error) {
       console.error('获取考试结果失败:', error);
       toast.error('获取考试结果失败');
-      navigate('/exams');
+      router.push('/exams');
     } finally {
       setLoading(false);
     }

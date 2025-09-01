@@ -21,7 +21,7 @@ import {
   EyeOff
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 
 /**
  * 题目类型枚举
@@ -87,8 +87,8 @@ interface ExamInfo {
  * 提供考生参加考试的完整界面和功能
  */
 const ExamTaking: React.FC = () => {
-  const { examId } = useParams<{ examId: string }>();
-  const navigate = useNavigate();
+  const router = useRouter();
+  const { examId } = router.query as { examId: string };
   
   const [examInfo, setExamInfo] = useState<ExamInfo | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -197,7 +197,7 @@ const ExamTaking: React.FC = () => {
     } catch (error) {
       console.error('获取考试数据失败:', error);
       toast.error('获取考试数据失败');
-      navigate('/exams');
+      router.push('/exams');
     } finally {
       setLoading(false);
     }
@@ -237,7 +237,7 @@ const ExamTaking: React.FC = () => {
       // await examService.submitExam(examId!, answersArray);
       
       toast.success('考试提交成功！');
-      navigate(`/exams/${examId}/result`);
+      router.push(`/exams/${examId}/result`);
     } catch (error) {
       console.error('提交考试失败:', error);
       toast.error('提交考试失败');
