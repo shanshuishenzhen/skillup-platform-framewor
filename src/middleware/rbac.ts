@@ -8,6 +8,7 @@ import { getEnvConfig } from '@/utils/envConfig';
  */
 export enum UserRole {
   USER = 'USER',
+  TEACHER = 'TEACHER',
   ADMIN = 'ADMIN',
   SUPER_ADMIN = 'SUPER_ADMIN'
 }
@@ -396,7 +397,7 @@ export async function verifyUserAccess(
     allowExpiredToken?: boolean;
   }
 ): Promise<RBACResult> {
-  return verifyRBAC(req, [UserRole.USER, UserRole.ADMIN, UserRole.SUPER_ADMIN], options);
+  return verifyRBAC(req, [UserRole.USER, UserRole.TEACHER, UserRole.ADMIN, UserRole.SUPER_ADMIN], options);
 }
 
 /**
