@@ -29,13 +29,13 @@ import {
   CheckCircle,
   AlertCircle
 } from 'lucide-react';
+import { ExamService } from '@/services/examService';
 import { 
-  ExamService, 
   ExamStatus, 
   ExamDifficulty,
   type Exam, 
   type ExamQueryParams
-} from '@/services/examService';
+} from '@/types/exam';
 
 /**
  * 技能考试页面

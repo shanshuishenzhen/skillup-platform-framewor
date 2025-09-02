@@ -2,503 +2,531 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { toast } from 'sonner';
 import { 
   Trophy, 
-  Medal, 
-  Target, 
   Clock, 
   CheckCircle, 
   XCircle, 
   AlertCircle,
+  BarChart3,
   Download,
   Share2,
-  RotateCcw,
-  Home,
-  FileText,
-  TrendingUp,
-  Award
+  ArrowLeft,
+  Target
 } from 'lucide-react';
-import { 
-  ExamService, 
-  QuestionType, 
-  ExamDifficulty,
-  AttemptStatus,
-  type Exam, 
-  type Question, 
-  type ExamAttempt,
-  type UserAnswer
-} from '@/services/examService';
+import { Exam } from '@/types/exam';
+import { Question, QuestionOption } from '@/types/question';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
+import { formatTime, formatDateTime } from '@/utils/format';
+import Link from 'next/link';
+
+interface ExamSubmission {
+  id: string;
+  exam_id: string;
+  user_id: string;
+  answers: Record<string, any>;
+  score: number;
+  total_score: number;
+  percentage: number;
+  time_used: number;
+  submitted_at: string;
+  graded_at?: string;
+  feedback?: string;
+  question_results: QuestionResult[];
+}
+
+interface QuestionResult {
+  question_id: string;
+  question: Question;
+  user_answer: any;
+  correct_answer: any;
+  is_correct: boolean;
+  points_earned: number;
+  points_possible: number;
+  feedback?: string;
+}
+
+interface ExamStats {
+  total_participants: number;
+  average_score: number;
+  highest_score: number;
+  lowest_score: number;
+  pass_rate: number;
+  user_rank: number;
+}
 
 /**
- * 考试结果页面
- * 显示用户的考试成绩和详细分析
+ * 考试结果页面组件
+ * 显示用户的考试成绩、答题详情和统计信息
  */
 export default function ExamResultPage() {
   const params = useParams();
   const router = useRouter();
+  const { user } = useAuth();
   const examId = params.id as string;
   
+  // 状态管理
   const [exam, setExam] = useState<Exam | null>(null);
-  const [attempt, setAttempt] = useState<ExamAttempt | null>(null);
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [answers, setAnswers] = useState<UserAnswer[]>([]);
+  const [submission, setSubmission] = useState<ExamSubmission | null>(null);
+  const [stats, setStats] = useState<ExamStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showDetailedResults, setShowDetailedResults] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
 
   /**
-   * 加载考试结果
+   * 获取考试结果数据
    */
-  const loadExamResult = async () => {
+  const fetchResultData = async () => {
     try {
       setLoading(true);
       
-      // 加载考试信息
-      const examData = await ExamService.getExamById(examId);
-      setExam(examData);
+      // 获取考试信息
+      const examResponse = await fetch(`/api/exams/${examId}`);
+      const examResult = await examResponse.json();
       
-      // TODO: 实现获取考试结果的API调用
-      // const resultData = await ExamService.getExamResult(examId);
-      // setAttempt(resultData.attempt);
-      // setQuestions(resultData.questions);
-      // setAnswers(resultData.answers);
+      if (!examResult.success) {
+        toast.error('获取考试信息失败');
+        router.push('/exams');
+        return;
+      }
       
-      // 模拟数据
-      const mockAttempt: ExamAttempt = {
-        id: 'attempt_1',
-        exam_id: examId,
-        user_id: 'user_1',
-        status: AttemptStatus.COMPLETED,
-        score: 85,
-        max_score: 100,
-        started_at: new Date(Date.now() - 3600000).toISOString(),
-        completed_at: new Date().toISOString(),
-        time_spent: 3600,
-        attempt_number: 1,
-        submitted_at: new Date().toISOString(),
-        remaining_time: 0,
-        violations: [],
-        ip_address: '192.168.1.1',
-        user_agent: 'Mozilla/5.0'
-      };
-      setAttempt(mockAttempt);
+      setExam(examResult.data);
+      
+      // 获取用户提交记录
+      const submissionResponse = await fetch(`/api/exams/${examId}/submit`);
+      const submissionResult = await submissionResponse.json();
+      
+      if (!submissionResult.success || !submissionResult.data) {
+        toast.error('未找到考试提交记录');
+        router.push('/exams');
+        return;
+      }
+      
+      setSubmission(submissionResult.data);
+      
+      // 获取考试统计信息
+      const statsResponse = await fetch(`/api/exams/${examId}/stats`);
+      const statsResult = await statsResponse.json();
+      
+      if (statsResult.success) {
+        setStats(statsResult.data);
+      }
       
     } catch (error) {
-      console.error('加载考试结果失败:', error);
-      toast.error('加载考试结果失败');
-      router.push('/skill-exam');
+      console.error('获取考试结果失败:', error);
+      toast.error('获取考试结果失败');
+      router.push('/exams');
     } finally {
       setLoading(false);
     }
   };
 
   /**
-   * 格式化时间显示
-   */
-  const formatDuration = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    
-    if (hours > 0) {
-      return `${hours}小时${minutes}分钟${secs}秒`;
-    }
-    if (minutes > 0) {
-      return `${minutes}分钟${secs}秒`;
-    }
-    return `${secs}秒`;
-  };
-
-  /**
    * 获取成绩等级
    */
-  const getScoreGrade = (score: number, maxScore: number) => {
-    const percentage = (score / maxScore) * 100;
-    if (percentage >= 90) return { grade: 'A', color: 'text-green-600', bg: 'bg-green-100' };
-    if (percentage >= 80) return { grade: 'B', color: 'text-blue-600', bg: 'bg-blue-100' };
-    if (percentage >= 70) return { grade: 'C', color: 'text-yellow-600', bg: 'bg-yellow-100' };
-    if (percentage >= 60) return { grade: 'D', color: 'text-orange-600', bg: 'bg-orange-100' };
-    return { grade: 'F', color: 'text-red-600', bg: 'bg-red-100' };
-  };
-
-  /**
-   * 检查是否通过考试
-   */
-  const isPassed = () => {
-    if (!exam || !attempt) return false;
-    return attempt.score >= exam.passing_score;
-  };
-
-  /**
-   * 获取难度显示文本
-   */
-  const getDifficultyText = (difficulty: ExamDifficulty) => {
-    const difficultyMap = {
-      [ExamDifficulty.BEGINNER]: '初级',
-      [ExamDifficulty.INTERMEDIATE]: '中级',
-      [ExamDifficulty.ADVANCED]: '高级'
-    };
-    return difficultyMap[difficulty] || difficulty;
-  };
-
-  /**
-   * 重新考试
-   */
-  const retakeExam = () => {
-    if (!exam?.allow_retake) {
-      toast.error('该考试不允许重考');
-      return;
+  const getGradeInfo = (percentage: number) => {
+    if (percentage >= 90) {
+      return { grade: 'A', color: 'text-green-600', bgColor: 'bg-green-100' };
+    } else if (percentage >= 80) {
+      return { grade: 'B', color: 'text-blue-600', bgColor: 'bg-blue-100' };
+    } else if (percentage >= 70) {
+      return { grade: 'C', color: 'text-yellow-600', bgColor: 'bg-yellow-100' };
+    } else if (percentage >= 60) {
+      return { grade: 'D', color: 'text-orange-600', bgColor: 'bg-orange-100' };
+    } else {
+      return { grade: 'F', color: 'text-red-600', bgColor: 'bg-red-100' };
     }
-    router.push(`/exam/${examId}`);
   };
 
   /**
-   * 下载证书
+   * 获取答案显示文本
    */
-  const downloadCertificate = () => {
-    if (!isPassed()) {
-      toast.error('只有通过考试才能下载证书');
-      return;
+  const getAnswerText = (question: Question, answer: any) => {
+    if (!answer) return '未作答';
+    
+    switch (question.type) {
+      case 'choice':
+        const option = question.options?.find(opt => opt.id === answer || opt.text === answer);
+        return option?.text || answer;
+        
+      case 'multiple_choice':
+        if (Array.isArray(answer)) {
+          const selectedOptions = question.options?.filter(opt => 
+            answer.includes(opt.id) || answer.includes(opt.text)
+          );
+          return selectedOptions?.map(opt => opt.text).join(', ') || answer.join(', ');
+        }
+        return answer;
+        
+      case 'true_false':
+        return answer === 'true' || answer === true ? '正确' : '错误';
+        
+      default:
+        return answer.toString();
     }
-    // TODO: 实现证书下载功能
-    toast.success('证书下载功能开发中');
+  };
+
+  /**
+   * 下载成绩报告
+   */
+  const handleDownloadReport = () => {
+    // 这里可以实现PDF报告生成和下载功能
+    toast.info('成绩报告下载功能开发中');
   };
 
   /**
    * 分享成绩
    */
-  const shareResult = () => {
-    if (!attempt) return;
-    
-    const shareText = `我在技能提升平台完成了「${exam?.title}」考试，获得了${attempt.score}分的成绩！`;
-    
+  const handleShareResult = () => {
     if (navigator.share) {
       navigator.share({
-        title: '考试成绩分享',
-        text: shareText,
+        title: `${exam?.title} - 考试成绩`,
+        text: `我在"${exam?.title}"考试中获得了 ${submission?.percentage.toFixed(1)}% 的成绩！`,
         url: window.location.href
       });
     } else {
-      navigator.clipboard.writeText(shareText);
+      // 复制到剪贴板
+      navigator.clipboard.writeText(
+        `我在"${exam?.title}"考试中获得了 ${submission?.percentage.toFixed(1)}% 的成绩！`
+      );
       toast.success('成绩信息已复制到剪贴板');
     }
   };
 
-  /**
-   * 渲染成绩概览
-   */
-  const renderScoreOverview = () => {
-    if (!attempt || !exam) return null;
-    
-    const scoreGrade = getScoreGrade(attempt.score, attempt.max_score);
-    const percentage = (attempt.score / attempt.max_score) * 100;
-    const passed = isPassed();
-
-    return (
-      <Card className="text-center">
-        <CardHeader>
-          <div className="flex justify-center mb-4">
-            {passed ? (
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
-                <Trophy className="h-10 w-10 text-green-600" />
-              </div>
-            ) : (
-              <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center">
-                <AlertCircle className="h-10 w-10 text-red-600" />
-              </div>
-            )}
-          </div>
-          <CardTitle className="text-2xl">
-            {passed ? '恭喜通过考试！' : '很遗憾，未通过考试'}
-          </CardTitle>
-          <CardDescription>
-            {exam.title} · {getDifficultyText(exam.difficulty)}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <div className="flex items-center justify-center gap-4">
-              <div className={`text-6xl font-bold ${scoreGrade.color}`}>
-                {attempt.score}
-              </div>
-              <div className="text-left">
-                <div className="text-2xl text-gray-600">/ {attempt.max_score}</div>
-                <div className={`text-lg font-semibold ${scoreGrade.color}`}>
-                  {percentage.toFixed(1)}%
-                </div>
-              </div>
-            </div>
-            <Badge className={`${scoreGrade.bg} ${scoreGrade.color} text-lg px-3 py-1`}>
-              等级 {scoreGrade.grade}
-            </Badge>
-          </div>
-          
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>及格线</span>
-              <span>{exam.passing_score} 分</span>
-            </div>
-            <Progress 
-              value={percentage} 
-              className="h-3"
-            />
-            <div className="flex justify-between text-xs text-gray-500">
-              <span>0</span>
-              <span className="text-red-500">及格线 ({exam.passing_score})</span>
-              <span>{attempt.max_score}</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div className="bg-gray-50 p-3 rounded-lg">
-              <div className="text-gray-600">用时</div>
-              <div className="font-semibold">
-                {formatDuration(attempt.time_spent)}
-              </div>
-            </div>
-            <div className="bg-gray-50 p-3 rounded-lg">
-              <div className="text-gray-600">完成时间</div>
-              <div className="font-semibold">
-                {new Date(attempt.completed_at).toLocaleString()}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  };
-
-  /**
-   * 渲染操作按钮
-   */
-  const renderActionButtons = () => (
-    <div className="flex flex-wrap justify-center gap-3">
-      <Button onClick={() => router.push('/skill-exam')} variant="outline">
-        <Home className="h-4 w-4 mr-2" />
-        返回首页
-      </Button>
-      
-      <Button 
-        onClick={() => setShowDetailedResults(!showDetailedResults)}
-        variant="outline"
-      >
-        <FileText className="h-4 w-4 mr-2" />
-        {showDetailedResults ? '隐藏' : '查看'}详细结果
-      </Button>
-      
-      {isPassed() && (
-        <Button onClick={downloadCertificate} variant="outline">
-          <Download className="h-4 w-4 mr-2" />
-          下载证书
-        </Button>
-      )}
-      
-      <Button onClick={shareResult} variant="outline">
-        <Share2 className="h-4 w-4 mr-2" />
-        分享成绩
-      </Button>
-      
-      {exam?.allow_retake && (
-        <Button onClick={retakeExam}>
-          <RotateCcw className="h-4 w-4 mr-2" />
-          重新考试
-        </Button>
-      )}
-    </div>
-  );
-
-  /**
-   * 渲染详细结果
-   */
-  const renderDetailedResults = () => {
-    if (!showDetailedResults || !attempt) return null;
-
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
-            详细分析
-          </CardTitle>
-          <CardDescription>
-            查看您在各个方面的表现
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* 基本统计 */}
-          <div className="grid grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600">{questions.length}</div>
-              <div className="text-sm text-gray-600">总题目数</div>
-            </div>
-            <div className="text-center p-4 bg-green-50 rounded-lg">
-              <div className="text-2xl font-bold text-green-600">
-                {answers.filter(a => a.answer).length}
-              </div>
-              <div className="text-sm text-gray-600">已答题目</div>
-            </div>
-            <div className="text-center p-4 bg-yellow-50 rounded-lg">
-              <div className="text-2xl font-bold text-yellow-600">
-                {Math.round(attempt.time_spent / 60)}
-              </div>
-              <div className="text-sm text-gray-600">用时（分钟）</div>
-            </div>
-            <div className="text-center p-4 bg-purple-50 rounded-lg">
-              <div className="text-2xl font-bold text-purple-600">
-                {attempt.attempt_number}
-              </div>
-              <div className="text-sm text-gray-600">尝试次数</div>
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* 题型分析 */}
-          <div>
-            <h3 className="text-lg font-semibold mb-4">题型分析</h3>
-            <div className="space-y-3">
-              {Object.entries(
-                questions.reduce((acc, q) => {
-                  const type = q.type;
-                  if (!acc[type]) {
-                    acc[type] = { total: 0, score: 0, maxScore: 0 };
-                  }
-                  acc[type].total += 1;
-                  acc[type].maxScore += q.score;
-                  // TODO: 计算实际得分
-                  acc[type].score += Math.floor(q.score * 0.8); // 模拟80%正确率
-                  return acc;
-                }, {} as Record<string, { total: number; score: number; maxScore: number }>)
-              ).map(([type, stats]) => {
-                const percentage = (stats.score / stats.maxScore) * 100;
-                const typeText = {
-                  [QuestionType.SINGLE_CHOICE]: '单选题',
-                  [QuestionType.MULTIPLE_CHOICE]: '多选题',
-                  [QuestionType.TRUE_FALSE]: '判断题',
-                  [QuestionType.FILL_BLANK]: '填空题',
-                  [QuestionType.ESSAY]: '问答题'
-                }[type as QuestionType] || type;
-                
-                return (
-                  <div key={type} className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium">{typeText}</span>
-                      <span className="text-sm text-gray-600">
-                        {stats.score}/{stats.maxScore} 分 ({percentage.toFixed(1)}%)
-                      </span>
-                    </div>
-                    <Progress value={percentage} className="h-2" />
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* 改进建议 */}
-          <div>
-            <h3 className="text-lg font-semibold mb-4">改进建议</h3>
-            <div className="space-y-3">
-              {isPassed() ? (
-                <Alert>
-                  <CheckCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    恭喜您通过了考试！您的表现很出色，继续保持这种学习状态。
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    建议您复习相关知识点，特别关注得分较低的题型，然后重新参加考试。
-                  </AlertDescription>
-                </Alert>
-              )}
-              
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h4 className="font-medium mb-2">学习建议：</h4>
-                <ul className="text-sm space-y-1 text-gray-700">
-                  <li>• 重点复习得分较低的知识点</li>
-                  <li>• 多做相关练习题加强理解</li>
-                  <li>• 注意答题时间的合理分配</li>
-                  <li>• 仔细阅读题目，避免粗心错误</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  };
-
+  // 组件挂载时获取数据
   useEffect(() => {
-    if (examId) {
-      loadExamResult();
+    if (!user) {
+      router.push('/login');
+      return;
     }
-  }, [examId]);
+    
+    fetchResultData();
+  }, [user, examId]);
 
   if (loading) {
     return (
       <div className="container mx-auto p-6">
-        <div className="text-center py-8">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="mt-2 text-gray-600">加载中...</p>
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">加载考试结果中...</p>
         </div>
       </div>
     );
   }
 
-  if (!exam || !attempt) {
+  if (!exam || !submission) {
     return (
       <div className="container mx-auto p-6">
-        <Card>
-          <CardContent className="text-center py-8">
-            <XCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">结果不可用</h3>
-            <p className="text-gray-600 mb-4">无法找到考试结果</p>
-            <Button onClick={() => router.push('/skill-exam')}>返回考试列表</Button>
-          </CardContent>
-        </Card>
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            考试结果加载失败，请刷新页面重试。
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }
 
+  const gradeInfo = getGradeInfo(submission.percentage);
+  const correctCount = submission.question_results?.filter(r => r.is_correct).length || 0;
+  const totalQuestions = submission.question_results?.length || 0;
+
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* 成绩概览 */}
-      {renderScoreOverview()}
-      
-      {/* 操作按钮 */}
-      {renderActionButtons()}
-      
-      {/* 详细结果 */}
-      {renderDetailedResults()}
-      
-      {/* 通过提示 */}
-      {isPassed() && (
-        <Card className="border-green-200 bg-green-50">
+    <div className="container mx-auto p-6 max-w-6xl">
+      {/* 页面头部 */}
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <Link href="/exams">
+            <Button variant="ghost" size="sm">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              返回考试列表
+            </Button>
+          </Link>
+          <h1 className="text-3xl font-bold mt-2">{exam.title} - 考试结果</h1>
+          <p className="text-gray-600 mt-1">提交时间：{formatDateTime(submission.submitted_at)}</p>
+        </div>
+        
+        <div className="flex space-x-2">
+          <Button variant="outline" onClick={handleDownloadReport}>
+            <Download className="w-4 h-4 mr-2" />
+            下载报告
+          </Button>
+          <Button variant="outline" onClick={handleShareResult}>
+            <Share2 className="w-4 h-4 mr-2" />
+            分享成绩
+          </Button>
+        </div>
+      </div>
+
+      {/* 成绩概览卡片 */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        {/* 总分 */}
+        <Card>
           <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <Award className="h-8 w-8 text-green-600" />
+            <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-green-800">
-                  恭喜获得认证！
-                </h3>
-                <p className="text-green-700">
-                  您已成功通过「{exam.title}」考试，可以下载电子证书作为能力证明。
+                <p className="text-sm font-medium text-gray-600">总分</p>
+                <p className="text-3xl font-bold">
+                  {submission.score}
+                  <span className="text-lg text-gray-500">/{submission.total_score}</span>
                 </p>
               </div>
+              <Trophy className={`w-8 h-8 ${gradeInfo.color}`} />
             </div>
           </CardContent>
         </Card>
-      )}
+        
+        {/* 百分比和等级 */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">得分率</p>
+                <p className="text-3xl font-bold">{submission.percentage.toFixed(1)}%</p>
+                <Badge className={`${gradeInfo.bgColor} ${gradeInfo.color} mt-1`}>
+                  等级 {gradeInfo.grade}
+                </Badge>
+              </div>
+              <Target className={`w-8 h-8 ${gradeInfo.color}`} />
+            </div>
+          </CardContent>
+        </Card>
+        
+        {/* 正确率 */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">正确题数</p>
+                <p className="text-3xl font-bold">
+                  {correctCount}
+                  <span className="text-lg text-gray-500">/{totalQuestions}</span>
+                </p>
+                <p className="text-sm text-gray-600 mt-1">
+                  正确率 {totalQuestions > 0 ? ((correctCount / totalQuestions) * 100).toFixed(1) : 0}%
+                </p>
+              </div>
+              <CheckCircle className="w-8 h-8 text-green-600" />
+            </div>
+          </CardContent>
+        </Card>
+        
+        {/* 用时 */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">用时</p>
+                <p className="text-3xl font-bold">{formatTime(submission.time_used)}</p>
+                <p className="text-sm text-gray-600 mt-1">
+                  总时长 {formatTime((exam.duration || 0) * 60)}
+                </p>
+              </div>
+              <Clock className="w-8 h-8 text-blue-600" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 详细信息标签页 */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="overview">成绩概览</TabsTrigger>
+          <TabsTrigger value="details">答题详情</TabsTrigger>
+          <TabsTrigger value="statistics">统计信息</TabsTrigger>
+        </TabsList>
+        
+        {/* 成绩概览 */}
+        <TabsContent value="overview" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>成绩分析</CardTitle>
+              <CardDescription>您的考试表现分析</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <div className="flex justify-between text-sm mb-2">
+                    <span>总体得分</span>
+                    <span>{submission.percentage.toFixed(1)}%</span>
+                  </div>
+                  <Progress value={submission.percentage} className="h-3" />
+                </div>
+                
+                {submission.feedback && (
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      <strong>教师评语：</strong>{submission.feedback}
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-green-800 mb-2">答对题目</h4>
+                    <p className="text-2xl font-bold text-green-600">{correctCount}</p>
+                    <p className="text-sm text-green-600">共 {totalQuestions} 题</p>
+                  </div>
+                  
+                  <div className="bg-red-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-red-800 mb-2">答错题目</h4>
+                    <p className="text-2xl font-bold text-red-600">{totalQuestions - correctCount}</p>
+                    <p className="text-sm text-red-600">需要复习</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        {/* 答题详情 */}
+        <TabsContent value="details" className="space-y-4">
+          {submission.question_results?.map((result, index) => (
+            <Card key={result.question_id}>
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <CardTitle className="text-lg">
+                    第 {index + 1} 题
+                    <Badge className="ml-2">
+                      {result.points_earned}/{result.points_possible} 分
+                    </Badge>
+                  </CardTitle>
+                  {result.is_correct ? (
+                    <CheckCircle className="w-6 h-6 text-green-600" />
+                  ) : (
+                    <XCircle className="w-6 h-6 text-red-600" />
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="font-medium mb-2">题目内容</h4>
+                    <p className="text-gray-700">{result.question.content}</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <h4 className="font-medium mb-2">您的答案</h4>
+                      <div className={`p-3 rounded-lg ${
+                        result.is_correct ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
+                      }`}>
+                        {getAnswerText(result.question, result.user_answer)}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h4 className="font-medium mb-2">正确答案</h4>
+                      <div className="p-3 rounded-lg bg-green-50 text-green-800">
+                        {getAnswerText(result.question, result.correct_answer)}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {result.question.explanation && (
+                    <div>
+                      <h4 className="font-medium mb-2">解析</h4>
+                      <div className="p-3 rounded-lg bg-blue-50 text-blue-800">
+                        {result.question.explanation}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {result.feedback && (
+                    <div>
+                      <h4 className="font-medium mb-2">评语</h4>
+                      <div className="p-3 rounded-lg bg-gray-50 text-gray-800">
+                        {result.feedback}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </TabsContent>
+        
+        {/* 统计信息 */}
+        <TabsContent value="statistics">
+          {stats ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <BarChart3 className="w-5 h-5 mr-2" />
+                    考试统计
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">参与人数</span>
+                      <span className="font-medium">{stats.total_participants} 人</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">平均分</span>
+                      <span className="font-medium">{stats.average_score.toFixed(1)}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">最高分</span>
+                      <span className="font-medium">{stats.highest_score.toFixed(1)}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">最低分</span>
+                      <span className="font-medium">{stats.lowest_score.toFixed(1)}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">及格率</span>
+                      <span className="font-medium">{stats.pass_rate.toFixed(1)}%</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle>您的排名</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center">
+                    <div className="text-4xl font-bold text-blue-600 mb-2">
+                      #{stats.user_rank}
+                    </div>
+                    <p className="text-gray-600">
+                      在 {stats.total_participants} 名参与者中排名第 {stats.user_rank} 位
+                    </p>
+                    <div className="mt-4">
+                      <Progress 
+                        value={((stats.total_participants - stats.user_rank + 1) / stats.total_participants) * 100} 
+                        className="h-3" 
+                      />
+                      <p className="text-sm text-gray-600 mt-2">
+                        超过了 {(((stats.total_participants - stats.user_rank) / stats.total_participants) * 100).toFixed(1)}% 的参与者
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center text-gray-600">
+                  <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>统计信息暂不可用</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

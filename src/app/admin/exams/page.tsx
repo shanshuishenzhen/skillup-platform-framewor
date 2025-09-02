@@ -33,7 +33,8 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { ExamService, ExamStatus, ExamDifficulty, type Exam } from '@/services/examService';
+import { ExamService } from '@/services/examService';
+import { ExamStatus, ExamDifficulty, type Exam } from '@/types/exam';
 import QuestionManagement from '@/components/admin/QuestionManagement';
 import ExamAnalytics from '@/components/admin/ExamAnalytics';
 import ExamReports from '@/components/admin/ExamReports';

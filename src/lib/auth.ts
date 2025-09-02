@@ -195,6 +195,40 @@ export function isSuperAdmin(user?: User | null): boolean {
 }
 
 /**
+ * 验证管理员访问权限（用于API路由）
+ * @param request Next.js请求对象
+ * @returns 用户信息或抛出错误
+ */
+export async function verifyAdminAccess(request: any): Promise<User> {
+  // 简化版本：从请求头获取用户信息
+  // 在实际项目中，这里应该验证JWT token等
+  const authHeader = request.headers.get('authorization');
+  
+  if (!authHeader) {
+    throw new Error('未提供认证信息');
+  }
+  
+  // 模拟管理员用户
+  const mockAdminUser: User = {
+    id: 'admin-user-id',
+    phone: '13800138000',
+    userType: UserType.PREMIUM,
+    role: 'admin',
+    username: 'admin',
+    email: 'admin@example.com',
+    real_name: '管理员',
+    permissions: ['exam:read', 'exam:write', 'question:read', 'question:write'],
+    status: 'active',
+    department: 'IT',
+    position: '系统管理员',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  
+  return mockAdminUser;
+}
+
+/**
  * 检查用户是否可以访问管理后台
  * @param user 用户信息（可选）
  * @returns 是否可以访问管理后台

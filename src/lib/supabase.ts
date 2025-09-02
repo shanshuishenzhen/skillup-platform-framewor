@@ -5,6 +5,9 @@
 
 import { createClient } from '@supabase/supabase-js'
 
+// 导出 createClient 函数供其他模块使用
+export { createClient }
+
 // 获取环境变量
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://test.supabase.co'
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'test-anon-key'

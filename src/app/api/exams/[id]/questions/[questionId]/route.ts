@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
-import { verifyAdminAccess } from '@/lib/auth';
-import { QuestionType, ExamDifficulty } from '@/services/examService';
+import { verifyAdminAccess } from '@/middleware/rbac';
+import { QuestionType } from '@/types/question';
+import { ExamDifficulty } from '@/types/exam';
 
 // 更新题目的验证模式
 const UpdateQuestionSchema = z.object({

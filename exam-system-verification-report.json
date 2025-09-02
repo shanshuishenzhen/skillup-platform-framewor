@@ -1,0 +1,289 @@
+{
+  "timestamp": "2025-09-02T09:01:02.555Z",
+  "summary": {
+    "total": 37,
+    "passed": 32,
+    "failed": 4,
+    "warnings": 1,
+    "successRate": 89
+  },
+  "details": {
+    "projectStructure": [
+      {
+        "test": "源代码目录",
+        "path": "./src",
+        "passed": true,
+        "message": "目录存在"
+      },
+      {
+        "test": "Next.js App目录",
+        "path": "./src/app",
+        "passed": true,
+        "message": "目录存在"
+      },
+      {
+        "test": "组件目录",
+        "path": "./src/components",
+        "passed": true,
+        "message": "目录存在"
+      },
+      {
+        "test": "服务目录",
+        "path": "./src/services",
+        "passed": true,
+        "message": "目录存在"
+      },
+      {
+        "test": "类型定义目录",
+        "path": "./src/types",
+        "passed": true,
+        "message": "目录存在"
+      },
+      {
+        "test": "React Hooks目录",
+        "path": "./src/hooks",
+        "passed": true,
+        "message": "目录存在"
+      },
+      {
+        "test": "工具函数目录",
+        "path": "./src/utils",
+        "passed": true,
+        "message": "目录存在"
+      },
+      {
+        "test": "Package.json配置文件",
+        "path": "./package.json",
+        "passed": true,
+        "message": "文件存在"
+      },
+      {
+        "test": "Next.js配置文件",
+        "path": "./next.config.js",
+        "passed": true,
+        "message": "文件存在"
+      },
+      {
+        "test": "Tailwind配置文件",
+        "path": "./tailwind.config.js",
+        "passed": true,
+        "message": "文件存在"
+      },
+      {
+        "test": "TypeScript配置文件",
+        "path": "./tsconfig.json",
+        "passed": true,
+        "message": "文件存在"
+      },
+      {
+        "test": "环境变量文件",
+        "path": "./.env.local",
+        "passed": true,
+        "message": "文件存在"
+      },
+      {
+        "test": "API路由目录",
+        "path": "./src/app/api",
+        "passed": true,
+        "message": "目录存在"
+      },
+      {
+        "test": "考试API目录",
+        "path": "./src/app/api/exams",
+        "passed": true,
+        "message": "目录存在"
+      },
+      {
+        "test": "题目API目录",
+        "path": "./src/app/api/questions",
+        "passed": true,
+        "message": "目录存在"
+      },
+      {
+        "test": "考试服务文件",
+        "path": "./src/services/examService.ts",
+        "passed": true,
+        "message": "文件存在"
+      },
+      {
+        "test": "题目服务文件",
+        "path": "./src/services/questionService.ts",
+        "passed": true,
+        "message": "文件存在"
+      },
+      {
+        "test": "Supabase客户端文件",
+        "path": "./src/services/supabaseClient.ts",
+        "passed": true,
+        "message": "文件存在"
+      },
+      {
+        "test": "考试类型定义",
+        "path": "./src/types/exam.ts",
+        "passed": true,
+        "message": "文件存在"
+      },
+      {
+        "test": "题目类型定义",
+        "path": "./src/types/question.ts",
+        "passed": true,
+        "message": "文件存在"
+      },
+      {
+        "test": "首页组件",
+        "path": "./src/app/page.tsx",
+        "passed": true,
+        "message": "文件存在"
+      },
+      {
+        "test": "考试列表页面",
+        "path": "./src/app/exams/page.tsx",
+        "passed": true,
+        "message": "文件存在"
+      },
+      {
+        "test": "题目管理页面",
+        "path": "./src/app/questions/page.tsx",
+        "passed": true,
+        "message": "文件存在"
+      },
+      {
+        "test": "考试卡片组件",
+        "path": "./src/components/ExamCard.tsx",
+        "passed": true,
+        "message": "文件存在"
+      },
+      {
+        "test": "题目表单组件",
+        "path": "./src/components/QuestionForm.tsx",
+        "passed": true,
+        "message": "文件存在"
+      },
+      {
+        "test": "考试表单组件",
+        "path": "./src/components/ExamForm.tsx",
+        "passed": true,
+        "message": "文件存在"
+      }
+    ],
+    "apiEndpoints": [
+      {
+        "test": "获取考试列表API",
+        "endpoint": "/api/exams",
+        "expectedStatus": 200,
+        "actualStatus": "ERROR",
+        "passed": false,
+        "message": "请求失败: ",
+        "error": ""
+      },
+      {
+        "test": "获取题目列表API",
+        "endpoint": "/api/questions",
+        "expectedStatus": 200,
+        "actualStatus": "ERROR",
+        "passed": false,
+        "message": "请求失败: ",
+        "error": ""
+      },
+      {
+        "test": "不存在的API端点",
+        "endpoint": "/api/nonexistent",
+        "expectedStatus": 404,
+        "actualStatus": "ERROR",
+        "passed": false,
+        "message": "请求失败: ",
+        "error": ""
+      },
+      {
+        "test": "数据库连接测试(通过考试API)",
+        "endpoint": "/api/exams",
+        "expectedStatus": 200,
+        "actualStatus": "ERROR",
+        "passed": false,
+        "message": "请求失败: ",
+        "error": ""
+      }
+    ],
+    "components": [
+      {
+        "test": "首页组件 - 代码质量",
+        "path": "./src/app/page.tsx",
+        "passed": true,
+        "message": "包含导出语句",
+        "details": {
+          "hasExport": true,
+          "hasReact": false,
+          "size": 15446
+        }
+      },
+      {
+        "test": "考试列表页面 - 代码质量",
+        "path": "./src/app/exams/page.tsx",
+        "passed": true,
+        "message": "包含导出语句",
+        "details": {
+          "hasExport": true,
+          "hasReact": true,
+          "size": 12418
+        }
+      },
+      {
+        "test": "题目管理页面 - 代码质量",
+        "path": "./src/app/questions/page.tsx",
+        "passed": true,
+        "message": "包含导出语句",
+        "details": {
+          "hasExport": true,
+          "hasReact": true,
+          "size": 21751
+        }
+      },
+      {
+        "test": "考试卡片组件 - 代码质量",
+        "path": "./src/components/ExamCard.tsx",
+        "passed": true,
+        "message": "包含导出语句",
+        "details": {
+          "hasExport": true,
+          "hasReact": true,
+          "size": 7121
+        }
+      },
+      {
+        "test": "题目表单组件 - 代码质量",
+        "path": "./src/components/QuestionForm.tsx",
+        "passed": true,
+        "message": "包含导出语句",
+        "details": {
+          "hasExport": true,
+          "hasReact": true,
+          "size": 15125
+        }
+      },
+      {
+        "test": "考试表单组件 - 代码质量",
+        "path": "./src/components/ExamForm.tsx",
+        "passed": true,
+        "message": "包含导出语句",
+        "details": {
+          "hasExport": true,
+          "hasReact": true,
+          "size": 21776
+        }
+      }
+    ],
+    "database": [
+      {
+        "test": "数据库连接状态",
+        "passed": false,
+        "message": "数据库连接可能存在问题",
+        "method": "通过API端点测试"
+      }
+    ],
+    "overall": {
+      "passed": 32,
+      "failed": 4,
+      "warnings": 1
+    }
+  }
+}

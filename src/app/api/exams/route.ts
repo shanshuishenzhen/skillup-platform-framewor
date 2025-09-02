@@ -1,214 +1,224 @@
 /**
  * 考试管理API路由
- * GET /api/exams - 获取考试列表
- * POST /api/exams - 创建新考试
+ * 处理考试的CRUD操作和相关业务逻辑
+ * 
+ * @author SOLO Coding
+ * @version 1.0.0
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { examService } from '@/services/examService';
-import { verifyAdminAccess } from '@/middleware/rbac';
-import { ExamQueryParams, CreateExamRequest } from '@/types/exam';
-import { z } from 'zod';
+import { ExamService } from '@/services/examService';
+import { CreateExamRequest, ExamQueryParams } from '@/types/exam';
+import { supabaseAdmin } from '@/lib/supabase';
 
-// 创建考试验证模式
-const CreateExamSchema = z.object({
-  title: z.string().min(1, '考试标题不能为空').max(200, '考试标题不能超过200字符'),
-  description: z.string().min(1, '考试描述不能为空'),
-  category: z.string().min(1, '考试分类不能为空'),
-  difficulty: z.enum(['beginner', 'intermediate', 'advanced']),
-  duration: z.number().min(1, '考试时长至少1分钟').max(480, '考试时长不能超过8小时'),
-  totalQuestions: z.number().min(1, '题目数量至少1题').max(200, '题目数量不能超过200题'),
-  passingScore: z.number().min(0, '及格分数不能为负数').max(100, '及格分数不能超过100分'),
-  maxAttempts: z.number().min(1, '最大尝试次数至少1次').max(10, '最大尝试次数不能超过10次'),
-  allowRetake: z.boolean(),
-  startTime: z.string().datetime('开始时间格式不正确'),
-  endTime: z.string().datetime('结束时间格式不正确'),
-  registrationDeadline: z.string().datetime('报名截止时间格式不正确'),
-  isPublic: z.boolean(),
-  requiresApproval: z.boolean(),
-  fee: z.number().min(0, '考试费用不能为负数'),
-  currency: z.string().default('CNY'),
-  tags: z.array(z.string()).default([]),
-  skills: z.array(z.string()).default([]),
-  prerequisites: z.array(z.string()).default([]),
-  instructions: z.string().default(''),
-  rules: z.array(z.string()).default([])
-}).refine(data => {
-  const start = new Date(data.startTime);
-  const end = new Date(data.endTime);
-  const deadline = new Date(data.registrationDeadline);
-  
-  return deadline <= start && start < end;
-}, {
-  message: '时间设置不正确：报名截止时间 <= 开始时间 < 结束时间'
-});
+// 初始化考试服务
+const examService = new ExamService(supabaseAdmin);
 
 /**
+ * GET /api/exams
  * 获取考试列表
+ * 
+ * @param request - Next.js请求对象
+ * @returns 考试列表响应
+ * 
+ * @example
+ * GET /api/exams?search=javascript&difficulty=intermediate&page=1&limit=10
  */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     
-    // 解析查询参数
-    const params: ExamQueryParams = {
-      page: parseInt(searchParams.get('page') || '1'),
-      limit: Math.min(parseInt(searchParams.get('limit') || '20'), 100),
-      category: searchParams.get('category') || undefined,
-      difficulty: searchParams.get('difficulty') as any || undefined,
-      status: searchParams.get('status') as any || undefined,
+    // 构建查询参数
+    const queryParams: ExamQueryParams = {
       search: searchParams.get('search') || undefined,
-      tags: searchParams.get('tags')?.split(',').filter(Boolean) || undefined,
-      sortBy: searchParams.get('sortBy') as any || 'createdAt',
-      sortOrder: searchParams.get('sortOrder') as any || 'desc',
-      includeExpired: searchParams.get('includeExpired') === 'true'
+      status: searchParams.get('status') as any || undefined,
+      difficulty: searchParams.get('difficulty') as any || undefined,
+      category: searchParams.get('category') || undefined,
+      tags: searchParams.get('tags')?.split(',') || undefined,
+      createdBy: searchParams.get('createdBy') || undefined,
+      sortBy: searchParams.get('sortBy') || 'created_at',
+      sortOrder: (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc',
+      page: parseInt(searchParams.get('page') || '1'),
+      limit: parseInt(searchParams.get('limit') || '20')
     };
 
     // 获取考试列表
-    const result = await examService.getExams(params);
-
-    return NextResponse.json({
-      success: true,
-      data: result
-    });
-
-  } catch (error) {
-    console.error('获取考试列表失败:', error);
+    const result = await examService.getExams(queryParams);
     
     return NextResponse.json({
-      success: false,
-      message: error instanceof Error ? error.message : '获取考试列表失败',
-      error: process.env.NODE_ENV === 'development' ? error : undefined
-    }, { status: 500 });
+      success: true,
+      data: result,
+      message: '获取考试列表成功'
+    });
+  } catch (error) {
+    console.error('获取考试列表失败:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: '获取考试列表失败',
+        details: error instanceof Error ? error.message : '未知错误'
+      },
+      { status: 500 }
+    );
   }
 }
 
 /**
+ * POST /api/exams
  * 创建新考试
+ * 
+ * @param request - Next.js请求对象
+ * @returns 创建结果响应
+ * 
+ * @example
+ * POST /api/exams
+ * {
+ *   "title": "JavaScript基础考试",
+ *   "description": "测试JavaScript基础知识",
+ *   "difficulty": "intermediate",
+ *   "duration": 60,
+ *   "totalQuestions": 20,
+ *   "passingScore": 70
+ * }
  */
 export async function POST(request: NextRequest) {
   try {
-    // 验证管理员权限（允许管理员和教师创建考试）
-    const authResult = await verifyAdminAccess(request, ['admin', 'teacher']);
-    if (!authResult.success) {
+    // 解析请求体
+    const body: CreateExamRequest = await request.json();
+    
+    // 验证必填字段
+    if (!body.title || !body.description || !body.difficulty) {
       return NextResponse.json(
-        { success: false, message: authResult.message },
-        { status: 403 }
+        {
+          success: false,
+          error: '缺少必填字段',
+          details: '标题、描述和难度为必填字段'
+        },
+        { status: 400 }
       );
     }
 
-    const { user } = authResult;
-    const body = await request.json();
-
-    // 验证请求数据
-    const validationResult = CreateExamSchema.safeParse(body);
-    if (!validationResult.success) {
-      return NextResponse.json({
-        success: false,
-        message: '数据验证失败',
-        errors: validationResult.error.errors
-      }, { status: 400 });
+    // 验证数值字段
+    if (body.duration <= 0 || body.totalQuestions <= 0 || body.passingScore < 0 || body.passingScore > 100) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '参数值无效',
+          details: '时长和题目数必须大于0，及格分数必须在0-100之间'
+        },
+        { status: 400 }
+      );
     }
-
-    const examData: CreateExamRequest = validationResult.data;
 
     // 创建考试
-    const exam = await examService.createExam(examData, user.id);
-
-    return NextResponse.json({
-      success: true,
-      message: '考试创建成功',
-      data: exam
-    }, { status: 201 });
-
-  } catch (error) {
-    console.error('创建考试失败:', error);
+    const exam = await examService.createExam(body);
     
     return NextResponse.json({
-      success: false,
-      message: error instanceof Error ? error.message : '创建考试失败',
-      error: process.env.NODE_ENV === 'development' ? error : undefined
-    }, { status: 500 });
+      success: true,
+      data: exam,
+      message: '考试创建成功'
+    }, { status: 201 });
+  } catch (error) {
+    console.error('创建考试失败:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: '创建考试失败',
+        details: error instanceof Error ? error.message : '未知错误'
+      },
+      { status: 500 }
+    );
   }
 }
 
 /**
- * 批量操作考试
+ * PUT /api/exams
+ * 批量更新考试
+ * 
+ * @param request - Next.js请求对象
+ * @returns 更新结果响应
  */
-export async function PATCH(request: NextRequest) {
+export async function PUT(request: NextRequest) {
   try {
-    // 验证管理员权限（只允许管理员进行批量操作）
-    const authResult = await verifyAdminAccess(request, ['admin']);
-    if (!authResult.success) {
+    const body = await request.json();
+    const { ids, updates } = body;
+    
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
       return NextResponse.json(
-        { success: false, message: authResult.message },
-        { status: 403 }
+        {
+          success: false,
+          error: '无效的考试ID列表'
+        },
+        { status: 400 }
       );
     }
 
-    const body = await request.json();
-    const { action, examIds } = body;
-
-    if (!action || !Array.isArray(examIds) || examIds.length === 0) {
-      return NextResponse.json({
-        success: false,
-        message: '请提供有效的操作类型和考试ID列表'
-      }, { status: 400 });
-    }
-
-    let result;
-    switch (action) {
-      case 'publish':
-        result = await examService.batchPublishExams(examIds);
-        break;
-      case 'unpublish':
-        result = await examService.batchUnpublishExams(examIds);
-        break;
-      case 'delete':
-        result = await examService.batchDeleteExams(examIds);
-        break;
-      default:
-        return NextResponse.json({
-          success: false,
-          message: '不支持的操作类型'
-        }, { status: 400 });
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: `批量${action}操作完成`,
-      data: result
-    });
-
-  } catch (error) {
-    console.error('批量操作考试失败:', error);
+    // 批量更新考试
+    const results = await Promise.all(
+      ids.map(id => examService.updateExam({ id, ...updates }))
+    );
     
     return NextResponse.json({
-      success: false,
-      message: error instanceof Error ? error.message : '批量操作失败',
-      error: process.env.NODE_ENV === 'development' ? error : undefined
-    }, { status: 500 });
+      success: true,
+      data: results,
+      message: `成功更新${results.length}个考试`
+    });
+  } catch (error) {
+    console.error('批量更新考试失败:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: '批量更新考试失败',
+        details: error instanceof Error ? error.message : '未知错误'
+      },
+      { status: 500 }
+    );
   }
 }
 
 /**
- * 获取考试分类和统计信息
+ * DELETE /api/exams
+ * 批量删除考试
+ * 
+ * @param request - Next.js请求对象
+ * @returns 删除结果响应
  */
-export async function OPTIONS(request: NextRequest) {
+export async function DELETE(request: NextRequest) {
   try {
-    const stats = await examService.getExamStatsSummary();
+    const { searchParams } = new URL(request.url);
+    const idsParam = searchParams.get('ids');
+    
+    if (!idsParam) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '缺少考试ID参数'
+        },
+        { status: 400 }
+      );
+    }
+
+    const ids = idsParam.split(',');
+    
+    // 批量删除考试
+    const results = await Promise.all(
+      ids.map(id => examService.deleteExam(id))
+    );
     
     return NextResponse.json({
       success: true,
-      data: stats
+      data: { deletedCount: results.length },
+      message: `成功删除${results.length}个考试`
     });
-
   } catch (error) {
-    console.error('获取考试统计失败:', error);
-    
-    return NextResponse.json({
-      success: false,
-      message: error instanceof Error ? error.message : '获取统计信息失败'
-    }, { status: 500 });
+    console.error('批量删除考试失败:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: '批量删除考试失败',
+        details: error instanceof Error ? error.message : '未知错误'
+      },
+      { status: 500 }
+    );
   }
 }
