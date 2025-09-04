@@ -204,7 +204,8 @@ export default function QuestionManagementPage() {
       [QuestionType.MULTIPLE_CHOICE]: '多选题',
       [QuestionType.TRUE_FALSE]: '判断题',
       [QuestionType.FILL_BLANK]: '填空题',
-      [QuestionType.ESSAY]: '问答题'
+      [QuestionType.SHORT_ANSWER]: '简答题',
+      [QuestionType.CODING]: '编程题'
     };
     return typeMap[type] || type;
   };
@@ -216,7 +217,8 @@ export default function QuestionManagementPage() {
     const difficultyMap = {
       [ExamDifficulty.BEGINNER]: '初级',
       [ExamDifficulty.INTERMEDIATE]: '中级',
-      [ExamDifficulty.ADVANCED]: '高级'
+      [ExamDifficulty.ADVANCED]: '高级',
+      [ExamDifficulty.EXPERT]: '专家级'
     };
     return difficultyMap[difficulty] || difficulty;
   };
