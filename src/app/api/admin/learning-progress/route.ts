@@ -1,5 +1,6 @@
-import { NextRequest, import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdminClient } from '@/lib/supabase';
+import { parseJWTToken } from '@/utils/jwt';
 
 const supabase = getSupabaseAdminClient();
 
