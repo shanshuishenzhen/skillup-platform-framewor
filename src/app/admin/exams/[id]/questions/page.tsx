@@ -412,7 +412,7 @@ export default function QuestionManagementPage() {
         );
       
       case QuestionType.FILL_BLANK:
-      case QuestionType.ESSAY:
+      case QuestionType.SHORT_ANSWER:
         return (
           <div>
             <Label htmlFor="correct_answer">参考答案</Label>
@@ -498,7 +498,7 @@ export default function QuestionManagementPage() {
                       <SelectItem value={QuestionType.MULTIPLE_CHOICE}>多选题</SelectItem>
                       <SelectItem value={QuestionType.TRUE_FALSE}>判断题</SelectItem>
                       <SelectItem value={QuestionType.FILL_BLANK}>填空题</SelectItem>
-                      <SelectItem value={QuestionType.ESSAY}>问答题</SelectItem>
+                      <SelectItem value={QuestionType.SHORT_ANSWER}>问答题</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
