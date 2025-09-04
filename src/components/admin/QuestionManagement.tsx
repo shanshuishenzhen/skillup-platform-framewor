@@ -14,7 +14,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Plus, Edit, Trash2, Search, Filter, Upload, Download } from 'lucide-react';
 import { toast } from 'sonner';
-import { Question, QuestionType, ExamDifficulty } from '@/services/examService';
+import { Question, QuestionType } from '@/types/question';
+import { ExamDifficulty } from '@/types/exam';
 import QuestionImport from './QuestionImport';
 
 interface QuestionManagementProps {
