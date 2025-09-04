@@ -3,24 +3,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
   Trophy, 
-  Target, 
-  Clock, 
-  CheckCircle, 
   XCircle, 
   AlertCircle,
-  AlertTriangle,
-  Download,
-  Share2,
   RotateCcw,
   Home,
-  BarChart3,
-  FileText,
-  Award,
-  TrendingUp
+  Info,
+  CheckCircle,
+  Target,
+  Download,
+  Share2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/router';
@@ -131,7 +126,6 @@ const ExamResult: React.FC = () => {
   const [result, setResult] = useState<ExamResult | null>(null);
   const [statistics, setStatistics] = useState<ExamStatistics | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('overview');
 
   /**
    * 获取考试结果数据
@@ -454,7 +448,7 @@ const ExamResult: React.FC = () => {
             <Progress value={result.percentage} className="w-full max-w-md mx-auto" />
             
             <div className="flex justify-center gap-4 mt-6">
-              <Button onClick={() => navigate('/exams')} variant="outline">
+              <Button onClick={() => router.push('/exams')} variant="outline">
                 <Home className="h-4 w-4 mr-2" />
                 返回考试列表
               </Button>
@@ -473,268 +467,30 @@ const ExamResult: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* 详细分析 */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="overview">总体分析</TabsTrigger>
-          <TabsTrigger value="questions">题目详情</TabsTrigger>
-          <TabsTrigger value="statistics">统计分析</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="overview" className="space-y-6">
-          {/* 答题统计 */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" />
-                答题统计
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center p-4 bg-green-50 rounded-lg">
-                  <div className="text-2xl font-bold text-green-600">{statistics?.correct_answers}</div>
-                  <div className="text-sm text-gray-600">完全正确</div>
-                </div>
-                <div className="text-center p-4 bg-orange-50 rounded-lg">
-                  <div className="text-2xl font-bold text-orange-600">{statistics?.partial_answers}</div>
-                  <div className="text-sm text-gray-600">部分正确</div>
-                </div>
-                <div className="text-center p-4 bg-red-50 rounded-lg">
-                  <div className="text-2xl font-bold text-red-600">{statistics?.incorrect_answers}</div>
-                  <div className="text-sm text-gray-600">完全错误</div>
-                </div>
-                <div className="text-center p-4 bg-gray-50 rounded-lg">
-                  <div className="text-2xl font-bold text-gray-600">{statistics?.unanswered}</div>
-                  <div className="text-sm text-gray-600">未作答</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+      {/* 考试说明 */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="text-center">
+          <div className="mb-4">
+            <AlertCircle className="h-12 w-12 text-blue-500 mx-auto mb-3" />
+            <h3 className="text-lg font-semibold text-gray-900">技能等级考试说明</h3>
+          </div>
           
-          {/* 知识点分析 */}
-          {statistics?.category_breakdown && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  知识点掌握情况
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {Object.entries(statistics.category_breakdown).map(([category, data]) => (
-                    <div key={category} className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium">{category}</span>
-                        <span className="text-sm text-gray-600">
-                          {data.correct}/{data.total} ({data.percentage}%)
-                        </span>
-                      </div>
-                      <Progress value={data.percentage} className="h-2" />
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-        
-        <TabsContent value="questions" className="space-y-4">
-          {result.questions.map((question, index) => (
-            <Card key={question.id}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge variant="outline">第{index + 1}题</Badge>
-                      <Badge variant="secondary">{getQuestionTypeText(question.type)}</Badge>
-                      <Badge className={getStatusColor(question.status)}>
-                        {getStatusText(question.status)}
-                      </Badge>
-                    </div>
-                    <CardTitle className="text-lg">{question.title}</CardTitle>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {getStatusIcon(question.status)}
-                    <span className="font-medium">
-                      {question.earned_score}/{question.score}分
-                    </span>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-gray-700">{question.content}</p>
-                
-                {/* 选择题选项 */}
-                {question.options && (
-                  <div className="space-y-2">
-                    <div className="font-medium text-sm text-gray-600">选项：</div>
-                    {question.options.map((option) => {
-                      const isUserSelected = question.user_answer?.selected_options?.includes(option.id);
-                      const isCorrect = option.is_correct;
-                      
-                      return (
-                        <div 
-                          key={option.id} 
-                          className={`p-3 rounded-lg border ${
-                            isCorrect ? 'bg-green-50 border-green-200' : 
-                            isUserSelected && !isCorrect ? 'bg-red-50 border-red-200' : 
-                            'bg-gray-50 border-gray-200'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span>{option.text}</span>
-                            <div className="flex items-center gap-2">
-                              {isUserSelected && (
-                                <Badge variant="outline" className="text-xs">
-                                  您的选择
-                                </Badge>
-                              )}
-                              {isCorrect && (
-                                <CheckCircle className="h-4 w-4 text-green-600" />
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-                
-                {/* 文本答案 */}
-                {question.user_answer?.text_answer && (
-                  <div className="space-y-2">
-                    <div className="font-medium text-sm text-gray-600">您的答案：</div>
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      {question.user_answer.text_answer}
-                    </div>
-                  </div>
-                )}
-                
-                {/* 标准答案和解析 */}
-                {question.explanation && (
-                  <Alert>
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      <div className="font-medium mb-1">解析：</div>
-                      {question.explanation}
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </TabsContent>
-        
-        <TabsContent value="statistics" className="space-y-6">
-          {/* 时间分析 */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                时间分析
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="text-center p-4 bg-blue-50 rounded-lg">
-                  <div className="text-2xl font-bold text-blue-600">{formatDuration(result.time_spent)}</div>
-                  <div className="text-sm text-gray-600">总用时</div>
-                </div>
-                <div className="text-center p-4 bg-purple-50 rounded-lg">
-                  <div className="text-2xl font-bold text-purple-600">
-                    {statistics?.time_per_question.toFixed(1)}分钟
-                  </div>
-                  <div className="text-sm text-gray-600">平均每题用时</div>
-                </div>
-                <div className="text-center p-4 bg-green-50 rounded-lg">
-                  <div className="text-2xl font-bold text-green-600">
-                    {((result.time_spent / (examInfo?.duration || result.time_spent)) * 100).toFixed(0)}%
-                  </div>
-                  <div className="text-sm text-gray-600">时间利用率</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="max-w-2xl mx-auto text-gray-600 space-y-3">
+            <p>本次考试为技能等级认定考试，重点关注技能掌握程度的评估。</p>
+            <p>考试结果将由相关部门进行统一评估和通知，请耐心等待。</p>
+            <p>如有疑问，请联系相关管理部门或培训机构。</p>
+          </div>
           
-          {/* 难度分析 */}
-          {statistics?.difficulty_breakdown && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Target className="h-5 w-5" />
-                  难度分析
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {Object.entries(statistics.difficulty_breakdown).map(([difficulty, data]) => {
-                    const percentage = data.total > 0 ? (data.correct / data.total) * 100 : 0;
-                    return (
-                      <div key={difficulty} className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium capitalize">{difficulty}</span>
-                          <span className="text-sm text-gray-600">
-                            {data.correct}/{data.total} ({percentage.toFixed(0)}%)
-                          </span>
-                        </div>
-                        <Progress value={percentage} className="h-2" />
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-          
-          {/* 建议和改进 */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Award className="h-5 w-5" />
-                学习建议
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {result.is_passed ? (
-                  <Alert className="border-green-200 bg-green-50">
-                    <Trophy className="h-4 w-4 text-green-600" />
-                    <AlertDescription className="text-green-800">
-                      恭喜您通过考试！您在JavaScript基础知识方面表现优秀。
-                    </AlertDescription>
-                  </Alert>
-                ) : (
-                  <Alert className="border-orange-200 bg-orange-50">
-                    <AlertTriangle className="h-4 w-4 text-orange-600" />
-                    <AlertDescription className="text-orange-800">
-                      本次考试未达到及格线，建议您重点复习以下知识点后再次尝试。
-                    </AlertDescription>
-                  </Alert>
-                )}
-                
-                <div className="space-y-2">
-                  <div className="font-medium">改进建议：</div>
-                  <ul className="list-disc list-inside space-y-1 text-sm text-gray-600">
-                    {statistics && statistics.accuracy_rate < 80 && (
-                      <li>建议加强基础知识的学习和练习</li>
-                    )}
-                    {statistics && statistics.time_per_question > 10 && (
-                      <li>可以通过更多练习来提高答题速度</li>
-                    )}
-                    {statistics && statistics.partial_answers > statistics.correct_answers && (
-                      <li>注意审题，确保理解题目要求</li>
-                    )}
-                    <li>建议复习相关课程材料和参考资料</li>
-                    <li>可以参加相关的学习小组或讨论</li>
-                  </ul>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+          <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <p className="text-blue-800 font-medium">成绩通知方式</p>
+            <p className="text-blue-700 text-sm mt-1">
+              详细成绩和认证结果将通过官方渠道统一发布，请关注相关通知。
+            </p>
+          </div>
+        </div>
+      </div>
+
+
     </div>
   );
 };

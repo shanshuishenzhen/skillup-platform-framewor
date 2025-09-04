@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useParams } from 'next/navigation';
+import { ExamService } from '@/services/examService';
 
 // 类型定义
 interface ExamDetail {
@@ -254,31 +255,68 @@ export default function ExamDetailPage() {
 
   // 报名考试
   const handleRegister = async () => {
+    if (!exam) return;
+    
     setRegistering(true);
     try {
-      // 模拟API调用
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // 调用实际API
+      await ExamService.enrollExam(exam.id, 'current-user-id'); // TODO: 从认证上下文获取用户ID
       
       const newRegistration: UserRegistration = {
         id: 'reg-new',
-        status: exam?.requiresApproval ? 'pending' : 'approved',
+        status: exam.requiresApproval ? 'pending' : 'approved',
         registeredAt: new Date().toISOString(),
-        approvedAt: exam?.requiresApproval ? undefined : new Date().toISOString()
+        approvedAt: exam.requiresApproval ? undefined : new Date().toISOString()
       };
       
       setUserRegistration(newRegistration);
-      toast.success(exam?.requiresApproval ? '报名申请已提交，等待审核' : '报名成功');
+      toast.success(exam.requiresApproval ? '报名申请已提交，等待审核' : '报名成功');
     } catch (error) {
-      toast.error('报名失败，请重试');
+      console.error('报名考试失败:', error);
+      toast.error(error instanceof Error ? error.message : '报名失败，请重试');
     } finally {
       setRegistering(false);
     }
   };
 
   // 开始考试
-  const handleStartExam = () => {
-    toast.info('即将跳转到考试页面');
-    // 这里应该跳转到考试页面
+  const handleStartExam = async () => {
+    if (!exam) return;
+    
+    try {
+      setLoading(true);
+      // 调用开始考试API
+      const submission = await ExamService.startExam(exam.id, 'current-user-id'); // TODO: 从认证上下文获取用户ID
+      
+      toast.success('考试开始，正在跳转...');
+      
+      // 跳转到考试页面
+      window.location.href = `/skill-exam/${exam.id}/take?submission=${submission.id}`;
+    } catch (error) {
+      console.error('开始考试失败:', error);
+      toast.error(error instanceof Error ? error.message : '开始考试失败，请重试');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 取消报名
+  const handleCancelRegistration = async () => {
+    if (!exam || !userRegistration) return;
+    
+    setRegistering(true);
+    try {
+      // 调用取消报名API
+      await ExamService.cancelEnrollment(exam.id, 'current-user-id'); // TODO: 从认证上下文获取用户ID
+      
+      setUserRegistration(null);
+      toast.success('已取消报名');
+    } catch (error) {
+      console.error('取消报名失败:', error);
+      toast.error(error instanceof Error ? error.message : '取消报名失败，请重试');
+    } finally {
+      setRegistering(false);
+    }
   };
 
   if (loading) {
@@ -516,9 +554,18 @@ export default function ExamDetailPage() {
               )}
               
               {userRegistration && userRegistration.status === 'pending' && (
-                <div className="text-center">
+                <div className="text-center space-y-3">
                   <AlertCircle className="w-8 h-8 text-yellow-500 mx-auto mb-2" />
                   <p className="text-sm text-gray-600">报名申请审核中</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleCancelRegistration}
+                    disabled={registering}
+                    className="w-full"
+                  >
+                    {registering ? '取消中...' : '取消报名'}
+                  </Button>
                 </div>
               )}
               

@@ -12,7 +12,8 @@ import { Plus, Search, Filter, BookOpen, Users, Clock } from 'lucide-react';
 import { ExamCard } from '@/components/ExamCard';
 import { Exam, ExamStatus, ExamDifficulty } from '@/types/exam';
 import { toast } from 'sonner';
-import { supabase, getCurrentUser } from '@/services/supabaseClient';
+import { supabase } from '@/lib/supabase';
+import { getCurrentUser } from '@/lib/auth';
 
 /**
  * 考试列表页面组件

@@ -4,17 +4,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdminClient } from '@/lib/supabase';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { ErrorHandler } from '@/utils/errorHandler';
 import { verifyAdminAccess } from '@/middleware/rbac';
 
-// 初始化 Supabase 客户端
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabase = getSupabaseAdminClient();
 
 // 扩展用户数据验证模式
 const ExtendedUserSchema = z.object({

@@ -29,11 +29,12 @@ import {
   Settings,
   BookOpen,
   Keyboard,
-  Zap
+  Zap,
+  Loader2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { ExamService } from '@/services/examService';
+import { examService } from '@/services/examService';
 import { ExamStatus, ExamDifficulty, type Exam } from '@/types/exam';
 import QuestionManagement from '@/components/admin/QuestionManagement';
 import ExamAnalytics from '@/components/admin/ExamAnalytics';
@@ -64,6 +65,7 @@ export default function ExamManagementPage() {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [pageSize] = useState(10); // 每页显示的考试数量
   
   // 性能优化和用户体验增强
   const { loadExamsBatch, searchExams, clearCache } = useExamOptimization();
@@ -105,14 +107,14 @@ export default function ExamManagementPage() {
       setLoading(true);
       const result = await loadExamsBatch(
         currentPage,
-        10,
+        pageSize,
         {
           status: statusFilter !== 'all' ? statusFilter : undefined,
           search: searchTerm || undefined
         }
       );
-      setExams(result.data);
-      setTotalPages(result.total_pages);
+      setExams(result.exams || []);
+      setTotalPages(result.totalPages || 0);
     } catch (error) {
       console.error('加载考试列表失败:', error);
       toast.error('加载考试列表失败');
@@ -135,8 +137,8 @@ export default function ExamManagementPage() {
       const result = await searchExams(debouncedSearchQuery, {
         status: statusFilter !== 'all' ? statusFilter : undefined
       });
-      setExams(result.data);
-      setTotalPages(result.total_pages);
+      setExams(result.exams || []);
+      setTotalPages(result.totalPages || 0);
     } catch (error) {
       console.error('搜索考试失败:', error);
       toast.error('搜索考试失败');
@@ -146,10 +148,28 @@ export default function ExamManagementPage() {
   };
 
   /**
-   * 创建考试
+   * 创建或更新考试
    */
   const handleCreateExam = async () => {
     try {
+      setLoading(true);
+      
+      // 验证必填字段
+      if (!newExam.title.trim()) {
+        toast.error('请输入考试标题');
+        return;
+      }
+      
+      if (!newExam.category.trim()) {
+        toast.error('请输入考试分类');
+        return;
+      }
+      
+      if (newExam.passing_score > newExam.total_score) {
+        toast.error('及格分数不能大于总分');
+        return;
+      }
+      
       const examData = {
         ...newExam,
         start_time: newExam.start_time.toISOString(),
@@ -158,12 +178,28 @@ export default function ExamManagementPage() {
         created_by: 'current-user-id' // TODO: 从认证上下文获取
       };
       
-      await ExamService.createExam(examData);
+      if (editingExam) {
+        // 编辑模式
+        await examService.updateExam({
+          id: editingExam.id,
+          ...examData
+        });
+        toast.success('考试更新成功');
+        setEditingExam(null);
+      } else {
+        // 创建模式
+        await examService.createExam(examData, 'current-user-id');
+        toast.success('考试创建成功');
+      }
+      
       setShowCreateDialog(false);
       resetNewExamForm();
       loadExams();
     } catch (error) {
-      console.error('创建考试失败:', error);
+      console.error(editingExam ? '更新考试失败:' : '创建考试失败:', error);
+      toast.error(editingExam ? '更新考试失败' : '创建考试失败');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -176,11 +212,105 @@ export default function ExamManagementPage() {
     }
 
     try {
-      await ExamService.deleteExam(examId);
+      setLoading(true);
+      await examService.deleteExam(examId);
+      toast.success('考试删除成功');
       loadExams();
     } catch (error) {
       console.error('删除考试失败:', error);
+      toast.error('删除考试失败');
+    } finally {
+      setLoading(false);
     }
+  };
+
+  /**
+   * 发布考试
+   * @param examId 考试ID
+   */
+  const handlePublishExam = async (examId: string) => {
+    try {
+      setLoading(true);
+      await examService.updateExamStatus(examId, ExamStatus.PUBLISHED);
+      toast.success('考试发布成功');
+      loadExams();
+    } catch (error) {
+      console.error('发布考试失败:', error);
+      toast.error('发布考试失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * 撤回考试
+   * @param examId 考试ID
+   */
+  const handleWithdrawExam = async (examId: string) => {
+    if (!confirm('确定要撤回这个考试吗？已报名的考生将无法参加考试。')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await examService.updateExamStatus(examId, ExamStatus.DRAFT);
+      toast.success('考试撤回成功');
+      loadExams();
+    } catch (error) {
+      console.error('撤回考试失败:', error);
+      toast.error('撤回考试失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * 编辑考试
+   * @param exam 考试对象
+   */
+  const handleEditExam = (exam: Exam) => {
+    try {
+      // 填充表单数据
+      setNewExam({
+        title: exam.title,
+        description: exam.description || '',
+        category: exam.category,
+        difficulty: exam.difficulty,
+        duration: exam.duration,
+        total_questions: exam.total_questions,
+        total_score: exam.total_score,
+        passing_score: exam.passing_score,
+        max_attempts: exam.max_attempts || 3,
+        allow_retake: exam.allow_retake || false,
+        start_time: new Date(exam.start_time),
+        end_time: new Date(exam.end_time),
+        registration_deadline: new Date(exam.registration_deadline),
+        status: exam.status,
+        is_public: exam.is_public || true,
+        requires_approval: exam.requires_approval || false,
+        fee: exam.fee || 0,
+        currency: exam.currency || 'CNY',
+        tags: exam.tags || [],
+        skills: exam.skills || [],
+        prerequisites: exam.prerequisites || [],
+        instructions: exam.instructions || '',
+        rules: exam.rules || []
+      });
+      
+      setEditingExam(exam);
+      setShowCreateDialog(true);
+    } catch (error) {
+      console.error('编辑考试失败:', error);
+      toast.error('编辑考试失败');
+    }
+  };
+
+  /**
+   * 查看考试详情
+   * @param examId 考试ID
+   */
+  const handleViewDetails = (examId: string) => {
+    window.open(`/admin/exams/${examId}`, '_blank');
   };
 
   /**
@@ -323,6 +453,7 @@ export default function ExamManagementPage() {
             size="sm"
             variant="outline"
             onClick={() => openQuestionManagement(exam.id)}
+            disabled={loading}
           >
             <BookOpen className="h-4 w-4 mr-1" />
             题目管理
@@ -331,6 +462,7 @@ export default function ExamManagementPage() {
             size="sm"
             variant="outline"
             onClick={() => openAnalytics(exam.id)}
+            disabled={loading}
           >
             <BarChart3 className="h-4 w-4 mr-1" />
             统计分析
@@ -339,6 +471,7 @@ export default function ExamManagementPage() {
             size="sm"
             variant="outline"
             onClick={() => openReports(exam.id)}
+            disabled={loading}
           >
             <FileText className="h-4 w-4 mr-1" />
             报表
@@ -346,7 +479,8 @@ export default function ExamManagementPage() {
           <Button
             size="sm"
             variant="outline"
-            onClick={() => {/* TODO: 查看详情 */}}
+            onClick={() => handleViewDetails(exam.id)}
+            disabled={loading}
           >
             <Eye className="h-4 w-4 mr-1" />
             详情
@@ -354,15 +488,45 @@ export default function ExamManagementPage() {
           <Button
             size="sm"
             variant="outline"
-            onClick={() => setEditingExam(exam)}
+            onClick={() => handleEditExam(exam)}
+            disabled={loading}
           >
             <Edit className="h-4 w-4 mr-1" />
             编辑
           </Button>
+          
+          {/* 发布/撤回按钮 */}
+          {exam.status === ExamStatus.DRAFT && (
+            <Button
+              size="sm"
+              variant="default"
+              onClick={() => handlePublishExam(exam.id)}
+              disabled={loading}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              <Zap className="h-4 w-4 mr-1" />
+              发布
+            </Button>
+          )}
+          
+          {exam.status === ExamStatus.PUBLISHED && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleWithdrawExam(exam.id)}
+              disabled={loading}
+              className="text-orange-600 hover:text-orange-700 border-orange-300 hover:border-orange-400"
+            >
+              <Settings className="h-4 w-4 mr-1" />
+              撤回
+            </Button>
+          )}
+          
           <Button
             size="sm"
             variant="outline"
             onClick={() => handleDeleteExam(exam.id)}
+            disabled={loading || exam.status === ExamStatus.ONGOING}
             className="text-red-600 hover:text-red-700"
           >
             <Trash2 className="h-4 w-4 mr-1" />
@@ -518,9 +682,9 @@ export default function ExamManagementPage() {
             </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>创建新考试</DialogTitle>
+                <DialogTitle>{editingExam ? '编辑考试' : '创建新考试'}</DialogTitle>
                 <DialogDescription>
-                  填写考试基本信息，创建后可以添加题目
+                  {editingExam ? '修改考试信息' : '填写考试基本信息，创建后可以添加题目'}
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
@@ -651,12 +815,27 @@ export default function ExamManagementPage() {
                 <div className="flex justify-end space-x-2">
                   <Button
                     variant="outline"
-                    onClick={() => setShowCreateDialog(false)}
+                    onClick={() => {
+                      setShowCreateDialog(false);
+                      setEditingExam(null);
+                      resetNewExamForm();
+                    }}
+                    disabled={loading}
                   >
                     取消
                   </Button>
-                  <Button onClick={handleCreateExam}>
-                    创建考试
+                  <Button 
+                    onClick={handleCreateExam}
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        {editingExam ? '更新中...' : '创建中...'}
+                      </>
+                    ) : (
+                      editingExam ? '更新考试' : '创建考试'
+                    )}
                   </Button>
                 </div>
               </div>

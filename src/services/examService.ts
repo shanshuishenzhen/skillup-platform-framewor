@@ -92,9 +92,19 @@ export class ExamService {
         query = query.eq('created_by', createdBy);
       }
 
-      // 应用排序
+      // 应用排序 - 字段名映射
+      const fieldMapping: Record<string, string> = {
+        'createdAt': 'created_at',
+        'updatedAt': 'updated_at',
+        'totalQuestions': 'total_questions',
+        'passingScore': 'passing_score',
+        'maxAttempts': 'max_attempts',
+        'durationMinutes': 'duration_minutes'
+      };
+      
+      const dbField = fieldMapping[sortBy] || sortBy;
       const ascending = sortOrder === 'asc';
-      query = query.order(sortBy, { ascending });
+      query = query.order(dbField, { ascending });
 
       // 应用分页
       const offset = (page - 1) * limit;
@@ -362,6 +372,41 @@ export class ExamService {
   }
 
   /**
+   * 更新考试状态
+   * 
+   * @param id - 考试ID
+   * @param status - 新状态
+   * @returns Promise<Exam> 更新后的考试
+   * 
+   * @example
+   * ```typescript
+   * const updatedExam = await examService.updateExamStatus('123', ExamStatus.PUBLISHED);
+   * ```
+   */
+  async updateExamStatus(id: string, status: ExamStatus): Promise<Exam> {
+    try {
+      const { data, error } = await supabase
+        .from('exams')
+        .update({ 
+          status,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        throw new Error(`更新考试状态失败: ${error.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('ExamService.updateExamStatus error:', error);
+      throw error;
+    }
+  }
+
+  /**
    * 用户报名参加考试
    * 
    * @param examId - 考试ID
@@ -421,6 +466,258 @@ export class ExamService {
       return data;
     } catch (error) {
       console.error('ExamService.enrollExam error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 获取考试进行数据
+   * 
+   * @param examId - 考试ID
+   * @returns Promise<{questions: any[], attempt: any}> 考试数据
+   * 
+   * @example
+   * ```typescript
+   * const examData = await examService.getExamForTaking('exam123');
+   * console.log('题目数量:', examData.questions.length);
+   * ```
+   */
+  async getExamForTaking(examId: string): Promise<{
+    questions: any[];
+    attempt: any;
+  }> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('用户未登录');
+      }
+
+      // 获取用户的考试记录
+      const { data: attempt, error: attemptError } = await supabase
+        .from('exam_attempts')
+        .select('*')
+        .eq('exam_id', examId)
+        .eq('user_id', user.id)
+        .eq('status', 'in_progress')
+        .single();
+
+      if (attemptError || !attempt) {
+        throw new Error('未找到进行中的考试记录');
+      }
+
+      // 获取考试题目
+      const { data: questions, error: questionsError } = await supabase
+        .from('exam_questions')
+        .select(`
+          *,
+          question_options(*)
+        `)
+        .eq('exam_id', examId)
+        .order('order_index');
+
+      if (questionsError) {
+        throw new Error('获取考试题目失败');
+      }
+
+      // 获取已保存的答案
+      const { data: savedAnswers } = await supabase
+        .from('exam_answers')
+        .select('*')
+        .eq('attempt_id', attempt.id);
+
+      // 格式化答案数据
+      const answers = savedAnswers?.map(answer => ({
+        questionId: answer.question_id,
+        answer: answer.answer_content
+      })) || [];
+
+      return {
+        questions: questions || [],
+        attempt: {
+          ...attempt,
+          answers,
+          flaggedQuestions: attempt.flagged_questions || []
+        }
+      };
+    } catch (error: any) {
+      console.error('获取考试数据失败:', error);
+      throw new Error(error.message || '获取考试数据失败');
+    }
+  }
+
+  /**
+   * 保存答案
+   * 
+   * @param data - 答案数据
+   * @returns Promise<void>
+   * 
+   * @example
+   * ```typescript
+   * await examService.saveAnswers({
+   *   attemptId: 'attempt123',
+   *   answers: [{ questionId: 'q1', answer: ['A'] }],
+   *   flaggedQuestions: ['q2'],
+   *   currentQuestionIndex: 1
+   * });
+   * ```
+   */
+  async saveAnswers(data: {
+    attemptId: string;
+    answers: Array<{ questionId: string; answer: string[] }>;
+    flaggedQuestions: string[];
+    currentQuestionIndex: number;
+  }): Promise<void> {
+    try {
+      // 更新考试记录
+      const { error: updateError } = await supabase
+        .from('exam_attempts')
+        .update({
+          current_question_index: data.currentQuestionIndex,
+          flagged_questions: data.flaggedQuestions,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', data.attemptId);
+
+      if (updateError) {
+        throw new Error('更新考试记录失败');
+      }
+
+      // 保存答案
+      for (const answer of data.answers) {
+        const { error: answerError } = await supabase
+          .from('exam_answers')
+          .upsert({
+            attempt_id: data.attemptId,
+            question_id: answer.questionId,
+            answer_content: answer.answer,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'attempt_id,question_id'
+          });
+
+        if (answerError) {
+          console.error('保存答案失败:', answerError);
+        }
+      }
+    } catch (error: any) {
+      console.error('保存答案失败:', error);
+      throw new Error(error.message || '保存答案失败');
+    }
+  }
+
+  /**
+   * 提交考试
+   * 
+   * @param data - 提交数据
+   * @returns Promise<{submissionId: string}> 提交结果
+   * 
+   * @example
+   * ```typescript
+   * const result = await examService.submitExam({
+   *   attemptId: 'attempt123',
+   *   answers: [{ questionId: 'q1', answer: ['A'] }],
+   *   flaggedQuestions: [],
+   *   violations: [],
+   *   timeSpent: 1800
+   * });
+   * ```
+   */
+  async submitExam(data: {
+    attemptId: string;
+    answers: Array<{ questionId: string; answer: string[] }>;
+    flaggedQuestions: string[];
+    violations: string[];
+    timeSpent: number;
+    isAutoSubmit?: boolean;
+  }): Promise<{ submissionId: string }> {
+    try {
+      // 先保存最终答案
+      await this.saveAnswers({
+        attemptId: data.attemptId,
+        answers: data.answers,
+        flaggedQuestions: data.flaggedQuestions,
+        currentQuestionIndex: 0
+      });
+
+      // 更新考试记录状态
+      const { data: submission, error: submitError } = await supabase
+        .from('exam_attempts')
+        .update({
+          status: 'completed',
+          end_time: new Date().toISOString(),
+          time_spent: data.timeSpent,
+          violations: data.violations,
+          is_auto_submit: data.isAutoSubmit || false,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', data.attemptId)
+        .select('id')
+        .single();
+
+      if (submitError) {
+        throw new Error('提交考试失败');
+      }
+
+      return { submissionId: submission.id };
+    } catch (error: any) {
+      console.error('提交考试失败:', error);
+      throw new Error(error.message || '提交考试失败');
+    }
+  }
+
+  /**
+   * 取消报名
+   * 
+   * @param examId - 考试ID
+   * @param userId - 用户ID
+   * @returns Promise<boolean> 取消是否成功
+   * 
+   * @example
+   * ```typescript
+   * const success = await examService.cancelEnrollment('exam123', 'user456');
+   * if (success) {
+   *   console.log('取消报名成功');
+   * }
+   * ```
+   */
+  async cancelEnrollment(examId: string, userId: string): Promise<boolean> {
+    try {
+      // 检查参与记录
+      const { data: participation } = await supabase
+        .from('exam_participations')
+        .select('*')
+        .eq('exam_id', examId)
+        .eq('user_id', userId)
+        .single();
+
+      if (!participation) {
+        throw new Error('您尚未报名此考试');
+      }
+
+      // 检查是否已经开始考试
+      const { data: submissions } = await supabase
+        .from('exam_submissions')
+        .select('*')
+        .eq('exam_id', examId)
+        .eq('user_id', userId);
+
+      if (submissions && submissions.length > 0) {
+        throw new Error('考试已开始，无法取消报名');
+      }
+
+      // 删除参与记录
+      const { error } = await supabase
+        .from('exam_participations')
+        .delete()
+        .eq('id', participation.id);
+
+      if (error) {
+        throw new Error(`取消报名失败: ${error.message}`);
+      }
+
+      return true;
+    } catch (error) {
+      console.error('ExamService.cancelEnrollment error:', error);
       throw error;
     }
   }
@@ -944,6 +1241,265 @@ export class ExamService {
       };
     } catch (error) {
       console.error('ExamService.getExamAnalytics error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 检查考试资格
+   * 
+   * @param examId - 考试ID
+   * @param userId - 用户ID（可选，默认使用当前用户）
+   * @returns Promise<ExamEligibility> 资格检查结果
+   * 
+   * @example
+   * ```typescript
+   * const eligibility = await examService.checkExamEligibility('exam123');
+   * console.log('是否可以参加:', eligibility.can_take);
+   * console.log('剩余尝试次数:', eligibility.attempts_remaining);
+   * ```
+   */
+  async checkExamEligibility(examId: string, userId?: string): Promise<ExamEligibility> {
+    try {
+      // 获取考试信息
+      const exam = await this.getExamById(examId);
+      if (!exam) {
+        throw new Error('考试不存在');
+      }
+
+      // 如果没有提供用户ID，尝试从当前会话获取
+      if (!userId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          return {
+            can_take: false,
+            is_registered: false,
+            attempts_remaining: 0,
+            reason: '请先登录'
+          };
+        }
+        userId = user.id;
+      }
+
+      // 检查参与记录
+      const { data: participation } = await supabase
+        .from('exam_participations')
+        .select('*')
+        .eq('exam_id', examId)
+        .eq('user_id', userId)
+        .single();
+
+      const isRegistered = !!participation;
+      const attemptsUsed = participation?.attempts_used || 0;
+      const attemptsRemaining = exam.max_attempts - attemptsUsed;
+
+      // 检查考试状态
+      if (exam.status !== ExamStatus.PUBLISHED && exam.status !== ExamStatus.ONGOING) {
+        return {
+          can_take: false,
+          is_registered: isRegistered,
+          attempts_remaining: attemptsRemaining,
+          reason: '考试未发布或已结束'
+        };
+      }
+
+      // 检查时间
+      const now = new Date();
+      const startTime = new Date(exam.start_time);
+      const endTime = new Date(exam.end_time);
+      
+      if (now < startTime) {
+        return {
+          can_take: false,
+          is_registered: isRegistered,
+          attempts_remaining: attemptsRemaining,
+          reason: '考试尚未开始'
+        };
+      }
+      
+      if (now > endTime) {
+        return {
+          can_take: false,
+          is_registered: isRegistered,
+          attempts_remaining: attemptsRemaining,
+          reason: '考试已结束'
+        };
+      }
+
+      // 检查报名截止时间
+      if (exam.registration_deadline && now > new Date(exam.registration_deadline)) {
+        return {
+          can_take: false,
+          is_registered: isRegistered,
+          attempts_remaining: attemptsRemaining,
+          reason: '报名已截止'
+        };
+      }
+
+      // 检查尝试次数
+      if (attemptsRemaining <= 0) {
+        return {
+          can_take: false,
+          is_registered: isRegistered,
+          attempts_remaining: 0,
+          reason: '已达到最大尝试次数'
+        };
+      }
+
+      // 检查是否需要审批
+      if (exam.requires_approval && participation?.status !== 'approved') {
+        return {
+          can_take: false,
+          is_registered: isRegistered,
+          attempts_remaining: attemptsRemaining,
+          reason: '等待管理员审批'
+        };
+      }
+
+      return {
+        can_take: true,
+        is_registered: isRegistered,
+        attempts_remaining: attemptsRemaining
+      };
+    } catch (error) {
+      console.error('ExamService.checkExamEligibility error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 用户报名考试（简化版本，用于前端调用）
+   * 
+   * @param examId - 考试ID
+   * @param userId - 用户ID（可选，默认使用当前用户）
+   * @returns Promise<ExamParticipation> 参与记录
+   * 
+   * @example
+   * ```typescript
+   * const participation = await examService.registerForExam('exam123');
+   * console.log('报名成功，参与ID:', participation.id);
+   * ```
+   */
+  async registerForExam(examId: string, userId?: string): Promise<ExamParticipation> {
+    try {
+      // 如果没有提供用户ID，从当前会话获取
+      if (!userId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          throw new Error('请先登录');
+        }
+        userId = user.id;
+      }
+
+      return await this.enrollExam(examId, userId);
+    } catch (error) {
+      console.error('ExamService.registerForExam error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 取消报名
+   * 
+   * @param examId - 考试ID
+   * @param userId - 用户ID（可选，默认使用当前用户）
+   * @returns Promise<boolean> 取消是否成功
+   * 
+   * @example
+   * ```typescript
+   * const success = await examService.cancelEnrollment('exam123');
+   * if (success) {
+   *   console.log('取消报名成功');
+   * }
+   * ```
+   */
+  async cancelEnrollment(examId: string, userId?: string): Promise<boolean> {
+    try {
+      // 如果没有提供用户ID，从当前会话获取
+      if (!userId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          throw new Error('请先登录');
+        }
+        userId = user.id;
+      }
+
+      // 检查是否已经开始考试
+      const { data: submissions } = await supabase
+        .from('exam_submissions')
+        .select('*')
+        .eq('exam_id', examId)
+        .eq('user_id', userId)
+        .eq('status', 'in_progress');
+
+      if (submissions && submissions.length > 0) {
+        throw new Error('考试已开始，无法取消报名');
+      }
+
+      // 删除参与记录
+      const { error } = await supabase
+        .from('exam_participations')
+        .delete()
+        .eq('exam_id', examId)
+        .eq('user_id', userId);
+
+      if (error) {
+        throw new Error(`取消报名失败: ${error.message}`);
+      }
+
+      return true;
+    } catch (error) {
+      console.error('ExamService.cancelEnrollment error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 获取考试题目（不包含答案）
+   * 
+   * @param examId - 考试ID
+   * @param includeAnswers - 是否包含答案（默认false）
+   * @returns Promise<Question[]> 题目列表
+   * 
+   * @example
+   * ```typescript
+   * const questions = await examService.getExamQuestions('exam123', false);
+   * console.log('题目数量:', questions.length);
+   * ```
+   */
+  async getExamQuestions(examId: string, includeAnswers: boolean = false): Promise<Question[]> {
+    try {
+      const exam = await this.getExamById(examId);
+      if (!exam) {
+        throw new Error('考试不存在');
+      }
+
+      if (!exam.question_ids || exam.question_ids.length === 0) {
+        return [];
+      }
+
+      const { data: questions, error } = await supabase
+        .from('questions')
+        .select('*')
+        .in('id', exam.question_ids)
+        .order('created_at');
+
+      if (error) {
+        throw new Error(`获取考试题目失败: ${error.message}`);
+      }
+
+      // 如果不包含答案，移除答案信息
+      if (!includeAnswers) {
+        return questions.map(q => ({
+          ...q,
+          correct_answer: undefined,
+          explanation: undefined
+        }));
+      }
+
+      return questions;
+    } catch (error) {
+      console.error('ExamService.getExamQuestions error:', error);
       throw error;
     }
   }

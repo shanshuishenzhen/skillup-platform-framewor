@@ -28,7 +28,11 @@ import {
   Award,
   Shield,
   Zap,
-  TrendingUp
+  TrendingUp,
+  UserPlus,
+  UserMinus,
+  Loader2,
+  RotateCcw
 } from 'lucide-react';
 import { 
   ExamService, 
@@ -93,6 +97,15 @@ export default function ExamDetailsPage() {
     
     try {
       setRegistering(true);
+      
+      // 先检查资格
+      const eligibilityCheck = await ExamService.checkExamEligibility(examId);
+      if (!eligibilityCheck.can_take && !eligibilityCheck.is_registered) {
+        toast.error(eligibilityCheck.reason || '无法报名此考试');
+        return;
+      }
+
+      // 执行报名
       await ExamService.registerForExam(examId);
       setIsRegistered(true);
       toast.success('报名成功！');
@@ -101,9 +114,38 @@ export default function ExamDetailsPage() {
       const updatedEligibility = await ExamService.checkExamEligibility(examId);
       setEligibility(updatedEligibility);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('报名失败:', error);
-      toast.error('报名失败，请稍后重试');
+      toast.error(error.message || '报名失败，请稍后重试');
+    } finally {
+      setRegistering(false);
+    }
+  };
+
+  /**
+   * 取消报名
+   */
+  const cancelEnrollment = async () => {
+    if (!exam) {
+      toast.error('考试信息不存在');
+      return;
+    }
+
+    // 确认对话框
+    if (!confirm('确定要取消报名吗？取消后需要重新报名才能参加考试。')) {
+      return;
+    }
+
+    try {
+      setRegistering(true);
+      await ExamService.cancelEnrollment(examId);
+      toast.success('取消报名成功');
+      
+      // 重新加载数据
+      await loadExamDetails();
+    } catch (error: any) {
+      console.error('取消报名失败:', error);
+      toast.error(error.message || '取消报名失败，请重试');
     } finally {
       setRegistering(false);
     }
@@ -112,8 +154,30 @@ export default function ExamDetailsPage() {
   /**
    * 开始考试
    */
-  const startExam = () => {
-    router.push(`/exam/${examId}`);
+  const startExam = async () => {
+    if (!canStartExam()) {
+      toast.error('当前无法开始考试');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      // 再次检查资格
+      const eligibilityCheck = await ExamService.checkExamEligibility(examId);
+      if (!eligibilityCheck.can_take) {
+        toast.error(eligibilityCheck.reason || '无法开始考试');
+        return;
+      }
+
+      // 开始新的考试
+      await ExamService.startExam(examId);
+      router.push(`/exam/${examId}`);
+    } catch (error: any) {
+      console.error('开始考试失败:', error);
+      toast.error(error.message || '开始考试失败，请重试');
+    } finally {
+      setLoading(false);
+    }
   };
 
   /**
@@ -554,6 +618,17 @@ export default function ExamDetailsPage() {
             className="min-w-[120px]"
           >
             {registering ? '报名中...' : '立即报名'}
+          </Button>
+        )}
+        
+        {isRegistered && !canStartExam() && eligibility?.attempts_remaining === exam.max_attempts && (
+          <Button
+            variant="outline"
+            onClick={cancelEnrollment}
+            disabled={registering}
+            className="min-w-[120px] text-red-600 border-red-600 hover:bg-red-50"
+          >
+            {registering ? '取消中...' : '取消报名'}
           </Button>
         )}
         

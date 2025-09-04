@@ -1,13 +1,26 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clock, Users, FileText, Calendar, Play, Edit, Trash2 } from 'lucide-react';
+import { Clock, Users, FileText, Calendar, Play, Edit, Trash2, Eye, AlertTriangle } from 'lucide-react';
 import { Exam, ExamStatus } from '@/types/exam';
 import { formatDuration, formatDateTime } from '@/utils/format';
+import { ExamService } from '@/services/examService';
+import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface ExamCardProps {
   /** 考试数据 */
@@ -44,6 +57,10 @@ export default function ExamCard({
   isParticipated = false,
   userStatus
 }: ExamCardProps) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [eligibilityChecking, setEligibilityChecking] = useState(false);
   /**
    * 获取考试状态的显示信息
    * @param status - 考试状态
@@ -99,6 +116,80 @@ export default function ExamCard({
   };
 
   /**
+   * 处理查看详情按钮点击
+   */
+  const handleViewDetails = () => {
+    router.push(`/exam/${exam.id}/details`);
+  };
+
+  /**
+   * 处理参加考试按钮点击
+   */
+  const handleJoinExam = async () => {
+    if (eligibilityChecking || loading) return;
+
+    try {
+      setEligibilityChecking(true);
+      
+      // 检查考试资格
+      const eligibility = await ExamService.checkExamEligibility(exam.id);
+      
+      if (!eligibility.eligible) {
+        toast.error(eligibility.reason || '您暂时无法参加此考试');
+        return;
+      }
+
+      // 如果有进行中的考试，直接跳转
+      if (canContinueExam()) {
+        router.push(`/exam/${exam.id}`);
+        return;
+      }
+
+      // 跳转到考试详情页面进行报名
+      router.push(`/exam/${exam.id}/details`);
+    } catch (error) {
+      console.error('检查考试资格失败:', error);
+      toast.error('检查考试资格失败，请稍后重试');
+    } finally {
+      setEligibilityChecking(false);
+    }
+  };
+
+  /**
+   * 处理编辑考试按钮点击
+   */
+  const handleEditExam = () => {
+    if (onEdit) {
+      onEdit(exam);
+    } else {
+      router.push(`/admin/exams/${exam.id}/edit`);
+    }
+  };
+
+  /**
+   * 处理删除考试确认
+   */
+  const handleDeleteConfirm = async () => {
+    if (loading) return;
+
+    try {
+      setLoading(true);
+      await ExamService.deleteExam(exam.id);
+      toast.success('考试删除成功');
+      
+      if (onDelete) {
+        onDelete(exam.id);
+      }
+    } catch (error) {
+      console.error('删除考试失败:', error);
+      toast.error('删除考试失败，请稍后重试');
+    } finally {
+      setLoading(false);
+      setShowDeleteDialog(false);
+    }
+  };
+
+  /**
    * 获取考试时间状态
    * @returns 考试时间状态信息
    */
@@ -120,6 +211,7 @@ export default function ExamCard({
   const timeStatus = getTimeStatus();
 
   return (
+    <>
     <Card className="hover:shadow-lg transition-shadow duration-200">
       <CardHeader>
         <div className="flex justify-between items-start">
@@ -212,42 +304,62 @@ export default function ExamCard({
         {/* 操作按钮 */}
         <div className="flex justify-between items-center">
           <div className="flex space-x-2">
-            {/* 学生视图 - 参与考试按钮 */}
+            {/* 学生视图 - 操作按钮 */}
             {!showActions && (
-              <>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleViewDetails}
+                  disabled={loading || eligibilityChecking}
+                >
+                  <Eye className="h-4 w-4 mr-1" />
+                  查看详情
+                </Button>
+                
                 {canStartExam() && (
-                  <Link href={`/exam/${exam.id}/take`}>
-                    <Button size="sm">
-                      <Play className="w-4 h-4 mr-2" />
-                      {isParticipated ? '重新开始' : '开始考试'}
-                    </Button>
-                  </Link>
+                  <Button 
+                    size="sm"
+                    onClick={handleJoinExam}
+                    disabled={loading || eligibilityChecking}
+                  >
+                    {eligibilityChecking ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1" />
+                        检查中
+                      </>
+                    ) : (
+                      <>
+                        <Play className="h-4 w-4 mr-1" />
+                        开始考试
+                      </>
+                    )}
+                  </Button>
                 )}
                 
                 {canContinueExam() && (
-                  <Link href={`/exam/${exam.id}/take`}>
-                    <Button size="sm">
-                      <Play className="w-4 h-4 mr-2" />
-                      继续考试
-                    </Button>
-                  </Link>
+                  <Button 
+                    size="sm" 
+                    variant="secondary"
+                    onClick={handleJoinExam}
+                    disabled={loading || eligibilityChecking}
+                  >
+                    <Play className="h-4 w-4 mr-1" />
+                    继续考试
+                  </Button>
                 )}
                 
                 {userStatus === 'completed' && (
-                  <Link href={`/exam/${exam.id}/result`}>
-                    <Button variant="outline" size="sm">
-                      查看结果
-                    </Button>
-                  </Link>
-                )}
-                
-                {!canStartExam() && !canContinueExam() && userStatus !== 'completed' && (
-                  <Button size="sm" disabled>
-                    {exam.status === 'draft' ? '未发布' : 
-                     new Date() < new Date(exam.start_time) ? '未开始' : '已结束'}
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => router.push(`/exam/${exam.id}/result`)}
+                    disabled={loading}
+                  >
+                    查看结果
                   </Button>
                 )}
-              </>
+              </div>
             )}
             
             {/* 管理员视图 - 管理按钮 */}
@@ -262,19 +374,24 @@ export default function ExamCard({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => onEdit?.(exam)}
+                  onClick={handleEditExam}
+                  disabled={loading}
                 >
                   <Edit className="w-4 h-4 mr-2" />
                   编辑
                 </Button>
                 
                 <Button
-                  variant="outline"
+                  variant="destructive"
                   size="sm"
-                  onClick={() => onDelete?.(exam.id)}
-                  className="text-red-600 hover:text-red-700"
+                  onClick={() => setShowDeleteDialog(true)}
+                  disabled={loading}
                 >
-                  <Trash2 className="w-4 h-4 mr-2" />
+                  {loading ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                  ) : (
+                    <Trash2 className="w-4 h-4 mr-2" />
+                  )}
                   删除
                 </Button>
               </>
@@ -290,5 +407,44 @@ export default function ExamCard({
         </div>
       </CardContent>
     </Card>
+
+    {/* 删除确认对话框 */}
+    <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+            确认删除考试
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            您确定要删除考试「{exam.title}」吗？
+            <br />
+            <span className="text-destructive font-medium">
+              此操作不可撤销，将永久删除考试及其相关数据。
+            </span>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={loading}>
+            取消
+          </AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleDeleteConfirm}
+            disabled={loading}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {loading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                删除中...
+              </>
+            ) : (
+              '确认删除'
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

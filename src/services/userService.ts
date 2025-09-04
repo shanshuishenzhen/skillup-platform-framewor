@@ -147,6 +147,7 @@ export async function registerUser(
   phone: string,
   password: string,
   verificationCode: string,
+  idCard: string,
   name?: string
 ): Promise<RegisterResult> {
   try {
@@ -191,6 +192,7 @@ export async function registerUser(
           phone,
           password_hash: passwordHash,
           name: name || `用户${phone.slice(-4)}`,
+          id_card: idCard,
           user_type: 'registered',
           is_verified: true
         })
@@ -911,5 +913,113 @@ export async function verifyFace(
       success: false,
       message: '人脸验证失败，请稍后重试'
     };
+  }
+}
+
+/**
+ * 获取用户列表
+ * @param options 查询选项
+ * @returns 用户列表和分页信息
+ */
+export async function getUsers(options: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  role?: string;
+  status?: string;
+}) {
+  try {
+    const { page = 1, limit = 20, search, role, status } = options;
+    const offset = (page - 1) * limit;
+
+    let query = supabase
+      .from('users')
+      .select(`
+        id,
+        name,
+        phone,
+        email,
+        id_card,
+        employee_id,
+        department,
+        position,
+        organization,
+        role,
+        status,
+        assigned_exam_id,
+        exam_assignment_status,
+        exam_assignment_date,
+        created_at
+      `, { count: 'exact' });
+
+    // 搜索条件
+    if (search) {
+      query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%,employee_id.ilike.%${search}%`);
+    }
+
+    // 角色筛选
+    if (role) {
+      query = query.eq('role', role);
+    }
+
+    // 状态筛选
+    if (status) {
+      query = query.eq('status', status);
+    }
+
+    // 分页和排序
+    query = query
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    const { data: users, error, count } = await query;
+
+    if (error) {
+      throw error;
+    }
+
+    const totalPages = Math.ceil((count || 0) / limit);
+
+    return {
+      users: users || [],
+      total: count || 0,
+      page,
+      limit,
+      totalPages
+    };
+  } catch (error) {
+    console.error('获取用户列表失败:', error);
+    throw error;
+  }
+}
+
+/**
+ * 批量分配试卷给用户
+ * @param userIds 用户ID数组
+ * @param examId 试卷ID
+ * @returns 分配结果
+ */
+export async function batchAssignExam(userIds: string[], examId: string) {
+  try {
+    const { error } = await supabase
+      .from('users')
+      .update({
+        assigned_exam_id: examId,
+        exam_assignment_date: new Date().toISOString(),
+        exam_assignment_status: 'assigned'
+      })
+      .in('id', userIds);
+
+    if (error) {
+      throw error;
+    }
+
+    return {
+      success: true,
+      message: `成功为 ${userIds.length} 个用户分配试卷`
+    };
+  } catch (error) {
+    console.error('批量分配试卷失败:', error);
+    throw error;
   }
 }

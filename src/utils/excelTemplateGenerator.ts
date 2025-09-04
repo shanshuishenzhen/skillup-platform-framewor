@@ -71,10 +71,10 @@ export const USER_IMPORT_TEMPLATE: ExcelTemplate = {
       key: 'email',
       title: '邮箱',
       width: 25,
-      required: true,
+      required: false,
       type: 'email',
       example: 'zhangsan@company.com',
-      description: '用户邮箱地址，用于登录',
+      description: '用户邮箱地址，用于通知和辅助联系（可选）',
       validation: {
         pattern: '^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$',
         message: '请输入有效的邮箱地址'
@@ -84,10 +84,10 @@ export const USER_IMPORT_TEMPLATE: ExcelTemplate = {
       key: 'phone',
       title: '手机号',
       width: 15,
-      required: false,
+      required: true,
       type: 'phone',
       example: '13800138000',
-      description: '11位手机号码',
+      description: '11位手机号码，主身份标识',
       validation: {
         pattern: '^1[3-9]\\d{9}$',
         message: '请输入有效的11位手机号'

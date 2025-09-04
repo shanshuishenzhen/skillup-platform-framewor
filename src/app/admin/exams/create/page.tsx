@@ -43,6 +43,14 @@ interface ExamForm {
   allowReview: boolean;
   randomOrder: boolean;
   maxAttempts: number;
+  totalQuestions?: number;
+  questionDistribution?: {
+    singleChoice: number;
+    multipleChoice: number;
+    trueFalse: number;
+  };
+  questionSource?: 'manual' | 'random';
+  questionCategory?: string;
 }
 
 export default function CreateExamPage() {
@@ -62,7 +70,15 @@ export default function CreateExamPage() {
     instructions: '',
     allowReview: true,
     randomOrder: false,
-    maxAttempts: 1
+    maxAttempts: 1,
+    totalQuestions: 0,
+    questionDistribution: {
+      singleChoice: 0,
+      multipleChoice: 0,
+      trueFalse: 0
+    },
+    questionSource: 'manual',
+    questionCategory: ''
   });
 
   const handleInputChange = (field: keyof ExamForm, value: any) => {
@@ -87,24 +103,90 @@ export default function CreateExamPage() {
         return;
       }
 
-      // TODO: 调用API保存考试
-      console.log('保存考试:', { ...formData, status: isDraft ? 'draft' : 'published' });
-      
+      // 构建API请求数据
+      const examData = {
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        difficulty: formData.difficulty,
+        duration: formData.duration,
+        totalQuestions: 0, // 初始为0，后续添加题目时更新
+        passingScore: formData.passingScore,
+        maxAttempts: formData.maxAttempts,
+        instructions: formData.instructions,
+        settings: {
+          allowReview: formData.allowReview,
+          randomOrder: formData.randomOrder,
+          startTime: formData.startTime,
+          endTime: formData.endTime,
+          totalScore: formData.totalScore
+        }
+      };
+
+      // 调用API创建考试
+      const response = await fetch('/api/exams', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(examData),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.details || result.error || '创建考试失败');
+      }
+
       toast.success(isDraft ? '考试已保存为草稿' : '考试创建成功');
       
-      if (!isDraft) {
-        router.push('/admin/exams');
+      // 如果是创建考试（非草稿），跳转到考试详情页面继续配置题目
+      if (!isDraft && result.data?.id) {
+        router.push(`/admin/exams/${result.data.id}`);
+      } else if (isDraft) {
+        // 草稿保存成功后可以继续编辑
+        toast.info('您可以继续编辑或添加题目');
       }
     } catch (error) {
-      toast.error('保存失败');
+      console.error('保存考试失败:', error);
+      toast.error(error instanceof Error ? error.message : '保存失败');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleNext = async () => {
+    if (currentStep === 1) {
+      // 验证第一步的必填字段
+      if (!formData.title || !formData.category) {
+        toast.error('请填写考试标题和类别');
+        return;
+      }
+
+      if (formData.passingScore > formData.totalScore) {
+        toast.error('及格分不能大于总分');
+        return;
+      }
+
+      // 先保存草稿再进入下一步
+      try {
+        setLoading(true);
+        await handleSave(true); // 保存为草稿
+        setCurrentStep(2); // 进入试卷关联步骤
+      } catch (error) {
+        console.error('保存草稿失败:', error);
+        toast.error('请先保存基本信息');
+      } finally {
+        setLoading(false);
+      }
+    } else if (currentStep < 4) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
   const steps = [
     { id: 1, name: '基本信息', description: '设置考试基本信息' },
-    { id: 2, name: '考试设置', description: '配置考试参数' },
+    { id: 2, name: '试卷配置', description: '配置题目和试卷' },
     { id: 3, name: '时间安排', description: '设置考试时间' },
     { id: 4, name: '高级选项', description: '其他配置选项' }
   ];
@@ -171,9 +253,139 @@ export default function CreateExamPage() {
   );
 
   const renderStep2 = () => (
+    <div className="space-y-6">
+      <div className="bg-white p-6 rounded-lg border">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">试卷配置</h3>
+        
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              题目总数
+            </label>
+            <input
+              type="number"
+              min="1"
+              value={formData.totalQuestions || ''}
+              onChange={(e) => handleInputChange('totalQuestions', parseInt(e.target.value) || 0)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="请输入题目总数"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              题目分布
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">单选题</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.questionDistribution?.singleChoice || 0}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value) || 0;
+                    handleInputChange('questionDistribution', {
+                      ...formData.questionDistribution,
+                      singleChoice: value
+                    });
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">多选题</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.questionDistribution?.multipleChoice || 0}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value) || 0;
+                    handleInputChange('questionDistribution', {
+                      ...formData.questionDistribution,
+                      multipleChoice: value
+                    });
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">判断题</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.questionDistribution?.trueFalse || 0}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value) || 0;
+                    handleInputChange('questionDistribution', {
+                      ...formData.questionDistribution,
+                      trueFalse: value
+                    });
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              题目来源
+            </label>
+            <div className="space-y-2">
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="questionSource"
+                  value="manual"
+                  checked={formData.questionSource === 'manual'}
+                  onChange={(e) => handleInputChange('questionSource', e.target.value)}
+                  className="mr-2"
+                />
+                手动选择题目
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="questionSource"
+                  value="random"
+                  checked={formData.questionSource === 'random'}
+                  onChange={(e) => handleInputChange('questionSource', e.target.value)}
+                  className="mr-2"
+                />
+                从题库随机抽取
+              </label>
+            </div>
+          </div>
+
+          {formData.questionSource === 'random' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                题库类别
+              </label>
+              <select
+                value={formData.questionCategory || ''}
+                onChange={(e) => handleInputChange('questionCategory', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">请选择题库类别</option>
+                <option value="programming">编程基础</option>
+                <option value="database">数据库</option>
+                <option value="network">网络技术</option>
+                <option value="security">信息安全</option>
+                <option value="algorithm">算法与数据结构</option>
+              </select>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderStep3 = () => (
     <Card>
       <CardHeader>
-        <CardTitle>考试设置</CardTitle>
+        <CardTitle>时间安排</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -225,26 +437,6 @@ export default function CreateExamPage() {
           </div>
         </div>
         
-        <div>
-          <Label htmlFor="instructions">考试说明</Label>
-          <Textarea
-            id="instructions"
-            value={formData.instructions}
-            onChange={(e) => handleInputChange('instructions', e.target.value)}
-            placeholder="请输入考试说明和注意事项"
-            rows={4}
-          />
-        </div>
-      </CardContent>
-    </Card>
-  );
-
-  const renderStep3 = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle>时间安排</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <Label htmlFor="startTime">开始时间</Label>
@@ -265,6 +457,17 @@ export default function CreateExamPage() {
               onChange={(e) => handleInputChange('endTime', e.target.value)}
             />
           </div>
+        </div>
+        
+        <div>
+          <Label htmlFor="instructions">考试说明</Label>
+          <Textarea
+            id="instructions"
+            value={formData.instructions}
+            onChange={(e) => handleInputChange('instructions', e.target.value)}
+            placeholder="请输入考试说明和注意事项"
+            rows={4}
+          />
         </div>
         
         <div className="p-4 bg-blue-50 rounded-lg">
@@ -377,7 +580,7 @@ export default function CreateExamPage() {
       </div>
 
       {/* 表单内容 */}
-      <div className="space-y-6">
+      <div className="mt-8">
         {currentStep === 1 && renderStep1()}
         {currentStep === 2 && renderStep2()}
         {currentStep === 3 && renderStep3()}
@@ -399,8 +602,8 @@ export default function CreateExamPage() {
         </div>
         
         <Button
-          onClick={() => setCurrentStep(Math.min(steps.length, currentStep + 1))}
-          disabled={currentStep === steps.length}
+          onClick={handleNext}
+          disabled={currentStep === steps.length || loading}
         >
           下一步
         </Button>

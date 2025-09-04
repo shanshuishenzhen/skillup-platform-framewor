@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { Menu, ChevronDown, Settings } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -9,7 +9,6 @@ const navigation = [
   { name: '首页', href: '/' },
   { name: '关于我们', href: '/about' },
   { name: '产品服务', href: '/services', children: [
-    { name: '在线学习', href: '/courses' },
     { name: '技能培训学习', href: '/skill-training' },
     { name: '技能等级考试', href: '/skill-exam' },
     { name: 'OA 办公系统', href: '/oa' },
@@ -22,7 +21,56 @@ const navigation = [
 ];
 
 export default function Header() {
-  const [, setMobileMenuOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const dropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 处理下拉菜单鼠标进入
+  const handleMouseEnter = (itemName: string) => {
+    if (dropdownTimeoutRef.current) {
+      clearTimeout(dropdownTimeoutRef.current);
+    }
+    setOpenDropdown(itemName);
+  };
+
+  // 处理下拉菜单鼠标离开
+  const handleMouseLeave = () => {
+    dropdownTimeoutRef.current = setTimeout(() => {
+      setOpenDropdown(null);
+    }, 150); // 150ms延迟，避免鼠标快速移动时菜单闪烁
+  };
+
+  // 处理键盘导航
+  const handleKeyDown = (event: React.KeyboardEvent, itemName: string) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      setOpenDropdown(openDropdown === itemName ? null : itemName);
+    } else if (event.key === 'Escape') {
+      setOpenDropdown(null);
+    }
+  };
+
+  // 点击外部区域关闭下拉菜单
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('[data-dropdown]')) {
+        setOpenDropdown(null);
+        setIsMenuOpen(false);
+      }
+    };
+
+    if (openDropdown || isMenuOpen) {
+      document.addEventListener('click', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+      if (dropdownTimeoutRef.current) {
+        clearTimeout(dropdownTimeoutRef.current);
+      }
+    };
+  }, [openDropdown, isMenuOpen]);
   const { user, isLoggedIn } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -80,7 +128,8 @@ export default function Header() {
           <button
             type="button"
             className="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5 text-gray-700 dark:text-gray-300"
-            onClick={() => setMobileMenuOpen(true)}
+            onClick={() => setIsMenuOpen(true)}
+            data-dropdown
           >
             <span className="sr-only">打开主菜单</span>
             <Menu className="h-6 w-6" aria-hidden="true" />
@@ -89,23 +138,44 @@ export default function Header() {
 
         <div className="hidden lg:flex lg:gap-x-12">
           {navigation.map((item) => (
-            <div key={item.name} className="relative group">
+            <div key={item.name} className="relative">
               {item.children ? (
-                <>
-                  <button className="flex items-center gap-x-1 text-sm font-semibold leading-6 text-gray-900 dark:text-gray-100 hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
+                <div 
+                  className="relative"
+                  data-dropdown
+                  onMouseEnter={() => handleMouseEnter(item.name)}
+                  onMouseLeave={handleMouseLeave}
+                >
+                  <button 
+                    className="flex items-center gap-x-1 text-sm font-semibold leading-6 text-gray-900 dark:text-gray-100 hover:text-primary-600 dark:hover:text-primary-400 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 rounded-md"
+                    onClick={() => setOpenDropdown(openDropdown === item.name ? null : item.name)}
+                    onKeyDown={(e) => handleKeyDown(e, item.name)}
+                    aria-expanded={openDropdown === item.name}
+                    aria-haspopup="true"
+                  >
                     {item.name}
-                    <ChevronDown className="h-5 w-5 flex-none" aria-hidden="true" />
+                    <ChevronDown className={`h-5 w-5 flex-none transition-transform duration-200 ${
+                      openDropdown === item.name ? 'rotate-180' : ''
+                    }`} aria-hidden="true" />
                   </button>
-                  <div className="absolute -left-8 top-full z-10 mt-3 w-screen max-w-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                  <div className={`absolute -left-8 top-full z-10 mt-3 w-screen max-w-md transition-all duration-200 ${
+                    openDropdown === item.name 
+                      ? 'opacity-100 visible transform translate-y-0' 
+                      : 'opacity-0 invisible transform -translate-y-2'
+                  }`}>
                     <div className="overflow-hidden rounded-3xl bg-white/95 dark:bg-gray-900/95 shadow-lg ring-1 ring-gray-900/5 backdrop-blur-sm border border-gray-200/50">
                       <div className="p-4">
                         {item.children.map((child) => (
                           <div
                             key={child.name}
-                            className="group relative flex items-center gap-x-6 rounded-lg p-4 text-sm leading-6 hover:bg-gray-50 dark:hover:bg-gray-800"
+                            className="group relative flex items-center gap-x-6 rounded-lg p-4 text-sm leading-6 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150"
                           >
                             <div className="flex-auto">
-                              <Link href={child.href} className="block font-semibold text-gray-900 dark:text-gray-100">
+                              <Link 
+                                href={child.href} 
+                                className="block font-semibold text-gray-900 dark:text-gray-100"
+                                onClick={() => setOpenDropdown(null)}
+                              >
                                 {child.name}
                                 <span className="absolute inset-0" />
                               </Link>
@@ -115,11 +185,11 @@ export default function Header() {
                       </div>
                     </div>
                   </div>
-                </>
+                </div>
               ) : (
                 <Link
                   href={item.href}
-                  className="text-sm font-semibold leading-6 text-gray-900 dark:text-gray-100 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                  className="text-sm font-semibold leading-6 text-gray-900 dark:text-gray-100 hover:text-primary-600 dark:hover:text-primary-400 transition-colors duration-150 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
                 >
                   {item.name}
                 </Link>
@@ -176,6 +246,104 @@ export default function Header() {
           )}
         </div>
       </nav>
+
+      {/* Mobile menu */}
+       {isMenuOpen && (
+         <div className="lg:hidden absolute top-full left-0 right-0 bg-white/95 dark:bg-gray-900/95 shadow-lg border-t backdrop-blur-sm z-50" data-dropdown>
+          <div className="px-4 py-2 space-y-1 max-h-96 overflow-y-auto">
+            {navigation.map((item) => (
+              <div key={item.name}>
+                {item.children ? (
+                  <div>
+                    <button
+                      className="w-full text-left text-gray-700 dark:text-gray-300 px-3 py-2 text-sm font-medium border-b flex items-center justify-between focus:outline-none focus:bg-gray-50 dark:focus:bg-gray-800"
+                      onClick={() => setOpenDropdown(openDropdown === item.name ? null : item.name)}
+                      aria-expanded={openDropdown === item.name}
+                    >
+                      {item.name}
+                      <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${
+                        openDropdown === item.name ? 'rotate-180' : ''
+                      }`} />
+                    </button>
+                    {openDropdown === item.name && (
+                      <div className="bg-gray-50 dark:bg-gray-800">
+                        {item.children.map((child) => (
+                          <Link
+                            key={child.name}
+                            href={child.href}
+                            className="block text-gray-600 dark:text-gray-400 px-6 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150"
+                            onClick={() => {
+                              setIsMenuOpen(false);
+                              setOpenDropdown(null);
+                            }}
+                          >
+                            {child.name}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <Link
+                    href={item.href}
+                    className="block text-gray-700 dark:text-gray-300 px-3 py-2 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    {item.name}
+                  </Link>
+                )}
+              </div>
+            ))}
+            
+            {/* Mobile Auth Section */}
+            <div className="border-t pt-4 mt-4">
+              {isLoggedIn ? (
+                <>
+                  <div className="px-3 py-2 text-sm text-gray-700 dark:text-gray-300">
+                    欢迎，{user?.real_name || user?.username || user?.email}
+                  </div>
+                  {isAdmin && (
+                    <Link
+                      href="/admin"
+                      className="flex items-center gap-x-2 px-3 py-2 text-sm font-medium text-orange-600 dark:text-orange-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <Settings className="h-4 w-4" />
+                      管理后台
+                    </Link>
+                  )}
+                  <button
+                    onClick={() => {
+                      localStorage.removeItem('token');
+                      window.location.reload();
+                    }}
+                    className="block w-full text-left px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  >
+                    退出
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/login"
+                    className="block px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    登录
+                  </Link>
+                  <Link
+                    href="/register"
+                    className="block mx-3 my-2 px-3 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-md text-center transition-colors"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    注册
+                  </Link>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

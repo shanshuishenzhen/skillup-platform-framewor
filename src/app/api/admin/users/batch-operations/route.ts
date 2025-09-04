@@ -4,18 +4,15 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import * as XLSX from 'xlsx';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
-import { verifyAdminAccess } from '@/middleware/rbac';
+import { parseJWTToken } from '@/utils/jwt';
+import { ErrorHandler, AppError, ErrorType } from '@/utils/errorHandler';
+import { getSupabaseAdminClient } from '@/lib/supabase';
 
-// 初始化 Supabase 客户端
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabase = getSupabaseAdminClient();
 
 // 批量操作类型枚举
 const BatchOperationType = z.enum(['import', 'update', 'delete', 'activate', 'deactivate']);

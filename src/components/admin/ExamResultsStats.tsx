@@ -21,7 +21,10 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Send,
+  Mail,
+  Building
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -55,6 +58,7 @@ interface ExamStats {
 export default function ExamResultsStats({ examId, examTitle, onExport }: ExamResultsStatsProps) {
   const [stats, setStats] = useState<ExamStats | null>(null);
   const [loading, setLoading] = useState(false);
+  const [notificationLoading, setNotificationLoading] = useState(false);
 
   // 模拟数据
   const mockStats: ExamStats = {
@@ -113,6 +117,54 @@ export default function ExamResultsStats({ examId, examTitle, onExport }: ExamRe
     }
   };
 
+  /**
+   * 发送成绩通知到考生公司
+   */
+  const handleNotifyCompanies = async () => {
+    try {
+      setNotificationLoading(true);
+      // TODO: 实际API调用
+      // const response = await fetch(`/api/admin/exams/${examId}/notify-companies`, {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({ includeDetails: false }) // 技能等级考试不包含详细成绩
+      // });
+      
+      // 模拟延迟
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      toast.success('成绩通知已发送到相关公司');
+    } catch (error) {
+      console.error('发送公司通知失败:', error);
+      toast.error('发送公司通知失败');
+    } finally {
+      setNotificationLoading(false);
+    }
+  };
+
+  /**
+   * 发送成绩通知到考生个人
+   */
+  const handleNotifyIndividuals = async () => {
+    try {
+      setNotificationLoading(true);
+      // TODO: 实际API调用
+      // const response = await fetch(`/api/admin/exams/${examId}/notify-individuals`, {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({ includeDetails: false }) // 技能等级考试不包含详细成绩
+      // });
+      
+      // 模拟延迟
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      toast.success('成绩通知已发送到考生个人');
+    } catch (error) {
+      console.error('发送个人通知失败:', error);
+      toast.error('发送个人通知失败');
+    } finally {
+      setNotificationLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -148,6 +200,24 @@ export default function ExamResultsStats({ examId, examTitle, onExport }: ExamRe
           <p className="text-gray-600">考试结果统计</p>
         </div>
         <div className="flex items-center space-x-2">
+          <Button 
+            variant="default" 
+            size="sm" 
+            onClick={handleNotifyCompanies}
+            disabled={notificationLoading}
+          >
+            <Building className="w-4 h-4 mr-2" />
+            {notificationLoading ? '发送中...' : '通知公司'}
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleNotifyIndividuals}
+            disabled={notificationLoading}
+          >
+            <Mail className="w-4 h-4 mr-2" />
+            {notificationLoading ? '发送中...' : '通知个人'}
+          </Button>
           <Button variant="outline" size="sm" onClick={() => handleExport('excel')}>
             <Download className="w-4 h-4 mr-2" />
             导出Excel
@@ -308,6 +378,57 @@ export default function ExamResultsStats({ examId, examTitle, onExport }: ExamRe
                 <p className="text-sm font-medium text-gray-600">缺考</p>
                 <p className="text-xl font-bold text-gray-600">{stats.absentCount}人</p>
               </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 成绩通知说明 */}
+      <Card className="bg-blue-50 border-blue-200">
+        <CardHeader>
+          <CardTitle className="flex items-center text-blue-800">
+            <Send className="w-5 h-5 mr-2" />
+            技能等级考试成绩通知
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 bg-white rounded-lg border border-blue-200">
+                <div className="flex items-center mb-2">
+                  <Building className="w-5 h-5 text-blue-600 mr-2" />
+                  <h4 className="font-medium text-blue-800">公司通知</h4>
+                </div>
+                <p className="text-sm text-gray-600 mb-3">
+                  向考生所属公司发送汇总成绩报告，包含通过率统计和人员名单
+                </p>
+                <ul className="text-xs text-gray-500 space-y-1">
+                  <li>• 仅包含通过/未通过状态</li>
+                  <li>• 不包含具体分数</li>
+                  <li>• 按部门分组统计</li>
+                </ul>
+              </div>
+              
+              <div className="p-4 bg-white rounded-lg border border-blue-200">
+                <div className="flex items-center mb-2">
+                  <Mail className="w-5 h-5 text-blue-600 mr-2" />
+                  <h4 className="font-medium text-blue-800">个人通知</h4>
+                </div>
+                <p className="text-sm text-gray-600 mb-3">
+                  向考生个人发送考试结果通知，告知是否通过认证
+                </p>
+                <ul className="text-xs text-gray-500 space-y-1">
+                  <li>• 仅告知通过/未通过</li>
+                  <li>• 不显示具体成绩</li>
+                  <li>• 包含证书获取信息</li>
+                </ul>
+              </div>
+            </div>
+            
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-sm text-amber-800">
+                <strong>注意：</strong>根据技能等级考试规定，考生无法查看详细成绩，系统仅提供通过/未通过状态。
+              </p>
             </div>
           </div>
         </CardContent>

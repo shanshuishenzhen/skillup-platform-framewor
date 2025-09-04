@@ -13,6 +13,7 @@ interface User {
   name: string;
   email: string;
   phone?: string;
+  id_card?: string;
   employee_id?: string;
   department?: string;
   position?: string;
@@ -33,6 +34,7 @@ interface UserEditForm {
   name: string;
   email: string;
   phone: string;
+  id_card: string;
   employee_id: string;
   department: string;
   position: string;
@@ -65,6 +67,7 @@ export default function UserEditDialog({ user, isOpen, onClose, onSave }: UserEd
     name: '',
     email: '',
     phone: '',
+    id_card: '',
     employee_id: '',
     department: '',
     position: '',
@@ -91,6 +94,7 @@ export default function UserEditDialog({ user, isOpen, onClose, onSave }: UserEd
         name: user.name || '',
         email: user.email || '',
         phone: user.phone || '',
+        id_card: user.id_card || '',
         employee_id: user.employee_id || '',
         department: user.department || '',
         position: user.position || '',
@@ -138,6 +142,12 @@ export default function UserEditDialog({ user, isOpen, onClose, onSave }: UserEd
       newErrors.phone = '手机号不能为空';
     } else if (!/^1[3-9]\d{9}$/.test(formData.phone)) {
       newErrors.phone = '手机号格式不正确';
+    }
+
+    if (!formData.id_card.trim()) {
+      newErrors.id_card = '身份证号码不能为空';
+    } else if (!/^[1-9]\d{5}(18|19|20)\d{2}((0[1-9])|(1[0-2]))(([0-2][1-9])|10|20|30|31)\d{3}[0-9Xx]$/.test(formData.id_card)) {
+      newErrors.id_card = '身份证号码格式不正确';
     }
 
     // 邮箱为可选字段，但如果填写了需要验证格式
@@ -261,6 +271,25 @@ export default function UserEditDialog({ user, isOpen, onClose, onSave }: UserEd
                   />
                   {errors.phone && (
                     <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    身份证号码 <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.id_card}
+                    onChange={(e) => handleInputChange('id_card', e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      errors.id_card ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="请输入身份证号码"
+                    maxLength={18}
+                  />
+                  {errors.id_card && (
+                    <p className="mt-1 text-sm text-red-600">{errors.id_card}</p>
                   )}
                 </div>
 

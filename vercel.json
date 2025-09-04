@@ -1,7 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
-  "name": "skillup-platform",
   "framework": "nextjs",
   "outputDirectory": ".next",
   "buildCommand": "npm run build",

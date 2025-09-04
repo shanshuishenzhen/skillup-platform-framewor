@@ -13,19 +13,47 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://test.supaba
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'test-anon-key'
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'test-service-key'
 
+// 客户端实例缓存
+let _supabase: ReturnType<typeof createClient> | null = null
+let _supabaseAdmin: ReturnType<typeof createClient> | null = null
+
 /**
- * 前端Supabase客户端
+ * 获取前端Supabase客户端（单例模式）
  * 用于客户端操作，使用匿名密钥
  * @returns Supabase客户端实例
  */
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export function getSupabaseClient() {
+  if (!_supabase) {
+    _supabase = createClient(supabaseUrl, supabaseAnonKey)
+  }
+  return _supabase
+}
 
 /**
- * 后端Supabase客户端
+ * 获取后端Supabase客户端（单例模式）
  * 用于服务端操作，使用服务角色密钥
  * @returns Supabase服务端客户端实例
  */
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+export function getSupabaseAdminClient() {
+  if (!_supabaseAdmin) {
+    _supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+  }
+  return _supabaseAdmin
+}
+
+/**
+ * 前端Supabase客户端（向后兼容）
+ * 用于客户端操作，使用匿名密钥
+ * @returns Supabase客户端实例
+ */
+export const supabase = getSupabaseClient()
+
+/**
+ * 后端Supabase客户端（向后兼容）
+ * 用于服务端操作，使用服务角色密钥
+ * @returns Supabase服务端客户端实例
+ */
+export const supabaseAdmin = getSupabaseAdminClient()
 
 /**
  * 数据库表名常量

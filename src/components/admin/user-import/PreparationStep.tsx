@@ -250,7 +250,7 @@ export default function PreparationStep({ onComplete, onNext }: PreparationStepP
             <h3 className="text-lg font-semibold text-blue-900 mb-2">导入须知</h3>
             <ul className="text-blue-800 space-y-1 text-sm">
               <li>• 请确保数据格式正确，避免导入失败</li>
-              <li>• 手机号作为主要身份标识，必须唯一且有效</li>
+              <li>• 手机号和身份证号码为必填项，作为主要身份标识</li>
               <li>• 邮箱字段为可选项，仅用于通知和辅助联系</li>
               <li>• 系统将自动验证身份证号码格式和唯一性</li>
               <li>• 建议分批导入，单次不超过1000条记录</li>

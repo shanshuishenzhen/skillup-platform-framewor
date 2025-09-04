@@ -4,8 +4,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { sendVerificationCode } from '@/services/smsService';
-import { createErrorResponse, AppError, ErrorType } from '@/utils/errorHandler';
+import { getSupabaseAdminClient } from '@/lib/supabase';
+import { z } from 'zod';
+import { generalRateLimit } from '../../middleware/security';
+import { ErrorHandler, AppError, ErrorType } from '@/utils/errorHandler';
+
+const supabase = getSupabaseAdminClient();
 
 // 请求体接口定义
 interface SendSmsRequest {

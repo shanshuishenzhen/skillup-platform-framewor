@@ -296,6 +296,21 @@ export interface ExamQueryResponse {
 // ============================================================================
 
 /**
+ * 考试资格检查结果接口
+ * 定义用户是否有资格参加考试的检查结果
+ */
+export interface ExamEligibility {
+  /** 是否可以参加考试 */
+  can_take: boolean;
+  /** 是否已报名 */
+  is_registered: boolean;
+  /** 剩余尝试次数 */
+  attempts_remaining: number;
+  /** 不能参加的原因（当can_take为false时） */
+  reason?: string;
+}
+
+/**
  * 考试参与记录接口
  * 定义用户参与考试的记录
  */

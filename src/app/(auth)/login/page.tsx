@@ -118,6 +118,18 @@ function LoginForm() {
         return;
       }
 
+      // 添加详细的调试信息
+      console.log('🔐 登录请求开始');
+      console.log('📱 手机号:', formData.phone);
+      console.log('🔑 密码长度:', formData.password?.length || 0);
+      console.log('🎯 登录类型:', loginType);
+      console.log('👑 是否管理员:', isAdminLogin);
+      console.log('🌐 API端点:', apiEndpoint);
+      console.log('📦 请求体:', JSON.stringify(requestBody, null, 2));
+      
+      // 添加alert调试信息
+      alert(`登录调试信息:\n手机号: ${formData.phone}\n密码长度: ${formData.password?.length || 0}\n登录类型: ${loginType}\n是否管理员: ${isAdminLogin}\nAPI端点: ${apiEndpoint}\n即将发送登录请求...`);
+
       // 调用API接口进行登录
       const response = await fetch(apiEndpoint, {
         method: 'POST',
@@ -127,9 +139,17 @@ function LoginForm() {
         body: JSON.stringify(requestBody),
       });
 
+      console.log('🌐 API响应状态:', response.status);
+      console.log('🌐 API响应头:', Object.fromEntries(response.headers.entries()));
+
       const result = await response.json();
+      console.log('📦 API响应结果:', JSON.stringify(result, null, 2));
+      
+      // 添加响应调试alert
+      alert(`API响应调试:\n状态码: ${response.status}\n成功: ${result.success}\n消息: ${result.message || result.error || '无消息'}`);
       
       if (result.success && result.user && result.token) {
+        console.debug('✅ 登录成功，用户信息:', result.user);
         toast.success('登录成功！');
         
         // 登录成功
@@ -152,6 +172,7 @@ function LoginForm() {
           }
         }
       } else {
+        console.debug('❌ 登录失败，错误信息:', result.error || result.message);
         setError(result.error || result.message || '登录失败');
         toast.error(result.error || result.message || '登录失败');
       }

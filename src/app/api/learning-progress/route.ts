@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import learningProgressService from '@/services/learningProgressService';
-import { verifyToken } from '@/services/userService';
+import { getSupabaseAdminClient } from '@/lib/supabase';
+import { parseJWTToken } from '@/utils/jwt';
 import { ErrorHandler, AppError, ErrorType } from '@/utils/errorHandler';
+
+const supabase = getSupabaseAdminClient();
 
 /**
  * 学习进度API接口

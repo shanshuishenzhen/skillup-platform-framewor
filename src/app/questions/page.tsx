@@ -14,7 +14,8 @@ import { Plus, Search, Filter, Edit, Trash2, Eye, BookOpen, Target, Clock } from
 import { QuestionForm } from '@/components/QuestionForm';
 import { Question, QuestionType, QuestionDifficulty } from '@/types/question';
 import { toast } from 'sonner';
-import { supabase, getCurrentUser } from '@/services/supabaseClient';
+import { supabase } from '@/lib/supabase';
+import { getCurrentUser } from '@/lib/auth';
 
 /**
  * 题目管理页面组件

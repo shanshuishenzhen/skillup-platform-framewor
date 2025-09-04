@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useParams, useRouter } from 'next/navigation';
+import { ExamService } from '@/services/examService';
 
 // 类型定义
 interface Question {
@@ -166,13 +167,33 @@ export default function TakeExamPage() {
     const initializeExam = async () => {
       setLoading(true);
       try {
-        // 模拟API调用
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // 获取考试数据和用户答题记录
+        const examData = await ExamService.getExamForTaking(examId);
         
-        setQuestions(mockQuestions);
-        setAttempt(mockAttempt);
-        setTimeRemaining(mockAttempt.timeRemaining);
-        setCurrentQuestionIndex(mockAttempt.currentQuestionIndex);
+        if (!examData.attempt) {
+          toast.error('未找到有效的考试记录');
+          router.push(`/skill-exam/${examId}`);
+          return;
+        }
+        
+        setQuestions(examData.questions);
+        setAttempt(examData.attempt);
+        setTimeRemaining(examData.attempt.timeRemaining);
+        setCurrentQuestionIndex(examData.attempt.currentQuestionIndex);
+        
+        // 恢复已保存的答案
+        if (examData.attempt.answers && examData.attempt.answers.length > 0) {
+          const savedAnswers: Record<string, string | string[]> = {};
+          examData.attempt.answers.forEach(answer => {
+            savedAnswers[answer.questionId] = answer.answer.length === 1 ? answer.answer[0] : answer.answer;
+          });
+          setAnswers(savedAnswers);
+        }
+        
+        // 恢复标记的题目
+        if (examData.attempt.flaggedQuestions) {
+          setFlaggedQuestions(new Set(examData.attempt.flaggedQuestions));
+        }
         
         // 进入全屏模式
         enterFullscreen();
@@ -184,8 +205,9 @@ export default function TakeExamPage() {
         setupAntiCheat();
         
         setLoading(false);
-      } catch (error) {
-        toast.error('加载考试失败');
+      } catch (error: any) {
+        console.error('加载考试失败:', error);
+        toast.error(error.message || '加载考试失败');
         router.push(`/skill-exam/${examId}`);
       }
     };
@@ -352,14 +374,23 @@ export default function TakeExamPage() {
 
   // 自动保存
   const autoSave = async () => {
+    if (!attempt) return;
+    
     setAutoSaving(true);
     try {
-      // 模拟API调用
-      await new Promise(resolve => setTimeout(resolve, 500));
-      // 这里应该调用保存答案的API
-      console.log('自动保存答案:', answers);
+      // 调用保存答案的API
+      await ExamService.saveAnswers({
+        attemptId: attempt.id,
+        answers: Object.entries(answers).map(([questionId, answer]) => ({
+          questionId,
+          answer: Array.isArray(answer) ? answer : [answer]
+        })),
+        flaggedQuestions: Array.from(flaggedQuestions),
+        currentQuestionIndex
+      });
     } catch (error) {
       console.error('自动保存失败:', error);
+      // 不显示错误提示，避免干扰用户答题
     } finally {
       setAutoSaving(false);
     }
@@ -397,20 +428,43 @@ export default function TakeExamPage() {
 
   // 提交考试
   const handleSubmit = async () => {
-    if (!confirm('确定要提交考试吗？提交后将无法修改答案。')) {
+    if (!attempt) return;
+    
+    // 检查是否有未答题目
+    const unansweredCount = questions.length - Object.keys(answers).length;
+    let confirmMessage = '确定要提交考试吗？提交后将无法修改答案。';
+    
+    if (unansweredCount > 0) {
+      confirmMessage += `\n\n注意：还有 ${unansweredCount} 道题目未作答。`;
+    }
+    
+    if (!confirm(confirmMessage)) {
       return;
     }
 
     setSubmitting(true);
     try {
-      // 模拟API调用
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // 先保存当前答案
+      await autoSave();
+      
+      // 提交考试
+      const result = await ExamService.submitExam({
+        attemptId: attempt.id,
+        answers: Object.entries(answers).map(([questionId, answer]) => ({
+          questionId,
+          answer: Array.isArray(answer) ? answer : [answer]
+        })),
+        flaggedQuestions: Array.from(flaggedQuestions),
+        violations,
+        timeSpent: (attempt.timeRemaining - timeRemaining) * 1000 // 转换为毫秒
+      });
       
       toast.success('考试提交成功');
       cleanup();
-      router.push(`/skill-exam/${examId}/result`);
-    } catch (error) {
-      toast.error('提交失败，请重试');
+      router.push(`/skill-exam/${examId}/result/${result.submissionId}`);
+    } catch (error: any) {
+      console.error('提交考试失败:', error);
+      toast.error(error.message || '提交失败，请重试');
     } finally {
       setSubmitting(false);
     }
@@ -418,8 +472,37 @@ export default function TakeExamPage() {
 
   // 自动提交（时间到）
   const handleAutoSubmit = async () => {
+    if (!attempt) return;
+    
     toast.warning('考试时间已到，正在自动提交...');
-    await handleSubmit();
+    
+    setSubmitting(true);
+    try {
+      // 先保存当前答案
+      await autoSave();
+      
+      // 强制提交考试
+      const result = await ExamService.submitExam({
+        attemptId: attempt.id,
+        answers: Object.entries(answers).map(([questionId, answer]) => ({
+          questionId,
+          answer: Array.isArray(answer) ? answer : [answer]
+        })),
+        flaggedQuestions: Array.from(flaggedQuestions),
+        violations,
+        timeSpent: attempt.timeRemaining * 1000, // 全部时间用完
+        isAutoSubmit: true
+      });
+      
+      toast.success('考试已自动提交');
+      cleanup();
+      router.push(`/skill-exam/${examId}/result/${result.submissionId}`);
+    } catch (error: any) {
+      console.error('自动提交失败:', error);
+      toast.error('自动提交失败，请手动提交');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // 渲染题目内容

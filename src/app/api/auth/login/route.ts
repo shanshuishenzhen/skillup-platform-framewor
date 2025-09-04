@@ -4,8 +4,14 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { loginUser, loginUserWithSms } from '@/services/userService';
+import { getSupabaseAdminClient } from '@/lib/supabase';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { z } from 'zod';
+import { generalRateLimit } from '../../middleware/security';
 import { ErrorHandler, AppError, ErrorType } from '@/utils/errorHandler';
+
+const supabase = getSupabaseAdminClient();
 
 /**
  * 用户登录接口

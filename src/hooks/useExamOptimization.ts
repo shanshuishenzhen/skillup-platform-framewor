@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { ExamService } from '@/services/examService';
+import { examService } from '@/services/examService';
 
 /**
  * 考试系统性能优化Hook
@@ -192,7 +192,7 @@ export function useExamOptimization(config: OptimizationConfig = {}) {
       const cacheKey = `exam_${examId}`;
       if (!examCache.get(cacheKey)) {
         try {
-          const exam = await ExamService.getExam(examId);
+          const exam = await examService.getExam(examId);
           examCache.set(cacheKey, exam);
         } catch (error) {
           console.warn(`预加载考试 ${examId} 失败:`, error);
@@ -214,7 +214,7 @@ export function useExamOptimization(config: OptimizationConfig = {}) {
     const cacheKey = `exams_${page}_${pageSize}_${JSON.stringify(filters)}`;
     
     return getCachedData(cacheKey, async () => {
-      const result = await ExamService.getExams({
+      const result = await examService.getExams({
         page,
         pageSize,
         ...filters
@@ -240,7 +240,7 @@ export function useExamOptimization(config: OptimizationConfig = {}) {
     const cacheKey = `search_${query}_${JSON.stringify(filters)}`;
     
     return getCachedData(cacheKey, async () => {
-      return ExamService.searchExams(query, filters);
+      return examService.searchExams(query, filters);
     }, 2 * 60 * 1000); // 搜索结果缓存2分钟
   }, [getCachedData]);
 

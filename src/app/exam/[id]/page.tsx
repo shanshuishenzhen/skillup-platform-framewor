@@ -26,7 +26,10 @@ import {
   Timer,
   Send,
   Eye,
-  BookOpen
+  BookOpen,
+  Bookmark,
+  Save,
+  RotateCcw
 } from 'lucide-react';
 import { 
   ExamService, 
@@ -59,6 +62,8 @@ export default function ExamTakingPage() {
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [examStarted, setExamStarted] = useState(false);
   const [showInstructions, setShowInstructions] = useState(true);
+  const [markedQuestions, setMarkedQuestions] = useState<Set<string>>(new Set());
+  const [savingAnswer, setSavingAnswer] = useState(false);
 
   /**
    * 加载考试信息
@@ -116,6 +121,7 @@ export default function ExamTakingPage() {
     if (!attempt) return;
 
     try {
+      setSavingAnswer(true);
       const answerData: UserAnswer = {
         id: `${attempt.id}_${questionId}`,
         attempt_id: attempt.id,
@@ -130,11 +136,94 @@ export default function ExamTakingPage() {
         ...prev,
         [questionId]: answerData
       }));
+      
+      toast.success('答案已保存', { duration: 1000 });
     } catch (error) {
       console.error('提交答案失败:', error);
       toast.error('提交答案失败');
+    } finally {
+      setSavingAnswer(false);
     }
   }, [attempt]);
+
+  /**
+   * 暂存答案（本地保存，不提交到服务器）
+   */
+  const saveAnswerLocally = useCallback((questionId: string, answer: string | string[]) => {
+    if (!attempt) return;
+
+    const answerData: UserAnswer = {
+      id: `${attempt.id}_${questionId}`,
+      attempt_id: attempt.id,
+      question_id: questionId,
+      answer: Array.isArray(answer) ? answer.join(',') : answer,
+      answered_at: new Date().toISOString()
+    };
+
+    setAnswers(prev => ({
+      ...prev,
+      [questionId]: answerData
+    }));
+  }, [attempt]);
+
+  /**
+   * 标记/取消标记题目
+   */
+  const toggleQuestionMark = useCallback((questionId: string) => {
+    setMarkedQuestions(prev => {
+      const newMarked = new Set(prev);
+      if (newMarked.has(questionId)) {
+        newMarked.delete(questionId);
+        toast.success('已取消标记');
+      } else {
+        newMarked.add(questionId);
+        toast.success('已标记题目');
+      }
+      return newMarked;
+    });
+  }, []);
+
+  /**
+   * 跳转到下一个未答题目
+   */
+  const goToNextUnanswered = useCallback(() => {
+    const unansweredIndex = questions.findIndex((q, index) => 
+      index > currentQuestionIndex && !isQuestionAnswered(q.id)
+    );
+    
+    if (unansweredIndex !== -1) {
+      setCurrentQuestionIndex(unansweredIndex);
+    } else {
+      // 如果后面没有未答题目，从头开始找
+      const firstUnansweredIndex = questions.findIndex(q => !isQuestionAnswered(q.id));
+      if (firstUnansweredIndex !== -1) {
+        setCurrentQuestionIndex(firstUnansweredIndex);
+      } else {
+        toast.info('所有题目都已回答');
+      }
+    }
+  }, [questions, currentQuestionIndex, answers]);
+
+  /**
+   * 跳转到下一个标记题目
+   */
+  const goToNextMarked = useCallback(() => {
+    const markedIndex = questions.findIndex((q, index) => 
+      index > currentQuestionIndex && markedQuestions.has(q.id)
+    );
+    
+    if (markedIndex !== -1) {
+      setCurrentQuestionIndex(markedIndex);
+    } else {
+      // 如果后面没有标记题目，从头开始找
+      const firstMarkedIndex = questions.findIndex(q => markedQuestions.has(q.id));
+      if (firstMarkedIndex !== -1) {
+        setCurrentQuestionIndex(firstMarkedIndex);
+      } else {
+        toast.info('没有标记的题目');
+      }
+    }
+  }, [questions, currentQuestionIndex, markedQuestions]);
 
   /**
    * 提交考试
@@ -223,7 +312,11 @@ export default function ExamTakingPage() {
         return (
           <RadioGroup
             value={currentAnswer}
-            onValueChange={(value) => submitAnswer(question.id, value)}
+            onValueChange={(value) => {
+              saveAnswerLocally(question.id, value);
+              // 延迟提交到服务器
+              setTimeout(() => submitAnswer(question.id, value), 500);
+            }}
             className="space-y-3"
           >
             {question.options?.map((option, index) => (
@@ -256,7 +349,9 @@ export default function ExamTakingPage() {
                     } else {
                       newSelected = newSelected.filter(id => id !== option.id);
                     }
-                    submitAnswer(question.id, newSelected);
+                    saveAnswerLocally(question.id, newSelected);
+                    // 延迟提交到服务器
+                    setTimeout(() => submitAnswer(question.id, newSelected), 500);
                   }}
                 />
                 <Label htmlFor={option.id} className="flex-1 cursor-pointer">
@@ -274,7 +369,11 @@ export default function ExamTakingPage() {
         return (
           <RadioGroup
             value={currentAnswer}
-            onValueChange={(value) => submitAnswer(question.id, value)}
+            onValueChange={(value) => {
+              saveAnswerLocally(question.id, value);
+              // 延迟提交到服务器
+              setTimeout(() => submitAnswer(question.id, value), 500);
+            }}
             className="space-y-3"
           >
             <div className="flex items-center space-x-2">
@@ -290,23 +389,67 @@ export default function ExamTakingPage() {
 
       case QuestionType.FILL_BLANK:
         return (
-          <Input
-            value={currentAnswer}
-            onChange={(e) => submitAnswer(question.id, e.target.value)}
-            placeholder="请输入答案"
-            className="w-full"
-          />
+          <div className="space-y-2">
+            <Input
+              value={currentAnswer}
+              onChange={(e) => {
+                saveAnswerLocally(question.id, e.target.value);
+              }}
+              onBlur={(e) => {
+                // 失去焦点时提交到服务器
+                if (e.target.value.trim()) {
+                  submitAnswer(question.id, e.target.value);
+                }
+              }}
+              placeholder="请输入答案"
+              className="w-full"
+            />
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => submitAnswer(question.id, currentAnswer)}
+                disabled={!currentAnswer.trim() || savingAnswer}
+              >
+                <Save className="h-3 w-3 mr-1" />
+                {savingAnswer ? '保存中...' : '保存答案'}
+              </Button>
+            </div>
+          </div>
         );
 
       case QuestionType.ESSAY:
         return (
-          <Textarea
-            value={currentAnswer}
-            onChange={(e) => submitAnswer(question.id, e.target.value)}
-            placeholder="请输入您的答案"
-            rows={6}
-            className="w-full"
-          />
+          <div className="space-y-2">
+            <Textarea
+              value={currentAnswer}
+              onChange={(e) => {
+                saveAnswerLocally(question.id, e.target.value);
+              }}
+              onBlur={(e) => {
+                // 失去焦点时提交到服务器
+                if (e.target.value.trim()) {
+                  submitAnswer(question.id, e.target.value);
+                }
+              }}
+              placeholder="请输入您的答案"
+              rows={6}
+              className="w-full"
+            />
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => submitAnswer(question.id, currentAnswer)}
+                disabled={!currentAnswer.trim() || savingAnswer}
+              >
+                <Save className="h-3 w-3 mr-1" />
+                {savingAnswer ? '保存中...' : '保存答案'}
+              </Button>
+            </div>
+          </div>
         );
 
       default:
@@ -318,25 +461,67 @@ export default function ExamTakingPage() {
    * 渲染题目导航
    */
   const renderQuestionNavigation = () => (
-    <div className="grid grid-cols-10 gap-2">
-      {questions.map((question, index) => (
+    <div className="space-y-4">
+      {/* 快捷导航按钮 */}
+      <div className="flex gap-2 flex-wrap">
         <Button
-          key={question.id}
-          variant={currentQuestionIndex === index ? "default" : "outline"}
+          variant="outline"
           size="sm"
-          onClick={() => setCurrentQuestionIndex(index)}
-          className={`relative ${
-            isQuestionAnswered(question.id) 
-              ? 'bg-green-100 border-green-300 text-green-800 hover:bg-green-200' 
-              : ''
-          }`}
+          onClick={goToNextUnanswered}
+          className="text-orange-600 border-orange-300 hover:bg-orange-50"
         >
-          {index + 1}
-          {isQuestionAnswered(question.id) && (
-            <CheckCircle className="h-3 w-3 absolute -top-1 -right-1 text-green-600" />
-          )}
+          <AlertTriangle className="h-3 w-3 mr-1" />
+          下一个未答题
         </Button>
-      ))}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={goToNextMarked}
+          className="text-blue-600 border-blue-300 hover:bg-blue-50"
+        >
+          <Bookmark className="h-3 w-3 mr-1" />
+          下一个标记题
+        </Button>
+        <div className="text-sm text-gray-600 flex items-center ml-auto">
+          <span className="mr-4">已答: {getAnsweredCount()}/{questions.length}</span>
+          <span>标记: {markedQuestions.size}</span>
+        </div>
+      </div>
+      
+      {/* 题目导航网格 */}
+      <div className="grid grid-cols-10 gap-2">
+        {questions.map((question, index) => {
+          const isAnswered = isQuestionAnswered(question.id);
+          const isMarked = markedQuestions.has(question.id);
+          const isCurrent = currentQuestionIndex === index;
+          
+          return (
+            <Button
+              key={question.id}
+              variant={isCurrent ? "default" : "outline"}
+              size="sm"
+              onClick={() => setCurrentQuestionIndex(index)}
+              className={`relative ${
+                isAnswered 
+                  ? 'bg-green-100 border-green-300 text-green-800 hover:bg-green-200' 
+                  : isMarked
+                  ? 'bg-blue-100 border-blue-300 text-blue-800 hover:bg-blue-200'
+                  : ''
+              }`}
+            >
+              {index + 1}
+              {/* 已答标记 */}
+              {isAnswered && (
+                <CheckCircle className="h-3 w-3 absolute -top-1 -right-1 text-green-600" />
+              )}
+              {/* 标记标记 */}
+              {isMarked && (
+                <Bookmark className="h-3 w-3 absolute -top-1 -left-1 text-blue-600 fill-current" />
+              )}
+            </Button>
+          );
+        })}
+      </div>
     </div>
   );
 
@@ -567,8 +752,26 @@ export default function ExamTakingPage() {
                   限时 {currentQuestion.time_limit} 秒
                 </Badge>
               )}
+              {markedQuestions.has(currentQuestion.id) && (
+                <Badge variant="outline" className="text-blue-600 border-blue-300">
+                  <Bookmark className="h-3 w-3 mr-1" />
+                  已标记
+                </Badge>
+              )}
             </div>
             <div className="flex gap-2">
+              {/* 标记按钮 */}
+              <Button
+                variant={markedQuestions.has(currentQuestion.id) ? "default" : "outline"}
+                size="sm"
+                onClick={() => toggleQuestionMark(currentQuestion.id)}
+                className={markedQuestions.has(currentQuestion.id) ? "bg-blue-600 hover:bg-blue-700" : ""}
+              >
+                <Bookmark className="h-4 w-4" />
+                {markedQuestions.has(currentQuestion.id) ? '取消标记' : '标记题目'}
+              </Button>
+              
+              {/* 导航按钮 */}
               <Button
                 variant="outline"
                 size="sm"
@@ -586,6 +789,17 @@ export default function ExamTakingPage() {
               >
                 下一题
                 <ChevronRight className="h-4 w-4" />
+              </Button>
+              
+              {/* 快捷导航 */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToNextUnanswered}
+                className="text-orange-600 border-orange-300 hover:bg-orange-50"
+              >
+                <AlertTriangle className="h-4 w-4" />
+                下一未答
               </Button>
             </div>
           </div>
@@ -625,48 +839,78 @@ export default function ExamTakingPage() {
 
       {/* 提交确认对话框 */}
       <Dialog open={showSubmitDialog} onOpenChange={setShowSubmitDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>确认提交考试</DialogTitle>
-            <DialogDescription>
-              您确定要提交考试吗？提交后将无法修改答案。
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="h-5 w-5" />
+              确认提交考试
+            </DialogTitle>
+            <DialogDescription className="space-y-2">
+              <p>您确定要提交考试吗？提交后将无法修改答案。</p>
+              <div className="bg-gray-50 p-3 rounded-lg space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span>总题数：</span>
+                  <span>{questions.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>已答题数：</span>
+                  <span className={getAnsweredCount() === questions.length ? 'text-green-600' : 'text-orange-600'}>
+                    {getAnsweredCount()}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>未答题数：</span>
+                  <span className={questions.length - getAnsweredCount() === 0 ? 'text-green-600' : 'text-red-600'}>
+                    {questions.length - getAnsweredCount()}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>标记题数：</span>
+                  <span className="text-blue-600">{markedQuestions.size}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>剩余时间：</span>
+                  <span className={timeRemaining < 300 ? 'text-red-600' : 'text-gray-600'}>
+                    {formatTime(timeRemaining)}
+                  </span>
+                </div>
+              </div>
+              {questions.length - getAnsweredCount() > 0 && (
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    您还有 {questions.length - getAnsweredCount()} 道题未答，确定要提交吗？
+                  </AlertDescription>
+                </Alert>
+              )}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>总题目数：{questions.length}</div>
-                <div>已答题目：{getAnsweredCount()}</div>
-                <div>未答题目：{questions.length - getAnsweredCount()}</div>
-                <div>剩余时间：{formatTime(timeRemaining)}</div>
-              </div>
-            </div>
-            
-            {questions.length - getAnsweredCount() > 0 && (
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  您还有 {questions.length - getAnsweredCount()} 道题目未回答，确定要提交吗？
-                </AlertDescription>
-              </Alert>
-            )}
-            
-            <div className="flex justify-end space-x-2">
-              <Button
-                variant="outline"
-                onClick={() => setShowSubmitDialog(false)}
-                disabled={submitting}
-              >
-                继续答题
-              </Button>
-              <Button
-                onClick={submitExam}
-                disabled={submitting}
-                className="bg-green-600 hover:bg-green-700"
-              >
-                {submitting ? '提交中...' : '确认提交'}
-              </Button>
-            </div>
+          <div className="flex justify-end gap-2 mt-6">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowSubmitDialog(false)}
+              disabled={submitting}
+            >
+              <RotateCcw className="h-4 w-4 mr-1" />
+              继续答题
+            </Button>
+            <Button 
+              onClick={submitExam} 
+              disabled={submitting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {submitting ? (
+                <>
+                  <RotateCcw className="h-4 w-4 mr-1 animate-spin" />
+                  提交中...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-1" />
+                  确认提交
+                </>
+              )}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

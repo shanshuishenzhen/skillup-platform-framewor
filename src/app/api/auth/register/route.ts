@@ -4,8 +4,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { registerUser } from '@/services/userService';
-import { extractVerificationCode } from '@/types/dictionary';
+import { getSupabaseAdminClient } from '@/lib/supabase';
+import bcrypt from 'bcryptjs';
+import { z } from 'zod';
+import { generalRateLimit } from '../../middleware/security';
+import { ErrorHandler, AppError, ErrorType } from '@/utils/errorHandler';
+
+const supabase = getSupabaseAdminClient();
 
 /**
  * 用户注册接口
@@ -15,15 +20,15 @@ import { extractVerificationCode } from '@/types/dictionary';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { phone, password } = body;
+    const { phone, password, idCard } = body;
 
     // 使用统一的验证码提取函数，支持多种字段名称
     const code = extractVerificationCode(body);
 
     // 验证请求参数
-    if (!phone || !password || !code) {
+    if (!phone || !password || !code || !idCard) {
       return NextResponse.json(
-        { error: '手机号、密码和验证码不能为空' },
+        { error: '手机号、密码、身份证号码和验证码不能为空' },
         { status: 400 }
       );
     }
@@ -45,6 +50,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 验证身份证号码格式
+    const idCardRegex = /^[1-9]\d{5}(18|19|20)\d{2}((0[1-9])|(1[0-2]))(([0-2][1-9])|10|20|30|31)\d{3}[0-9Xx]$/;
+    if (!idCardRegex.test(idCard)) {
+      return NextResponse.json(
+        { error: '身份证号码格式不正确' },
+        { status: 400 }
+      );
+    }
+
     // 验证短信验证码格式
     if (!/^\d{6}$/.test(code)) {
       return NextResponse.json(
@@ -54,7 +68,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 调用用户服务进行注册
-    const result = await registerUser(phone, password, code);
+    const result = await registerUser(phone, password, code, idCard);
 
     if (result.success) {
       return NextResponse.json({

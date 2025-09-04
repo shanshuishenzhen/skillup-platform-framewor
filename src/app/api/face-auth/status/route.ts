@@ -5,15 +5,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdminClient } from '@/lib/supabase';
 import { generalRateLimit, tokenAuth } from '../../middleware/security';
 import { ErrorHandler, AppError, ErrorType } from '@/utils/errorHandler';
 
-// 初始化Supabase客户端
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// 使用统一的Supabase管理员客户端
+const supabase = getSupabaseAdminClient();
 
 // 响应接口
 interface StatusResponse {

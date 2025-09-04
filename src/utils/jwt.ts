@@ -302,19 +302,36 @@ export function hasAdminPermission(token: string): boolean {
       roleLength: payload.role?.length || 0
     });
     
-    // 步骤4: 角色转换和比较
+    // 步骤4: 角色转换和比较（支持RBAC枚举和小写格式）
     const originalRole = payload.role;
     const role = payload.role?.toLowerCase();
-    console.log('📊 角色转换过程:', {
-      originalRole: originalRole,
-      lowercaseRole: role,
-      conversionSuccessful: !!role
+    
+    console.log('🔄 角色转换过程:', {
+      originalRole,
+      convertedRole: role,
+      originalType: typeof originalRole,
+      convertedType: typeof role
     });
     
-    // 步骤5: 权限检查
-    const isAdmin = role === 'admin';
-    const isSuperAdmin = role === 'super_admin';
-    const hasPermission = isAdmin || isSuperAdmin;
+    // 步骤5: 权限判断（支持多种角色格式：RBAC枚举和小写格式）
+    const isAdmin = role === 'admin' || originalRole === 'ADMIN';
+    const isSuperAdmin = role === 'super_admin' || originalRole === 'SUPER_ADMIN';
+    const isAdminRole = isAdmin || isSuperAdmin;
+    
+    console.log('🎯 权限判断结果:', {
+      role,
+      originalRole,
+      isAdmin,
+      isSuperAdmin,
+      isAdminRole,
+      matchesAdmin: role === 'admin',
+      matchesSuperAdmin: role === 'super_admin',
+      matchesRBACAdmin: originalRole === 'ADMIN',
+      matchesRBACSuperAdmin: originalRole === 'SUPER_ADMIN',
+      finalResult: isAdminRole
+    });
+    
+    const hasPermission = isAdminRole;
     
     console.log('📊 权限检查详细过程:', {
       originalRole: originalRole,

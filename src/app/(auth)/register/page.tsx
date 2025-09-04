@@ -18,7 +18,8 @@ function RegisterForm() {
   const [formData, setFormData] = useState({
     phone: '',
     password: '',
-    smsCode: ''
+    smsCode: '',
+    idCard: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -106,7 +107,8 @@ function RegisterForm() {
         body: JSON.stringify({
           phone: formData.phone,
           password: formData.password,
-          verificationCode: formData.smsCode
+          verificationCode: formData.smsCode,
+          idCard: formData.idCard
         }),
       });
 
@@ -197,6 +199,23 @@ function RegisterForm() {
                 >
                   {countdown > 0 ? `${countdown}s` : '发送验证码'}
                 </Button>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="idCard">身份证号码</Label>
+              <div className="relative">
+                <Input
+                  id="idCard"
+                  type="text"
+                  placeholder="请输入身份证号码"
+                  value={formData.idCard}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, idCard: e.target.value })}
+                  required
+                  disabled={loading}
+                  pattern="^[1-9]\d{5}(18|19|20)\d{2}((0[1-9])|(1[0-2]))(([0-2][1-9])|10|20|30|31)\d{3}[0-9Xx]$"
+                  title="请输入有效的18位身份证号码"
+                />
               </div>
             </div>
             

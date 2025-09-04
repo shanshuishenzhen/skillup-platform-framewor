@@ -5,15 +5,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { baiduFaceService } from '@/services/baiduFaceService';
-import { tokenAuth } from '../../middleware/security';
+import { getSupabaseAdminClient } from '@/lib/supabase';
+import { generalRateLimit, tokenAuth } from '../../middleware/security';
+import { ErrorHandler, AppError, ErrorType } from '@/utils/errorHandler';
 
-// 初始化Supabase客户端
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabase = getSupabaseAdminClient();
 
 // 请求体接口
 interface VerifyRequest {
