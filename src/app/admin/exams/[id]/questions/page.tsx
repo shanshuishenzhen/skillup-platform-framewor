@@ -26,14 +26,9 @@ import {
   CheckCircle,
   XCircle
 } from 'lucide-react';
-import { 
-  ExamService, 
-  QuestionType, 
-  ExamDifficulty, 
-  type Exam, 
-  type Question, 
-  type QuestionOption 
-} from '@/services/examService';
+import { ExamService, type Exam } from '@/services/examService';
+import { QuestionType, type Question, type QuestionOption } from '@/types/question';
+import { ExamDifficulty } from '@/types/exam';
 
 /**
  * 题目管理页面
@@ -156,7 +151,7 @@ export default function QuestionManagementPage() {
     const newOption: QuestionOption = {
       id: `option_${Date.now()}`,
       text: '',
-      is_correct: false
+      isCorrect: false
     };
     setNewQuestion({
       ...newQuestion,
@@ -175,10 +170,10 @@ export default function QuestionManagementPage() {
     };
     
     // 如果是单选题，确保只有一个正确答案
-    if (field === 'is_correct' && value && newQuestion.type === QuestionType.SINGLE_CHOICE) {
+    if (field === 'isCorrect' && value && newQuestion.type === QuestionType.SINGLE_CHOICE) {
       updatedOptions.forEach((option, i) => {
         if (i !== index) {
-          option.is_correct = false;
+          option.isCorrect = false;
         }
       });
     }
