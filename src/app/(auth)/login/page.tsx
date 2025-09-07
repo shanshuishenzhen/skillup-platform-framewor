@@ -5,15 +5,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/Input";
 import { Camera, Lock, LogIn, Mail, X } from "lucide-react";
 import Link from "next/link";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, FormEvent } from "react";
 
 export default function LoginPage() {
+  // State for form fields
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+
+  // State for UI management
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Refs for camera capture
   const [stream, setStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // --- Camera Logic ---
   const startCamera = async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -23,7 +32,7 @@ export default function LoginPage() {
       }
     } catch (err) {
       console.error("Error accessing camera: ", err);
-      // TODO: Show a user-friendly error message
+      setError("无法访问摄像头。请检查您的权限设置。");
     }
   };
 
@@ -47,6 +56,7 @@ export default function LoginPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isModalOpen]);
 
+  // --- Handlers ---
   const handleFaceLoginClick = () => {
     setIsModalOpen(true);
   };
@@ -55,9 +65,10 @@ export default function LoginPage() {
     setIsModalOpen(false);
   };
 
-  const handleCapture = async () => {
+  const handleCaptureAndLogin = async () => {
     if (videoRef.current && canvasRef.current) {
       setIsLoading(true);
+      setError(null);
       const video = videoRef.current;
       const canvas = canvasRef.current;
       canvas.width = video.videoWidth;
@@ -78,18 +89,48 @@ export default function LoginPage() {
 
         if (response.ok && result.success) {
           alert('人脸识别成功! 即将跳转到首页。');
-          // In a real app, you would handle session/token and redirect properly.
           window.location.href = '/';
         } else {
-          alert(`登录失败: ${result.message || '未知错误'}`);
+          setError(result.message || '人脸识别失败。');
         }
-      } catch (error) {
-        console.error('Login API error:', error);
-        alert('登录请求失败，请稍后重试。');
+      } catch (err) {
+        setError('登录请求失败，请稍后重试。');
       } finally {
         setIsLoading(false);
         handleCloseModal();
       }
+    }
+  };
+
+  const handlePasswordLogin = async (event: FormEvent) => {
+    event.preventDefault();
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, password }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        if (result.needsFaceScan) {
+          // User needs to perform a face scan, open the modal
+          setIsModalOpen(true);
+        } else {
+          // Login successful, redirect to homepage
+          window.location.href = '/';
+        }
+      } else {
+        setError(result.message || '登录失败，请检查您的手机号和密码。');
+      }
+    } catch (err) {
+      setError('登录请求失败，请检查您的网络连接。');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -102,24 +143,43 @@ export default function LoginPage() {
             <CardDescription>使用您的手机号和密码登录</CardDescription>
           </CardHeader>
           <CardContent>
-            <form className="space-y-4">
+            {error && <div className="mb-4 text-center text-red-500 bg-red-100 p-3 rounded-md">{error}</div>}
+            <form className="space-y-4" onSubmit={handlePasswordLogin}>
               <div className="space-y-2">
                 <label htmlFor="phone" className="text-sm font-medium">手机号</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                  <Input id="phone" type="tel" placeholder="请输入您的手机号" required className="pl-10" />
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="请输入您的手机号"
+                    required
+                    className="pl-10"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
                 </div>
               </div>
               <div className="space-y-2">
                 <label htmlFor="password" className="text-sm font-medium">密码</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                  <Input id="password" type="password" placeholder="请输入您的密码" required className="pl-10" />
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="请输入您的密码"
+                    required
+                    className="pl-10"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
                 </div>
               </div>
-              <Button type="submit" className="w-full !mt-6 flex items-center justify-center">
-                <LogIn className="mr-2 h-5 w-5" />
-                登录
+              <Button type="submit" className="w-full !mt-6 flex items-center justify-center" disabled={isLoading}>
+                {isLoading ? '登录中...' : <>
+                  <LogIn className="mr-2 h-5 w-5" />
+                  登录
+                </>}
               </Button>
             </form>
 
@@ -134,7 +194,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <Button variant="outline" className="w-full flex items-center justify-center" onClick={handleFaceLoginClick}>
+            <Button variant="outline" className="w-full flex items-center justify-center" onClick={handleFaceLoginClick} disabled={isLoading}>
               <Camera className="mr-2 h-5 w-5" />
               人脸识别登录
             </Button>
@@ -160,7 +220,7 @@ export default function LoginPage() {
               <video ref={videoRef} className="w-full h-full object-cover" autoPlay playsInline />
               <canvas ref={canvasRef} className="hidden" />
             </div>
-            <Button className="w-full mt-4" onClick={handleCapture} disabled={isLoading}>
+            <Button className="w-full mt-4" onClick={handleCaptureAndLogin} disabled={isLoading}>
               {isLoading ? '正在验证...' : '捕获并登录'}
             </Button>
           </div>
