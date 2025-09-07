@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useAuth } from './useAuth';
+import { apiCache } from '@/utils/apiCache';
 
 /**
  * 学习进度数据接口
@@ -9,11 +10,12 @@ export interface LearningProgress {
   userId: string;
   courseId: string;
   lessonId: string;
-  currentTimeSeconds: number;
-  totalDurationSeconds: number;
-  completionPercentage: number;
+  currentTime: number;
+  duration: number;
+  progressPercentage: number;
   isCompleted: boolean;
   lastUpdatedAt: string;
+  createdAt: string;
 }
 
 /**
@@ -23,25 +25,20 @@ export interface CourseProgress {
   courseId: string;
   totalLessons: number;
   completedLessons: number;
-  totalDuration: number;
-  watchedDuration: number;
-  overallProgress: number;
-  lastWatchedLessonId?: string;
-  lastWatchedAt?: string;
+  courseProgressPercentage: number;
+  totalWatchTime: number;
+  lastStudyTime: string;
 }
 
 /**
  * 学习统计接口
  */
 export interface LearningStats {
-  totalCourses: number;
+  totalStudyTime: number;
   completedCourses: number;
-  totalLessons: number;
-  completedLessons: number;
-  totalWatchTime: number;
-  averageProgress: number;
+  inProgressCourses: number;
+  weeklyStudyTime: number;
   streakDays: number;
-  lastStudyDate?: string;
 }
 
 /**
@@ -87,8 +84,17 @@ export function useLearningProgress() {
       setLoading(true);
       setError(null);
       
+      const cacheKey = `/api/learning-progress?type=lesson&courseId=${courseId}&lessonId=${lessonId}`;
+      
+      // 尝试从缓存获取
+      const cached = apiCache.get<LearningProgress>(cacheKey, { courseId, lessonId });
+      if (cached) {
+        setLoading(false);
+        return cached;
+      }
+      
       const response = await fetch(
-        `/api/learning-progress?type=lesson&courseId=${courseId}&lessonId=${lessonId}`,
+        cacheKey,
         {
           method: 'GET',
           headers: getHeaders(),
@@ -100,6 +106,9 @@ export function useLearningProgress() {
       if (!result.success) {
         throw new Error(result.message || '获取学习进度失败');
       }
+      
+      // 缓存结果（2分钟）
+      apiCache.set(cacheKey, result.data, { courseId, lessonId }, 2 * 60 * 1000);
       
       return result.data;
       
@@ -130,8 +139,17 @@ export function useLearningProgress() {
       setLoading(true);
       setError(null);
       
+      const cacheKey = `/api/learning-progress?type=course&courseId=${courseId}`;
+      
+      // 尝试从缓存获取
+      const cached = apiCache.get<CourseProgress>(cacheKey, { courseId });
+      if (cached) {
+        setLoading(false);
+        return cached;
+      }
+      
       const response = await fetch(
-        `/api/learning-progress?type=course&courseId=${courseId}`,
+        cacheKey,
         {
           method: 'GET',
           headers: getHeaders(),
@@ -143,6 +161,9 @@ export function useLearningProgress() {
       if (!result.success) {
         throw new Error(result.message || '获取课程进度失败');
       }
+      
+      // 缓存结果（3分钟）
+      apiCache.set(cacheKey, result.data, { courseId }, 3 * 60 * 1000);
       
       return result.data;
       
@@ -238,6 +259,10 @@ export function useLearningProgress() {
         throw new Error(result.message || '保存学习进度失败');
       }
       
+      // 清除相关缓存以确保数据一致性
+      apiCache.delete(`/api/learning-progress?type=lesson&courseId=${courseId}&lessonId=${lessonId}`);
+      apiCache.delete(`/api/learning-progress?type=course&courseId=${courseId}`);
+      
       return true;
       
     } catch (err) {
@@ -282,6 +307,10 @@ export function useLearningProgress() {
         throw new Error(result.message || '标记完成失败');
       }
       
+      // 清除相关缓存
+      apiCache.delete(`/api/learning-progress?type=lesson&courseId=${courseId}&lessonId=${lessonId}`);
+      apiCache.delete(`/api/learning-progress?type=course&courseId=${courseId}`);
+      
       return true;
       
     } catch (err) {
@@ -325,6 +354,10 @@ export function useLearningProgress() {
       if (!result.success) {
         throw new Error(result.message || '重置进度失败');
       }
+      
+      // 清除相关缓存
+      apiCache.delete(`/api/learning-progress?type=lesson&courseId=${courseId}&lessonId=${lessonId}`);
+      apiCache.delete(`/api/learning-progress?type=course&courseId=${courseId}`);
       
       return true;
       

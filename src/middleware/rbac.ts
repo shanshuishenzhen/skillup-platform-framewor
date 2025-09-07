@@ -79,16 +79,6 @@ export async function verifyJWTToken(token: string): Promise<JWTPayload | null> 
     const config = getEnvConfig();
     const decoded = jwt.verify(token, config.security.jwtSecret) as any;
     
-    console.log('🔍 RBAC verifyJWTToken: 开始验证JWT令牌');
-    console.log('📊 原始解码结果:', {
-      userId: decoded.userId,
-      phone: decoded.phone,
-      role: decoded.role,
-      roleType: typeof decoded.role,
-      exp: decoded.exp,
-      iat: decoded.iat
-    });
-    
     // 验证令牌是否过期
     if (decoded.exp && decoded.exp < Math.floor(Date.now() / 1000)) {
       throw new RBACError('令牌已过期', 401, 'TOKEN_EXPIRED');
@@ -97,11 +87,6 @@ export async function verifyJWTToken(token: string): Promise<JWTPayload | null> 
     // 将字符串角色转换为UserRole枚举
     let userRole: UserRole;
     const roleString = decoded.role;
-    
-    console.log('🔄 角色转换过程:', {
-      originalRole: roleString,
-      originalType: typeof roleString
-    });
     
     if (typeof roleString === 'string') {
       switch (roleString.toUpperCase()) {
@@ -122,12 +107,6 @@ export async function verifyJWTToken(token: string): Promise<JWTPayload | null> 
       // 如果已经是枚举类型，直接使用
       userRole = roleString as UserRole;
     }
-    
-    console.log('✅ 角色转换完成:', {
-      convertedRole: userRole,
-      convertedType: typeof userRole,
-      isValidEnum: Object.values(UserRole).includes(userRole)
-    });
 
     const result: JWTPayload = {
       userId: decoded.userId,
@@ -137,7 +116,6 @@ export async function verifyJWTToken(token: string): Promise<JWTPayload | null> 
       exp: decoded.exp
     };
     
-    console.log('🎯 最终JWT载荷:', result);
     return result;
   } catch (error) {
     console.error('❌ JWT令牌验证失败:', error);
@@ -188,7 +166,19 @@ export async function getUserRoleFromDB(userId: string): Promise<UserRole | null
       return null;
     }
 
-    return user.role as UserRole;
+    // 将数据库中的角色映射到枚举
+    switch (user.role) {
+      case 'admin':
+        return UserRole.ADMIN;
+      case 'super_admin':
+        return UserRole.SUPER_ADMIN;
+      case 'teacher':
+        return UserRole.TEACHER;
+      case 'user':
+        return UserRole.USER;
+      default:
+        return user.role as UserRole;
+    }
   } catch (error) {
     console.error('获取用户角色失败:', error);
     return null;
@@ -202,27 +192,7 @@ export async function getUserRoleFromDB(userId: string): Promise<UserRole | null
  * @returns 是否具有权限
  */
 export function hasRequiredRole(userRole: UserRole, requiredRoles: UserRole[]): boolean {
-  console.log('🔍 hasRequiredRole: 开始角色权限检查');
-  console.log('📊 角色匹配参数:', {
-    userRole,
-    userRoleType: typeof userRole,
-    requiredRoles,
-    requiredRolesTypes: requiredRoles.map(r => typeof r)
-  });
-  
-  const hasPermission = requiredRoles.includes(userRole);
-  
-  console.log('🎯 角色匹配结果:', {
-    hasPermission,
-    matchDetails: requiredRoles.map(role => ({
-      requiredRole: role,
-      matches: role === userRole,
-      strictEquals: role === userRole,
-      enumComparison: Object.is(role, userRole)
-    }))
-  });
-  
-  return hasPermission;
+  return requiredRoles.includes(userRole);
 }
 
 /**
@@ -294,6 +264,7 @@ export async function verifyRBAC(
 
     // 如果需要，从数据库获取最新角色信息
     let currentRole = user.role;
+    
     if (options.checkDBRole) {
       const dbRole = await getUserRoleFromDB(user.userId);
       if (dbRole) {
@@ -302,6 +273,7 @@ export async function verifyRBAC(
     }
 
     // 检查角色权限
+    
     if (!hasRequiredRole(currentRole, requiredRoles)) {
       return {
         success: false,

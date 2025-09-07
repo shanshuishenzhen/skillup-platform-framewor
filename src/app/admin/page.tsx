@@ -9,7 +9,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Users, Upload, BookOpen, BarChart3, FileText, Shield, Bug, RefreshCw, Settings } from 'lucide-react';
+import { Users, Upload, BookOpen, BarChart3, FileText, Shield, Bug, RefreshCw, Settings, Network } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import UserImport from '@/components/admin/UserImport';
@@ -19,6 +19,7 @@ import ResourceUpload from '@/components/admin/ResourceUpload';
 import AdminGuide from '@/components/admin/AdminGuide';
 import ExamSystemManagement from '@/components/admin/ExamSystemManagement';
 import AdminTools from '@/components/admin/AdminTools';
+import OrganizationManagement from '@/components/admin/OrganizationManagement';
 // import TokenDebugPanel from '@/components/admin/TokenDebugPanel';
 import AdminGuard from '@/components/auth/AdminGuard';
 
@@ -60,7 +61,7 @@ interface AdminStats {
 /**
  * 管理功能选项卡类型
  */
-type AdminTab = 'overview' | 'users' | 'user-list' | 'resources' | 'exam-system' | 'tools' | 'guide' | 'debug';
+type AdminTab = 'overview' | 'users' | 'user-list' | 'resources' | 'exam-system' | 'organization' | 'tools' | 'guide' | 'debug';
 
 /**
  * 模拟统计数据
@@ -271,6 +272,12 @@ export default function AdminPage() {
       description: '考试管理和本地系统集成'
     },
     {
+      id: 'organization' as AdminTab,
+      name: '组织架构',
+      icon: Network,
+      description: '部门管理和组织架构可视化'
+    },
+    {
       id: 'tools' as AdminTab,
       name: '实用工具',
       icon: Settings,
@@ -437,6 +444,9 @@ export default function AdminPage() {
 
       case 'exam-system':
         return <ExamSystemManagement />;
+
+      case 'organization':
+        return <OrganizationManagement />;
 
       case 'tools':
         return <AdminTools />;

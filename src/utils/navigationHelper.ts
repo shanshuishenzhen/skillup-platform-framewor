@@ -63,6 +63,9 @@ export const ADMIN_NAVIGATION_MAP = {
   userList: '/admin?tab=user-list',
   userImport: '/admin?tab=users',
   
+  // 组织架构管理
+  organization: '/admin/organization',
+  
   // 考试系统
   examSystem: '/admin?tab=exam-system',
   examCreate: '/admin/exams/create',
@@ -107,6 +110,10 @@ export const getParentNavigationUrl = (currentPath: string): string => {
   }
   
   if (basePath === '/admin/debug') {
+    return ADMIN_NAVIGATION_MAP.admin;
+  }
+  
+  if (basePath === '/admin/organization') {
     return ADMIN_NAVIGATION_MAP.admin;
   }
   

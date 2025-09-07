@@ -4,11 +4,14 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseAdminClient } from '@/lib/supabase';
-import { parseJWTToken } from '@/utils/jwt';
-import { ErrorHandler, AppError, ErrorType } from '@/utils/errorHandler';
-
-const supabase = getSupabaseAdminClient();
+import { 
+  getAllCourses, 
+  getCoursesByCategory, 
+  getPopularCourses, 
+  getFreeCourses,
+  searchCourses 
+} from '@/services/courseService';
+import { AppError } from '@/utils/errorHandler';
 
 /**
  * 获取课程列表接口

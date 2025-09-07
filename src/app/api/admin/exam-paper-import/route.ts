@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Question, QuestionType, ExamDifficulty } from '../../../../types/exam';
+import { Question, QuestionType, ExamDifficulty, ExamStatus } from '../../../../types/exam';
 import { QuestionTypeDistribution } from '../../../../utils/examPaperParser';
+import { examService } from '../../../../services/examService';
+import { examPaperService } from '../../../../services/examPaperService';
+import { verifyAdminAccess } from '../../../../utils/auth';
 
 /**
  * 试卷导入请求数据接口
@@ -8,6 +11,8 @@ import { QuestionTypeDistribution } from '../../../../utils/examPaperParser';
 interface ExamPaperImportRequest {
   /** 试卷标题 */
   examTitle: string;
+  /** 试卷ID（来自模板） */
+  paperId?: string;
   /** 题型分布 */
   typeDistribution: QuestionTypeDistribution[];
   /** 题目列表 */
@@ -178,6 +183,46 @@ async function checkExamIdExists(examId: string): Promise<boolean> {
 }
 
 /**
+ * 检查试卷ID是否已存在
+ * @param paperId - 试卷ID（来自模板）
+ * @returns 是否存在
+ */
+async function checkPaperIdExists(paperId: string): Promise<boolean> {
+  try {
+    const existingPaper = await examPaperService.findByPaperCode(paperId);
+    return !!existingPaper;
+  } catch (error) {
+    console.error('检查试卷ID失败:', error);
+    return false;
+  }
+}
+
+/**
+ * 生成新的试卷ID（当原ID重复时）
+ * @param originalId - 原始试卷ID
+ * @returns 新的试卷ID
+ */
+async function generateNewPaperId(originalId: string): Promise<string> {
+  let counter = 1;
+  let newId = `${originalId}_${counter}`;
+  
+  // 循环检查直到找到不重复的ID
+  while (await checkPaperIdExists(newId)) {
+    counter++;
+    newId = `${originalId}_${counter}`;
+    
+    // 防止无限循环，最多尝试100次
+    if (counter > 100) {
+      // 如果还是重复，使用时间戳
+      newId = `${originalId}_${Date.now()}`;
+      break;
+    }
+  }
+  
+  return newId;
+}
+
+/**
  * 处理题目数据，确保格式正确
  * @param questions - 原始题目数据
  * @returns 处理后的题目数据
@@ -227,29 +272,23 @@ function processQuestions(questions: Question[]): Question[] {
 }
 
 /**
- * 模拟保存题目到数据库
+ * 保存题目到数据库
+ * @param examId - 考试ID
  * @param questions - 题目列表
+ * @param userId - 用户ID
  * @returns 保存结果
  */
-async function saveQuestionsToDatabase(questions: Question[]): Promise<{ success: boolean; savedCount: number; errors: string[] }> {
+async function saveQuestionsToDatabase(examId: string, questions: Question[], userId: string): Promise<{ success: boolean; savedCount: number; errors: string[] }> {
   try {
-    // 这里应该是实际的数据库保存逻辑
-    // 目前模拟保存过程
-    
     const processedQuestions = processQuestions(questions);
     
-    // 模拟异步保存
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // 在实际实现中，这里应该调用数据库API
-    // 例如：await db.questions.createMany({ data: processedQuestions });
-    
-    console.log(`模拟保存${processedQuestions.length}道题目到数据库`);
+    // 使用examService批量创建题目
+    const result = await examService.batchCreateQuestions(examId, processedQuestions, userId);
     
     return {
-      success: true,
-      savedCount: processedQuestions.length,
-      errors: []
+      success: result.success > 0,
+      savedCount: result.success,
+      errors: result.errors
     };
   } catch (error) {
     console.error('保存题目到数据库失败:', error);
@@ -262,33 +301,30 @@ async function saveQuestionsToDatabase(questions: Question[]): Promise<{ success
 }
 
 /**
- * 模拟创建考试
+ * 创建考试
  * @param examTitle - 考试标题
  * @param questions - 题目列表
  * @param typeDistribution - 题型分布
+ * @param userId - 用户ID
+ * @param paperId - 试卷ID（来自模板）
  * @returns 创建结果
  */
 async function createExam(
   examTitle: string,
   questions: Question[],
-  typeDistribution: QuestionTypeDistribution[]
-): Promise<{ success: boolean; examId?: string; errors: string[] }> {
+  typeDistribution: QuestionTypeDistribution[],
+  userId: string,
+  paperId?: string
+): Promise<{ success: boolean; examId?: string; errors: string[]; finalPaperId?: string }> {
   try {
-    // 生成唯一的考试ID
-    let examId = generateExamId(examTitle);
-    
-    // 检查ID是否已存在，如果存在则重新生成
-    let attempts = 0;
-    while (await checkExamIdExists(examId) && attempts < 5) {
-      examId = generateExamId(examTitle);
-      attempts++;
-    }
-    
-    if (attempts >= 5) {
-      return {
-        success: false,
-        errors: ['无法生成唯一的考试ID，请稍后重试']
-      };
+    // 处理试卷ID重复检查和自动重新编号
+    let finalPaperId = paperId;
+    if (paperId) {
+      const isDuplicate = await checkPaperIdExists(paperId);
+      if (isDuplicate) {
+        finalPaperId = await generateNewPaperId(paperId);
+        console.log(`试卷ID重复，自动重新编号: ${paperId} -> ${finalPaperId}`);
+      }
     }
     
     // 计算总分
@@ -296,32 +332,48 @@ async function createExam(
       return sum + (dist.count * dist.pointsPerQuestion);
     }, 0);
     
-    // 模拟创建考试记录
+    // 创建考试数据
     const examData = {
-      id: examId,
       title: examTitle,
       description: `通过Excel导入创建的试卷，包含${questions.length}道题目`,
-      totalQuestions: questions.length,
-      totalPoints: totalPoints,
-      duration: 120, // 默认120分钟
-      questionIds: questions.map(q => q.id),
-      typeDistribution: typeDistribution,
-      status: 'draft', // 默认为草稿状态
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      category: '导入试卷',
+      difficulty: ExamDifficulty.INTERMEDIATE,
+      duration: Math.max(60, questions.length * 2), // 每题2分钟，最少60分钟
+      total_questions: questions.length,
+      total_score: totalPoints,
+      passing_score: Math.ceil(totalPoints * 0.6), // 60%及格
+      max_attempts: 3,
+      is_public: false,
+      requires_approval: false,
+      allow_retake: true,
+      status: ExamStatus.DRAFT
     };
     
-    // 模拟异步创建
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // 在实际实现中，这里应该调用数据库API
-    // 例如：await db.exams.create({ data: examData });
-    
-    console.log(`模拟创建考试: ${examTitle} (ID: ${examId})`);
+    // 创建试卷记录
+    const examPaper = await examPaperService.createExamPaper({
+      title: examTitle,
+      description: `通过Excel导入创建的试卷，包含${questions.length}道题目`,
+      category: '导入试卷',
+      difficulty: 'intermediate' as 'beginner' | 'intermediate' | 'advanced',
+      totalQuestions: questions.length,
+      totalScore: totalPoints,
+      questionsData: questions,
+      tags: ['导入试卷'],
+      paperCode: finalPaperId, // 添加试卷ID字段
+      settings: {
+        timeLimit: Math.max(60, questions.length * 2),
+        passingScore: Math.ceil(totalPoints * 0.6),
+        allowReview: true,
+        showCorrectAnswers: false,
+        randomizeQuestions: false,
+        randomizeOptions: false
+      }
+    }, userId);
     
     return {
       success: true,
-      examId: examId,
+      examId: examPaper.id,
+      finalPaperId: finalPaperId,
       errors: []
     };
   } catch (error) {
@@ -342,6 +394,17 @@ async function createExam(
  */
 export async function POST(request: NextRequest): Promise<NextResponse<ExamPaperImportResponse>> {
   try {
+    // 验证管理员权限
+    const authResult = await verifyAdminAccess(request, ['admin', 'teacher']);
+    if (!authResult.success) {
+      return NextResponse.json(
+        { success: false, message: authResult.error },
+        { status: authResult.status }
+      );
+    }
+
+    const { user } = authResult;
+    
     // 解析请求体
     const body: ExamPaperImportRequest = await request.json();
     
@@ -382,21 +445,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<ExamPaper
       );
     }
     
-    // 保存题目到数据库
-    const saveResult = await saveQuestionsToDatabase(body.questions);
-    if (!saveResult.success) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: '保存题目失败',
-          errors: saveResult.errors
-        },
-        { status: 500 }
-      );
-    }
-    
     // 创建考试
-    const examResult = await createExam(body.examTitle, body.questions, body.typeDistribution);
+    const examResult = await createExam(body.examTitle, body.questions, body.typeDistribution, user.id, body.paperId);
     if (!examResult.success) {
       return NextResponse.json(
         {
@@ -408,11 +458,49 @@ export async function POST(request: NextRequest): Promise<NextResponse<ExamPaper
       );
     }
     
+    // 保存题目到数据库
+    const saveResult = await saveQuestionsToDatabase(examResult.examId!, body.questions, user.id);
+    if (!saveResult.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: '保存题目失败',
+          errors: saveResult.errors
+        },
+        { status: 500 }
+      );
+    }
+    
+    // 构建响应消息
+    let message = '试卷导入成功';
+    const warnings: string[] = [];
+    
+    // 检查是否有试卷ID重新编号
+    if (body.paperId && examResult.finalPaperId && body.paperId !== examResult.finalPaperId) {
+      warnings.push(`试卷ID重复，已自动重新编号：${body.paperId} -> ${examResult.finalPaperId}`);
+      message += '（试卷ID已重新编号）';
+    }
+    
     // 返回成功响应
     return NextResponse.json(
       {
         success: true,
-        message: `成功导入试卷"${body.examTitle}"，包含${body.questions.length}道题目`,
+        message: message,
+        warnings: warnings,
+        data: {
+          examPaper: { 
+            id: examResult.examId,
+            paperCode: examResult.finalPaperId
+          },
+          questions: body.questions,
+          summary: {
+            totalQuestions: body.questions.length,
+            totalScore: body.typeDistribution.reduce((sum, dist) => sum + (dist.count * dist.pointsPerQuestion), 0),
+            questionTypes: body.typeDistribution,
+            originalPaperId: body.paperId,
+            finalPaperId: examResult.finalPaperId
+          }
+        },
         importedCount: saveResult.savedCount,
         examId: examResult.examId
       },

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { 
@@ -10,12 +10,16 @@ import {
   Target,
   BarChart3,
   PlayCircle,
-  CheckCircle
+  CheckCircle,
+  Calendar,
+  Award
 } from 'lucide-react';
 import { useLearningProgress, LearningStats } from '@/hooks/useLearningProgress';
 import { getAllCourses, Course } from '@/services/courseService';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import CourseProgressCard from '@/components/progress/CourseProgressCard';
+import StatsCard from '@/components/progress/StatsCard';
 
 /**
  * 学习进度管理页面组件
@@ -38,29 +42,33 @@ export default function ProgressPage() {
   const [activeTab, setActiveTab] = useState<string>('overview');
 
   /**
-   * 初始化学习进度数据
+   * 初始化学习进度数据（优化版本）
    */
-  useEffect(() => {
+  const initializeProgress = useCallback(async () => {
     if (!user) return;
 
-    const initializeProgress = async () => {
-      try {
-        setLoading(true);
+    try {
+      setLoading(true);
 
-        // 并行加载学习统计和课程进度
-        const [statsResult, coursesResult] = await Promise.all([
-          getLearningStats(),
-          getAllCourses() // 暂时获取所有课程，后续可以添加用户课程过滤
-        ]);
+      // 并行加载学习统计和课程进度
+      const [statsResult, coursesResult] = await Promise.all([
+        getLearningStats(),
+        getAllCourses() // 暂时获取所有课程，后续可以添加用户课程过滤
+      ]);
 
-        if (statsResult) {
-          setLearningStats(statsResult);
-        }
+      if (statsResult) {
+        setLearningStats(statsResult);
+      }
 
-        if (coursesResult && coursesResult.length > 0) {
-          // 获取每个课程的详细进度
-          const coursesWithProgress = await Promise.all(
-            coursesResult.map(async (course: Course) => {
+      if (coursesResult && coursesResult.length > 0) {
+        // 批量获取课程进度，限制并发数量以提升性能
+        const batchSize = 5;
+        const coursesWithProgress: Array<Course & { progress?: any }> = [];
+        
+        for (let i = 0; i < coursesResult.length; i += batchSize) {
+          const batch = coursesResult.slice(i, i + batchSize);
+          const batchResults = await Promise.all(
+            batch.map(async (course: Course) => {
               const progressResult = await getCourseProgress(course.id as string);
               return {
                 ...course,
@@ -68,40 +76,43 @@ export default function ProgressPage() {
               };
             })
           );
-
-          setCourseProgresses(coursesWithProgress);
-          
-          // 获取最近学习的课程（按最后学习时间排序）
-          const recentlyStudied = coursesWithProgress
-            .filter(course => course.progress && course.progress.lastWatchedAt)
-            .sort((a, b) => {
-              const aTime = a.progress?.lastWatchedAt;
-              const bTime = b.progress?.lastWatchedAt;
-              if (!aTime || !bTime) return 0;
-              return new Date(bTime).getTime() - new Date(aTime).getTime();
-            })
-            .slice(0, 5);
-          
-          setRecentCourses(recentlyStudied);
+          coursesWithProgress.push(...batchResults);
         }
 
-      } catch (error) {
-        console.error('加载学习进度失败:', error);
-        toast.error('加载学习进度失败');
-      } finally {
-        setLoading(false);
+        setCourseProgresses(coursesWithProgress);
+        
+        // 获取最近学习的课程（按最后学习时间排序）
+        const recentlyStudied = coursesWithProgress
+          .filter(course => course.progress && course.progress.lastStudyTime)
+          .sort((a, b) => {
+            const aTime = a.progress?.lastStudyTime;
+            const bTime = b.progress?.lastStudyTime;
+            if (!aTime || !bTime) return 0;
+            return new Date(bTime).getTime() - new Date(aTime).getTime();
+          })
+          .slice(0, 5);
+        
+        setRecentCourses(recentlyStudied);
       }
-    };
 
-    initializeProgress();
+    } catch (error) {
+      console.error('加载学习进度失败:', error);
+      toast.error('加载学习进度失败');
+    } finally {
+      setLoading(false);
+    }
   }, [user, getCourseProgress, getLearningStats]);
 
+  useEffect(() => {
+    initializeProgress();
+  }, [initializeProgress]);
+
   /**
-   * 格式化时长显示
+   * 格式化时长显示（优化版本）
    * @param seconds 秒数
    * @returns 格式化的时长字符串
    */
-  const formatDuration = (seconds: number): string => {
+  const formatDuration = useCallback((seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     
@@ -109,14 +120,14 @@ export default function ProgressPage() {
       return `${hours}小时${minutes}分钟`;
     }
     return `${minutes}分钟`;
-  };
+  }, []);
 
   /**
-   * 格式化日期显示
+   * 格式化日期显示（优化版本）
    * @param dateString 日期字符串
    * @returns 格式化的日期字符串
    */
-  const formatDate = (dateString: string): string => {
+  const formatDate = useCallback((dateString: string): string => {
     const date = new Date(dateString);
     const now = new Date();
     const diffTime = now.getTime() - date.getTime();
@@ -131,23 +142,31 @@ export default function ProgressPage() {
     } else {
       return date.toLocaleDateString('zh-CN');
     }
-  };
+  }, []);
 
   /**
-   * 继续学习课程
+   * 继续学习课程（优化版本）
    * @param courseId 课程ID
    */
-  const continueLearning = (courseId: string) => {
+  const continueLearning = useCallback((courseId: string) => {
     router.push(`/courses/${courseId}/learn`);
-  };
+  }, [router]);
 
   /**
-   * 查看课程详情
+   * 查看课程详情（优化版本）
    * @param courseId 课程ID
    */
-  const viewCourse = (courseId: string) => {
+  const viewCourse = useCallback((courseId: string) => {
     router.push(`/courses/${courseId}`);
-  };
+  }, [router]);
+
+  /**
+   * 切换标签页（优化版本）
+   * @param tab 标签页键值
+   */
+  const handleTabChange = useCallback((tab: string) => {
+    setActiveTab(tab);
+  }, []);
 
   if (loading) {
     return (
@@ -181,7 +200,7 @@ export default function ProgressPage() {
             ].map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
-                onClick={() => setActiveTab(key)}
+                onClick={() => handleTabChange(key)}
                 className={`flex items-center px-1 py-4 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === key
                     ? 'border-blue-500 text-blue-600'
@@ -201,65 +220,46 @@ export default function ProgressPage() {
         {activeTab === 'overview' && (
           <div className="space-y-8">
             {/* 学习统计卡片 */}
-            {learningStats && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="flex items-center">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <BookOpen className="h-6 w-6 text-blue-600" />
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">学习中课程</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {learningStats.totalCourses - learningStats.completedCourses}
-                      </p>
-                    </div>
-                  </div>
+            {learningStats && useMemo(() => {
+              const statsCards = [
+                {
+                  icon: BookOpen,
+                  bgColor: 'bg-blue-100',
+                  iconColor: 'text-blue-600',
+                  label: '学习中课程',
+                  value: learningStats.totalCourses - learningStats.completedCourses
+                },
+                {
+                  icon: CheckCircle,
+                  bgColor: 'bg-green-100',
+                  iconColor: 'text-green-600',
+                  label: '已完成课程',
+                  value: learningStats.completedCourses
+                },
+                {
+                  icon: Clock,
+                  bgColor: 'bg-purple-100',
+                  iconColor: 'text-purple-600',
+                  label: '总学习时长',
+                  value: formatDuration(learningStats.totalWatchTime)
+                },
+                {
+                  icon: Target,
+                  bgColor: 'bg-orange-100',
+                  iconColor: 'text-orange-600',
+                  label: '连续学习',
+                  value: `${learningStats.streakDays}天`
+                }
+              ];
+
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {statsCards.map((card, index) => (
+                    <StatsCard key={index} {...card} />
+                  ))}
                 </div>
-                
-                <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="flex items-center">
-                    <div className="p-2 bg-green-100 rounded-lg">
-                      <CheckCircle className="h-6 w-6 text-green-600" />
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">已完成课程</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {learningStats.completedCourses}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="flex items-center">
-                    <div className="p-2 bg-purple-100 rounded-lg">
-                      <Clock className="h-6 w-6 text-purple-600" />
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">总学习时长</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {formatDuration(learningStats.totalWatchTime)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="flex items-center">
-                    <div className="p-2 bg-orange-100 rounded-lg">
-                      <Target className="h-6 w-6 text-orange-600" />
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">连续学习</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {learningStats.streakDays}天
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+              );
+            }, [learningStats, formatDuration])}
 
             {/* 最近学习的课程 */}
             <div className="bg-white rounded-lg shadow-sm">
@@ -281,7 +281,7 @@ export default function ProgressPage() {
                             <h3 className="font-medium text-gray-900">{course.title}</h3>
                             <div className="flex items-center space-x-4 text-sm text-gray-600">
                               <span>进度: {Math.round(course.progress?.progressPercentage || 0)}%</span>
-                              <span>最后学习: {formatDate(course.progress?.lastWatchedAt)}</span>
+                              <span>最后学习: {formatDate(course.progress?.lastStudyTime)}</span>
                             </div>
                           </div>
                         </div>
@@ -319,80 +319,37 @@ export default function ProgressPage() {
               <h2 className="text-lg font-semibold text-gray-900">课程进度详情</h2>
             </div>
             <div className="p-6">
-              {courseProgresses.length > 0 ? (
-                <div className="space-y-6">
-                  {courseProgresses.map((course) => (
-                    <div key={course.id as string} className="border border-gray-200 rounded-lg p-6">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-start space-x-4">
-                          <Image
-                             src={course.imageUrl || `https://trae-api-sg.mchost.guru/api/ide/v1/text_to_image?prompt=course%20thumbnail%20${encodeURIComponent(course.title)}&image_size=square`}
-                             alt={course.title}
-                             className="w-16 h-16 rounded-lg object-cover"
-                             width={64}
-                             height={64}
-                          />
-                          <div>
-                            <h3 className="text-lg font-semibold text-gray-900">{course.title}</h3>
-                            <p className="text-sm text-gray-600 mt-1">{course.description}</p>
-                            {course.progress && (
-                              <div className="flex items-center space-x-4 mt-2 text-sm text-gray-600">
-                                <span>已完成: {course.progress.completedLessons} / {course.progress.totalLessons} 课时</span>
-                                <span>学习时长: {formatDuration(course.progress.totalWatchTime)}</span>
-                                {course.progress.lastWatchedAt && (
-                                  <span>最后学习: {formatDate(course.progress.lastWatchedAt)}</span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => viewCourse(course.id as string)}
-                            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                          >
-                            查看详情
-                          </button>
-                          {course.progress && course.progress.progressPercentage < 100 && (
-                            <button
-                              onClick={() => continueLearning(course.id as string)}
-                              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                            >
-                              继续学习
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {course.progress && (
-                        <div>
-                          <div className="flex justify-between text-sm text-gray-600 mb-2">
-                            <span>课程进度</span>
-                            <span>{Math.round(course.progress.progressPercentage)}%</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${course.progress.progressPercentage}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">还没有报名任何课程</p>
-                  <button
-                    onClick={() => router.push('/courses')}
-                    className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    浏览课程
-                  </button>
-                </div>
-              )}
+              {useMemo(() => {
+                return courseProgresses.length > 0 ? (
+                  <div className="space-y-6">
+                    {courseProgresses.map((course) => (
+                      <CourseProgressCard
+                        key={course.id as string}
+                        courseId={course.id as string}
+                        title={course.title}
+                        description={course.description}
+                        imageUrl={course.imageUrl || `https://trae-api-sg.mchost.guru/api/ide/v1/text_to_image?prompt=course%20thumbnail%20${encodeURIComponent(course.title)}&image_size=square`}
+                        progress={course.progress}
+                        onContinueLearning={continueLearning}
+                        onViewDetails={viewCourse}
+                        formatDate={formatDate}
+                        formatDuration={formatDuration}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600">还没有报名任何课程</p>
+                    <button
+                      onClick={() => router.push('/courses')}
+                      className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      浏览课程
+                    </button>
+                  </div>
+                );
+              }, [courseProgresses, continueLearning, viewCourse, formatDate, formatDuration])}
             </div>
           </div>
         )}

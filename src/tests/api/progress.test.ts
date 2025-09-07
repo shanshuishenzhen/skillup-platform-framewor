@@ -38,12 +38,12 @@ interface CourseProgress {
   id: string;
   userId: string;
   courseId: string;
-  progress: number; // 0-100
+  courseProgressPercentage: number; // 0-100
   status: 'not_started' | 'in_progress' | 'completed' | 'paused';
   startedAt: Date;
   completedAt?: Date;
   lastAccessedAt: Date;
-  totalTimeSpent: number; // 分钟
+  totalWatchTime: number; // 分钟
   completedLessons: number;
   totalLessons: number;
   currentLessonId?: string;
@@ -62,12 +62,12 @@ interface LessonProgress {
   userId: string;
   courseId: string;
   lessonId: string;
-  progress: number; // 0-100
+  progressPercentage: number; // 0-100
   status: 'not_started' | 'in_progress' | 'completed';
   startedAt: Date;
   completedAt?: Date;
   timeSpent: number; // 分钟
-  watchTime?: number; // 视频观看时间（秒）
+  currentTime?: number; // 视频观看时间（秒）
   readingProgress?: number; // 阅读进度百分比
   interactionCount: number; // 互动次数
   lastPosition?: number; // 最后观看/阅读位置
@@ -90,7 +90,7 @@ interface LearningSession {
   endTime?: Date;
   duration: number; // 分钟
   activityType: 'video' | 'reading' | 'quiz' | 'assignment' | 'discussion';
-  progress: number;
+  progressPercentage: number;
   metadata: {
     device?: string;
     browser?: string;
@@ -152,7 +152,7 @@ interface LearningPath {
     prerequisites?: string[];
   }[];
   skills: string[];
-  progress: number;
+  courseProgressPercentage: number;
   status: 'not_started' | 'in_progress' | 'completed';
   createdAt: Date;
   updatedAt: Date;

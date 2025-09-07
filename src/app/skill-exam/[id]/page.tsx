@@ -33,7 +33,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useParams } from 'next/navigation';
-import { ExamService } from '@/services/examService';
+import { examService } from '@/services/examService';
 
 // 类型定义
 interface ExamDetail {
@@ -260,7 +260,7 @@ export default function ExamDetailPage() {
     setRegistering(true);
     try {
       // 调用实际API
-      await ExamService.enrollExam(exam.id, 'current-user-id'); // TODO: 从认证上下文获取用户ID
+      await examService.enrollExam(exam.id, 'current-user-id'); // TODO: 从认证上下文获取用户ID
       
       const newRegistration: UserRegistration = {
         id: 'reg-new',
@@ -286,7 +286,7 @@ export default function ExamDetailPage() {
     try {
       setLoading(true);
       // 调用开始考试API
-      const submission = await ExamService.startExam(exam.id, 'current-user-id'); // TODO: 从认证上下文获取用户ID
+      const submission = await examService.startExam(exam.id, 'current-user-id'); // TODO: 从认证上下文获取用户ID
       
       toast.success('考试开始，正在跳转...');
       
@@ -307,7 +307,7 @@ export default function ExamDetailPage() {
     setRegistering(true);
     try {
       // 调用取消报名API
-      await ExamService.cancelEnrollment(exam.id, 'current-user-id'); // TODO: 从认证上下文获取用户ID
+      await examService.cancelEnrollment(exam.id, 'current-user-id'); // TODO: 从认证上下文获取用户ID
       
       setUserRegistration(null);
       toast.success('已取消报名');

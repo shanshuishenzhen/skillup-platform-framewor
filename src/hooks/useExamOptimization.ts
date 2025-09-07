@@ -216,12 +216,12 @@ export function useExamOptimization(config: OptimizationConfig = {}) {
     return getCachedData(cacheKey, async () => {
       const result = await examService.getExams({
         page,
-        pageSize,
+        limit: pageSize,
         ...filters
       });
       
-      // 预加载下一页
-      if (result.data.length === pageSize) {
+      // 预加载下一页 - 修复：使用正确的属性名
+      if (result && result.exams && result.exams.length === pageSize) {
         setTimeout(() => {
           loadExamsBatch(page + 1, pageSize, filters);
         }, 1000);

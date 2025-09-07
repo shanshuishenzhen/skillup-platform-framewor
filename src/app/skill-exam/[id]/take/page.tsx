@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useParams, useRouter } from 'next/navigation';
-import { ExamService } from '@/services/examService';
+import { examService } from '@/services/examService';
 
 // 类型定义
 interface Question {
@@ -168,7 +168,7 @@ export default function TakeExamPage() {
       setLoading(true);
       try {
         // 获取考试数据和用户答题记录
-        const examData = await ExamService.getExamForTaking(examId);
+        const examData = await examService.getExamForTaking(examId);
         
         if (!examData.attempt) {
           toast.error('未找到有效的考试记录');
@@ -379,7 +379,7 @@ export default function TakeExamPage() {
     setAutoSaving(true);
     try {
       // 调用保存答案的API
-      await ExamService.saveAnswers({
+      await examService.saveAnswers({
         attemptId: attempt.id,
         answers: Object.entries(answers).map(([questionId, answer]) => ({
           questionId,
@@ -448,7 +448,7 @@ export default function TakeExamPage() {
       await autoSave();
       
       // 提交考试
-      const result = await ExamService.submitExam({
+      const result = await examService.submitExam({
         attemptId: attempt.id,
         answers: Object.entries(answers).map(([questionId, answer]) => ({
           questionId,
@@ -482,7 +482,7 @@ export default function TakeExamPage() {
       await autoSave();
       
       // 强制提交考试
-      const result = await ExamService.submitExam({
+      const result = await examService.submitExam({
         attemptId: attempt.id,
         answers: Object.entries(answers).map(([questionId, answer]) => ({
           questionId,

@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Search, Filter, Clock, Users, Star, RefreshCw } from 'lucide-react';
+import { Search, Filter, Clock, Users, Star, RefreshCw, PlayCircle, CheckCircle } from 'lucide-react';
 import { aiDataGeneratorService } from '@/services/aiDataGeneratorService';
+import { useLearningProgress } from '@/hooks/useLearningProgress';
 import type { VirtualCourse } from '@/services/aiDataGeneratorService';
 
 const categories = [
@@ -35,6 +36,8 @@ export default function CoursesPage() {
   const [sortBy, setSortBy] = useState('popular');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const { getCourseProgress } = useLearningProgress();
+  const [courseProgresses, setCourseProgresses] = useState<Record<string, any>>({});
 
   // 加载课程数据
   const loadCourses = async () => {
@@ -44,7 +47,7 @@ export default function CoursesPage() {
       setAllCourses(virtualCourses);
       setCourses(virtualCourses);
     } catch (error) {
-      console.error('生成课程数据失败:', error);
+      console.error('加载课程数据失败:', error);
     } finally {
       setLoading(false);
     }
@@ -55,6 +58,7 @@ export default function CoursesPage() {
     try {
       setRefreshing(true);
       // 清除缓存并重新生成
+      aiDataGeneratorService.clearCache();
       const virtualCourses = await aiDataGeneratorService.generateCourses(12);
       setAllCourses(virtualCourses);
       setCourses(virtualCourses);
@@ -69,6 +73,24 @@ export default function CoursesPage() {
   useEffect(() => {
     loadCourses();
   }, []);
+
+  // 加载课程进度
+  useEffect(() => {
+    const loadProgresses = async () => {
+      for (const course of courses) {
+        try {
+          const progress = await getCourseProgress(course.id);
+          setCourseProgresses(prev => ({
+            ...prev,
+            [course.id]: progress
+          }));
+        } catch (error) {
+          console.error(`获取课程 ${course.id} 进度失败:`, error);
+        }
+      }
+    };
+    loadProgresses();
+  }, [courses, getCourseProgress]);
 
   // 过滤和排序课程
   useEffect(() => {
@@ -257,15 +279,44 @@ export default function CoursesPage() {
                     </div>
                   </div>
                   
+                  {/* 学习进度 */}
+                  {courseProgresses[course.id] && (
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+                        <span>学习进度</span>
+                        <span>{Math.round(courseProgresses[course.id].progressPercentage || 0)}%</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${courseProgresses[course.id].progressPercentage || 0}%` }}
+                        ></div>
+                      </div>
+                      {courseProgresses[course.id].progressPercentage === 100 && (
+                        <div className="flex items-center text-green-600 text-sm mt-2">
+                          <CheckCircle className="w-4 h-4 mr-1" />
+                          <span>已完成</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
                   <div className="flex items-center justify-between">
                     <div className="text-2xl font-bold text-blue-600">
                       ¥{course.price}
                     </div>
                     <Link
-                      href={`/courses/${course.id}`}
-                      className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors duration-200"
+                      href={courseProgresses[course.id]?.progressPercentage > 0 ? `/courses/${course.id}/learn` : `/courses/${course.id}`}
+                      className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors duration-200 flex items-center gap-2"
                     >
-                      开始学习
+                      {courseProgresses[course.id]?.progressPercentage > 0 ? (
+                        <>
+                          <PlayCircle className="w-4 h-4" />
+                          继续学习
+                        </>
+                      ) : (
+                        '开始学习'
+                      )}
                     </Link>
                   </div>
                 </div>

@@ -1,9 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 import { getSupabaseAdminClient } from '@/lib/supabase';
 import { parseJWTToken } from '@/utils/jwt';
 import { ErrorHandler, AppError, ErrorType } from '@/utils/errorHandler';
+import { 
+  saveLearningProgress, 
+  getLearningProgress, 
+  getCourseProgress, 
+  getLearningStats,
+  markLessonCompleted,
+  resetLessonProgress 
+} from '@/services/learningProgressService';
 
 const supabase = getSupabaseAdminClient();
+
+/**
+ * 验证JWT令牌
+ * @param token JWT令牌
+ * @returns 验证结果
+ */
+function verifyToken(token: string): { valid: boolean; userId?: string; error?: string } {
+  try {
+    const decoded = parseJWTToken(token);
+    if (!decoded || !decoded.userId) {
+      return { valid: false, error: '无效的令牌' };
+    }
+    return { valid: true, userId: decoded.userId };
+  } catch (error) {
+    return { valid: false, error: '令牌解析失败' };
+  }
+}
 
 /**
  * 学习进度API接口
@@ -57,7 +84,7 @@ export async function GET(request: NextRequest) {
           );
         }
         
-        const lessonProgress = await learningProgressService.getLearningProgress(
+        const lessonProgress = await getLearningProgress(
           userId,
           courseId,
           lessonId
@@ -74,7 +101,7 @@ export async function GET(request: NextRequest) {
           );
         }
         
-        const courseProgress = await learningProgressService.getCourseProgress(
+        const courseProgress = await getCourseProgress(
           userId,
           courseId
         );
@@ -83,7 +110,7 @@ export async function GET(request: NextRequest) {
 
       case 'stats':
         // 获取用户学习统计
-        const learningStats = await learningProgressService.getLearningStats(userId);
+        const learningStats = await getLearningStats(userId);
         return NextResponse.json(learningStats);
 
       default:
@@ -163,7 +190,7 @@ export async function POST(request: NextRequest) {
     }
     
     // 保存学习进度
-    const result = await learningProgressService.saveLearningProgress(
+    const result = await saveLearningProgress(
       userId,
       courseId,
       lessonId,
@@ -235,8 +262,8 @@ export async function PUT(request: NextRequest) {
     
     // 更新完成状态
     const result = completed
-      ? await learningProgressService.markLessonCompleted(userId, courseId, lessonId)
-      : await learningProgressService.resetLessonProgress(userId, courseId, lessonId);
+      ? await markLessonCompleted(userId, courseId, lessonId)
+      : await resetLessonProgress(userId, courseId, lessonId);
     
     return NextResponse.json(result);
     

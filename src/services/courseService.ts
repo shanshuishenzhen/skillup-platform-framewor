@@ -12,6 +12,12 @@ import {
   ErrorSeverity,
   RetryConfig 
 } from '../utils/errorHandler';
+import { 
+  getMockCourse, 
+  getMockChapters, 
+  isMockCourse 
+} from './mockCourseData';
+import { apiCache } from '../utils/apiCache';
 
 export interface Course {
   id: string;
@@ -96,6 +102,15 @@ function getRetryConfig(): RetryConfig {
  */
 export async function getAllCourses(filters: CourseFilters = {}): Promise<Course[]> {
   try {
+    // 生成缓存键
+    const cacheKey = `courses:all:${JSON.stringify(filters)}`;
+    
+    // 尝试从缓存获取数据
+    const cachedCourses = await apiCache.get<Course[]>(cacheKey);
+    if (cachedCourses) {
+      return cachedCourses;
+    }
+
     // 使用重试机制进行数据库查询
     const courses = await withRetry(async () => {
       let query = supabase
@@ -164,7 +179,12 @@ export async function getAllCourses(filters: CourseFilters = {}): Promise<Course
       return courses || [];
     }, getRetryConfig());
 
-    return courses.map(transformCourseData);
+    const transformedCourses = courses.map(transformCourseData);
+    
+    // 缓存结果（5分钟）
+    await apiCache.set(cacheKey, transformedCourses, 5 * 60 * 1000);
+    
+    return transformedCourses;
   } catch (error) {
     if (error instanceof AppError) {
       console.error('获取课程列表失败:', error.message);
@@ -186,6 +206,23 @@ export async function getCourseById(
   includeChapters: boolean = false
 ): Promise<Course | null> {
   try {
+    // 优先检查模拟数据
+    if (isMockCourse(courseId)) {
+      const mockCourse = getMockCourse(courseId);
+      if (mockCourse) {
+        return mockCourse;
+      }
+    }
+
+    // 生成缓存键
+    const cacheKey = `course:${courseId}:chapters:${includeChapters}`;
+    
+    // 尝试从缓存获取数据
+    const cachedCourse = await apiCache.get<Course>(cacheKey);
+    if (cachedCourse) {
+      return cachedCourse;
+    }
+
     // 使用重试机制进行数据库查询
     const course = await withRetry(async () => {
       let selectQuery = `
@@ -261,7 +298,12 @@ export async function getCourseById(
       );
     }
 
-    return transformCourseData(course as Record<string, unknown>);
+    const transformedCourse = transformCourseData(course as Record<string, unknown>);
+    
+    // 缓存结果（10分钟）
+    await apiCache.set(cacheKey, transformedCourse, 10 * 60 * 1000);
+    
+    return transformedCourse;
   } catch (error) {
     if (error instanceof AppError && error.code === 'COURSE_NOT_FOUND') {
       return null;
@@ -289,6 +331,15 @@ export async function searchCourses(
   try {
     if (!query.trim()) {
       return getAllCourses(filters);
+    }
+
+    // 生成缓存键
+    const cacheKey = `courses:search:${query}:${JSON.stringify(filters)}`;
+    
+    // 尝试从缓存获取数据
+    const cachedResults = await apiCache.get<Course[]>(cacheKey);
+    if (cachedResults) {
+      return cachedResults;
     }
 
     // 使用重试机制进行数据库查询
@@ -345,7 +396,12 @@ export async function searchCourses(
       return courses || [];
     }, getRetryConfig());
 
-    return courses.map(transformCourseData);
+    const transformedCourses = courses.map(transformCourseData);
+    
+    // 缓存搜索结果（3分钟）
+    await apiCache.set(cacheKey, transformedCourses, 3 * 60 * 1000);
+    
+    return transformedCourses;
   } catch (error) {
     if (error instanceof AppError) {
       console.error('搜索课程失败:', error.message);
@@ -367,6 +423,15 @@ export async function getCoursesByCategory(
   filters: CourseFilters = {}
 ): Promise<Course[]> {
   try {
+    // 生成缓存键
+    const cacheKey = `courses:category:${category}:${JSON.stringify(filters)}`;
+    
+    // 尝试从缓存获取数据
+    const cachedResults = await apiCache.get<Course[]>(cacheKey);
+    if (cachedResults) {
+      return cachedResults;
+    }
+
     // 使用重试机制进行数据库查询
     const courses = await withRetry(async () => {
       let query = supabase
@@ -422,7 +487,12 @@ export async function getCoursesByCategory(
       return courses || [];
     }, getRetryConfig());
 
-    return courses.map(transformCourseData);
+    const transformedCourses = courses.map(transformCourseData);
+    
+    // 缓存分类课程结果（5分钟）
+    await apiCache.set(cacheKey, transformedCourses, 5 * 60 * 1000);
+    
+    return transformedCourses;
   } catch (error) {
     if (error instanceof AppError) {
       console.error('获取分类课程失败:', error.message);
@@ -440,6 +510,15 @@ export async function getCoursesByCategory(
  */
 export async function getPopularCourses(limit: number = 10): Promise<Course[]> {
   try {
+    // 生成缓存键
+    const cacheKey = `courses:popular:${limit}`;
+    
+    // 尝试从缓存获取数据
+    const cachedResults = await apiCache.get<Course[]>(cacheKey);
+    if (cachedResults) {
+      return cachedResults;
+    }
+
     // 使用重试机制进行数据库查询
     const courses = await withRetry(async () => {
       const { data: courses, error } = await supabase
@@ -467,7 +546,12 @@ export async function getPopularCourses(limit: number = 10): Promise<Course[]> {
       return courses || [];
     }, getRetryConfig());
 
-    return courses.map(transformCourseData);
+    const transformedCourses = courses.map(transformCourseData);
+    
+    // 缓存热门课程结果（10分钟）
+    await apiCache.set(cacheKey, transformedCourses, 10 * 60 * 1000);
+    
+    return transformedCourses;
   } catch (error) {
     if (error instanceof AppError) {
       console.error('获取热门课程失败:', error.message);
@@ -485,6 +569,15 @@ export async function getPopularCourses(limit: number = 10): Promise<Course[]> {
  */
 export async function getFreeCourses(limit: number = 10): Promise<Course[]> {
   try {
+    // 生成缓存键
+    const cacheKey = `courses:free:${limit}`;
+    
+    // 尝试从缓存获取数据
+    const cachedResults = await apiCache.get<Course[]>(cacheKey);
+    if (cachedResults) {
+      return cachedResults;
+    }
+
     // 使用重试机制进行数据库查询
     const courses = await withRetry(async () => {
       const { data: courses, error } = await supabase
@@ -513,7 +606,12 @@ export async function getFreeCourses(limit: number = 10): Promise<Course[]> {
       return courses || [];
     }, getRetryConfig());
 
-    return courses.map(transformCourseData);
+    const transformedCourses = courses.map(transformCourseData);
+    
+    // 缓存免费课程结果（10分钟）
+    await apiCache.set(cacheKey, transformedCourses, 10 * 60 * 1000);
+    
+    return transformedCourses;
   } catch (error) {
     if (error instanceof AppError) {
       console.error('获取免费课程失败:', error.message);
@@ -531,6 +629,20 @@ export async function getFreeCourses(limit: number = 10): Promise<Course[]> {
  */
 export async function getCourseChapters(courseId: string): Promise<Chapter[]> {
   try {
+    // 优先检查模拟数据
+    if (isMockCourse(courseId)) {
+      return getMockChapters(courseId);
+    }
+
+    // 生成缓存键
+    const cacheKey = `chapters:${courseId}`;
+    
+    // 尝试从缓存获取数据
+    const cachedChapters = await apiCache.get<Chapter[]>(cacheKey);
+    if (cachedChapters) {
+      return cachedChapters;
+    }
+
     // 使用重试机制进行数据库查询
     const chapters = await withRetry(async () => {
       const { data: chapters, error } = await supabase
@@ -558,24 +670,29 @@ export async function getCourseChapters(courseId: string): Promise<Chapter[]> {
       return chapters || [];
     }, getRetryConfig());
 
-    return chapters.map(chapter => ({
+    const transformedChapters = chapters.map(chapter => ({
       id: chapter.id,
       courseId: chapter.course_id,
       title: chapter.title,
       description: chapter.description,
       orderIndex: chapter.order_index,
-      duration: chapter.duration,
+      duration: chapter.duration_minutes || 0,
       videos: chapter.videos?.map((video: Record<string, unknown>) => ({
         id: video.id,
         chapterId: video.chapter_id,
         title: video.title,
         description: video.description,
         videoUrl: video.video_url,
-        duration: video.duration,
-        orderIndex: video.order_index,
-        isPreview: video.is_preview
+        duration: Math.round((video.duration_seconds as number || 0) / 60), // 转换为分钟
+        orderIndex: video.order_index || 0,
+        isPreview: video.is_preview || false
       })).sort((a: Video, b: Video) => a.orderIndex - b.orderIndex) || []
     }));
+    
+    // 缓存章节结果（15分钟）
+    await apiCache.set(cacheKey, transformedChapters, 15 * 60 * 1000);
+    
+    return transformedChapters;
   } catch (error) {
     if (error instanceof AppError) {
       console.error('获取课程章节失败:', error.message);
@@ -593,6 +710,15 @@ export async function getCourseChapters(courseId: string): Promise<Chapter[]> {
  */
 export async function getCoursePreviewVideos(courseId: string): Promise<Video[]> {
   try {
+    // 生成缓存键
+    const cacheKey = `preview-videos:${courseId}`;
+    
+    // 尝试从缓存获取数据
+    const cachedVideos = await apiCache.get<Video[]>(cacheKey);
+    if (cachedVideos) {
+      return cachedVideos;
+    }
+
     // 使用重试机制进行数据库查询
     const videos = await withRetry(async () => {
       const { data: videos, error } = await supabase
@@ -621,16 +747,21 @@ export async function getCoursePreviewVideos(courseId: string): Promise<Video[]>
       return videos || [];
     }, getRetryConfig());
 
-    return videos.map(video => ({
+    const transformedVideos = videos.map(video => ({
       id: video.id,
       chapterId: video.chapter_id,
       title: video.title,
       description: video.description,
       videoUrl: video.video_url,
-      duration: video.duration,
-      orderIndex: video.order_index,
-      isPreview: video.is_preview
+      duration: Math.round((video.duration_seconds as number || 0) / 60), // 转换为分钟
+      orderIndex: video.order_index || 0,
+      isPreview: video.is_preview || false
     }));
+    
+    // 缓存预览视频结果（15分钟）
+    await apiCache.set(cacheKey, transformedVideos, 15 * 60 * 1000);
+    
+    return transformedVideos;
   } catch (error) {
     if (error instanceof AppError) {
       console.error('获取课程预览视频失败:', error.message);
@@ -674,17 +805,17 @@ function transformCourseData(dbCourse: Record<string, unknown>): Course {
       courseId: chapter.course_id as string,
       title: chapter.title as string,
       description: chapter.description as string,
-      orderIndex: chapter.order_index as number,
-      duration: chapter.duration as number,
+      orderIndex: chapter.order_index as number || 0,
+      duration: chapter.duration_minutes as number || 0,
       videos: (chapter.videos as any[])?.map((video: Record<string, unknown>) => ({
         id: video.id as string,
         chapterId: video.chapter_id as string,
         title: video.title as string,
         description: video.description as string,
         videoUrl: video.video_url as string,
-        duration: video.duration as number,
-        orderIndex: video.order_index as number,
-        isPreview: video.is_preview as boolean
+        duration: Math.round((video.duration_seconds as number || 0) / 60), // 转换为分钟
+        orderIndex: video.order_index as number || 0,
+        isPreview: video.is_preview as boolean || false
       })).sort((a: Video, b: Video) => a.orderIndex - b.orderIndex) || []
     })).sort((a: Chapter, b: Chapter) => a.orderIndex - b.orderIndex) || []
   };

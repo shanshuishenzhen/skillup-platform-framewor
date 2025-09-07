@@ -9,6 +9,8 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { generalRateLimit } from '../../middleware/security';
 import { ErrorHandler, AppError, ErrorType } from '@/utils/errorHandler';
+import { registerUser } from '@/services/userService';
+import { extractVerificationCode } from '@/types/dictionary';
 
 const supabase = getSupabaseAdminClient();
 

@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { withRetry, createError, AppError, ErrorType, ErrorSeverity, RetryConfig } from '@/utils/errorHandler';
+import { isMockCourse, getMockCourseVideos } from './mockCourseData';
 
 /**
  * 学习进度记录接口
@@ -112,6 +113,112 @@ export async function saveLearningProgress(
   duration: number
 ): Promise<{ success: boolean; message: string; data?: LearningProgress }> {
   try {
+    // 检查是否为模拟课程
+    if (isMockCourse(courseId)) {
+      // 对于模拟课程，仍然保存到数据库以记录用户的学习进度
+      // 但如果保存失败，不抛出错误，而是返回成功状态
+      try {
+        const result = await withRetry(async () => {
+          // 计算完成百分比
+          const progressPercentage = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
+          const isCompleted = progressPercentage >= 90; // 观看90%以上视为完成
+
+          // 检查是否已存在记录
+          const { data: existingProgress } = await supabase
+            .from('learning_progress')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('course_id', courseId)
+            .eq('lesson_id', lessonId)
+            .single();
+
+          const progressData = {
+            user_id: userId,
+            course_id: courseId,
+            lesson_id: lessonId,
+            current_time_seconds: currentTime,
+            duration: duration,
+            progress_percentage: progressPercentage,
+            is_completed: isCompleted,
+            last_updated_at: new Date().toISOString()
+          };
+
+          let dbResult;
+          if (existingProgress) {
+            // 更新现有记录
+            dbResult = await supabase
+              .from('learning_progress')
+              .update(progressData)
+              .eq('id', existingProgress.id)
+              .select()
+              .single();
+          } else {
+            // 创建新记录
+            dbResult = await supabase
+              .from('learning_progress')
+              .insert({
+                ...progressData,
+                created_at: new Date().toISOString()
+              })
+              .select()
+              .single();
+          }
+
+          if (dbResult.error) {
+            throw new Error(`数据库操作失败: ${dbResult.error.message}`);
+          }
+
+          return dbResult.data;
+        }, getRetryConfig());
+
+        const progress: LearningProgress = {
+          id: result.id,
+          userId: result.user_id,
+          courseId: result.course_id,
+          lessonId: result.lesson_id,
+          currentTime: result.current_time_seconds,
+          duration: result.duration,
+          progressPercentage: result.progress_percentage,
+          isCompleted: result.is_completed,
+          lastUpdatedAt: result.last_updated_at,
+          createdAt: result.created_at
+        };
+
+        return {
+          success: true,
+          message: '学习进度保存成功',
+          data: progress
+        };
+      } catch (error) {
+        // 对于模拟课程，即使保存失败也返回成功状态
+        console.warn('模拟课程进度保存失败，但不影响用户体验:', error);
+        
+        // 返回模拟的进度数据
+        const progressPercentage = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
+        const isCompleted = progressPercentage >= 90;
+        
+        const mockProgress: LearningProgress = {
+          id: `mock-${userId}-${courseId}-${lessonId}`,
+          userId,
+          courseId,
+          lessonId,
+          currentTime,
+          duration,
+          progressPercentage,
+          isCompleted,
+          lastUpdatedAt: new Date().toISOString(),
+          createdAt: new Date().toISOString()
+        };
+
+        return {
+          success: true,
+          message: '学习进度保存成功',
+          data: mockProgress
+        };
+      }
+    }
+
+    // 对于真实课程，执行正常的数据库操作
     const result = await withRetry(async () => {
       // 计算完成百分比
       const progressPercentage = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
@@ -232,6 +339,80 @@ export async function getLearningProgress(
   lessonId?: string
 ): Promise<{ success: boolean; data?: LearningProgress | LearningProgress[]; message: string }> {
   try {
+    // 检查是否为模拟课程
+    if (isMockCourse(courseId)) {
+      // 对于模拟课程，尝试从数据库获取进度，但不抛出错误
+      const { data: progressData, error } = await supabase
+        .from('learning_progress')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('course_id', courseId)
+        .eq('lesson_id', lessonId || '')
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') {
+        console.warn('获取模拟课程进度失败，使用默认值:', error);
+      }
+
+      if (lessonId) {
+        // 返回单个课时进度，如果没有记录则返回默认值
+        if (progressData) {
+          const progress: LearningProgress = {
+            id: progressData.id,
+            userId: progressData.user_id,
+            courseId: progressData.course_id,
+            lessonId: progressData.lesson_id,
+            currentTime: progressData.current_time_seconds,
+            duration: progressData.duration,
+            progressPercentage: progressData.progress_percentage,
+            isCompleted: progressData.is_completed,
+            lastUpdatedAt: progressData.last_updated_at,
+            createdAt: progressData.created_at
+          };
+          return {
+            success: true,
+            data: progress,
+            message: '获取学习进度成功'
+          };
+        } else {
+          // 返回默认进度
+          return {
+            success: true,
+            data: undefined,
+            message: '暂无学习进度'
+          };
+        }
+      } else {
+        // 返回课程所有进度
+        const { data: allProgressData } = await supabase
+          .from('learning_progress')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('course_id', courseId)
+          .order('last_updated_at', { ascending: false });
+
+        const progressList: LearningProgress[] = (allProgressData || []).map((item: any) => ({
+          id: item.id,
+          userId: item.user_id,
+          courseId: item.course_id,
+          lessonId: item.lesson_id,
+          currentTime: item.current_time_seconds,
+          duration: item.duration,
+          progressPercentage: item.progress_percentage,
+          isCompleted: item.is_completed,
+          lastUpdatedAt: item.last_updated_at,
+          createdAt: item.created_at
+        }));
+
+        return {
+          success: true,
+          data: progressList,
+          message: '获取课程学习进度成功'
+        };
+      }
+    }
+
+    // 对于数据库课程，使用原有逻辑
     const result = await withRetry(async () => {
       let query = supabase
         .from('learning_progress')
@@ -306,17 +487,17 @@ export async function getLearningProgress(
       };
     } else {
       const progressList: LearningProgress[] = result.map((item: any) => ({
-        id: item.id,
-        userId: item.user_id,
-        courseId: item.course_id,
-        lessonId: item.lesson_id,
-        currentTime: item.current_time_seconds,
-        duration: item.duration,
-        progressPercentage: item.progress_percentage,
-        isCompleted: item.is_completed,
-        lastUpdatedAt: item.last_updated_at,
-        createdAt: item.created_at
-      }));
+          id: item.id,
+          userId: item.user_id,
+          courseId: item.course_id,
+          lessonId: item.lesson_id,
+          currentTime: item.current_time_seconds,
+          duration: item.duration,
+          progressPercentage: item.progress_percentage,
+          isCompleted: item.is_completed,
+          lastUpdatedAt: item.last_updated_at,
+          createdAt: item.created_at
+        }));
 
       return {
         success: true,
@@ -359,7 +540,48 @@ export async function getCourseProgress(
   courseId: string
 ): Promise<{ success: boolean; data?: CourseProgress; message: string }> {
   try {
-    const { progressList, courseData } = await withRetry(async () => {
+    // 检查是否为模拟课程
+    if (isMockCourse(courseId)) {
+      // 对于模拟课程，获取模拟视频数据
+      const mockVideos = getMockCourseVideos(courseId);
+      
+      // 获取用户对该课程的学习进度（如果有的话）
+      const { data: progressList, error: progressError } = await supabase
+        .from('learning_progress')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('course_id', courseId);
+
+      if (progressError) {
+        console.warn('获取模拟课程进度失败，使用默认值:', progressError);
+      }
+
+      const totalLessons = mockVideos.length;
+      const completedLessons = (progressList || []).filter(p => p.is_completed).length;
+      const courseProgressPercentage = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
+      const totalWatchTime = (progressList || []).reduce((sum, p) => sum + p.current_time_seconds, 0);
+      const lastStudyTime = (progressList || []).length > 0 
+        ? Math.max(...(progressList || []).map(p => new Date(p.last_updated_at).getTime()))
+        : 0;
+
+      const courseProgress: CourseProgress = {
+        courseId,
+        totalLessons,
+        completedLessons,
+        courseProgressPercentage,
+        totalWatchTime,
+        lastStudyTime: new Date(lastStudyTime).toISOString()
+      };
+
+      return {
+        success: true,
+        data: courseProgress,
+        message: '获取课程进度成功'
+      };
+    }
+
+    // 对于数据库课程，使用原有逻辑
+    const { progressList, videos } = await withRetry(async () => {
       // 获取课程的所有课时进度
       const { data: progressList, error: progressError } = await supabase
         .from('learning_progress')
@@ -368,6 +590,7 @@ export async function getCourseProgress(
         .eq('course_id', courseId);
 
       if (progressError) {
+        console.error('获取学习进度失败:', progressError);
         throw createError(
           ErrorType.DATABASE_ERROR,
           '获取课程进度失败',
@@ -375,35 +598,65 @@ export async function getCourseProgress(
             code: 'GET_COURSE_PROGRESS_FAILED',
             statusCode: 500,
             severity: ErrorSeverity.MEDIUM,
-            context: { userId, additionalData: { courseId, error: progressError } }
+            context: { userId, additionalData: { courseId } },
+            originalError: progressError
           }
         );
       }
 
-      // 获取课程总课时数
-      const { data: courseData, error: courseError } = await supabase
-        .from('courses')
-        .select('lesson_count')
-        .eq('id', courseId)
-        .single();
+      // 查询章节信息
+      const { data: chapters, error: chaptersError } = await supabase
+        .from('chapters')
+        .select('id')
+        .eq('course_id', courseId);
 
-      if (courseError) {
+      if (chaptersError) {
+        console.error('查询章节失败:', chaptersError);
         throw createError(
           ErrorType.DATABASE_ERROR,
-          '获取课程信息失败',
+          '查询章节失败',
           {
-            code: 'GET_COURSE_INFO_FAILED',
+            code: 'GET_CHAPTERS_FAILED',
             statusCode: 500,
-            severity: ErrorSeverity.MEDIUM,
-            context: { userId, additionalData: { courseId, error: courseError } }
+            severity: ErrorSeverity.HIGH,
+            originalError: chaptersError
           }
         );
       }
 
-      return { progressList, courseData };
+      if (!chapters || chapters.length === 0) {
+        return {
+          progressList: progressList || [],
+          videos: []
+        };
+      }
+
+      const chapterIds = chapters.map(chapter => chapter.id);
+
+      // 查询视频总数
+      const { data: videos, error: videosError } = await supabase
+        .from('videos')
+        .select('id')
+        .in('chapter_id', chapterIds);
+
+      if (videosError) {
+        console.error('查询视频失败:', videosError);
+        throw createError(
+          ErrorType.DATABASE_ERROR,
+          '查询视频失败',
+          {
+            code: 'GET_VIDEOS_FAILED',
+            statusCode: 500,
+            severity: ErrorSeverity.HIGH,
+            originalError: videosError
+          }
+        );
+      }
+
+      return { progressList: progressList || [], videos: videos || [] };
     }, getRetryConfig());
 
-    const totalLessons = courseData.lesson_count || 0;
+    const totalLessons = videos?.length || 0;
     const completedLessons = progressList.filter(p => p.is_completed).length;
     const courseProgressPercentage = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
     const totalWatchTime = progressList.reduce((sum, p) => sum + p.current_time_seconds, 0);

@@ -1,0 +1,53 @@
+{
+  "timestamp": "2025-09-07T10:47:05.746Z",
+  "summary": {
+    "total": 1,
+    "passed": 0,
+    "failed": 1,
+    "passRate": 0,
+    "duration": 23,
+    "startTime": "2025-09-07T10:47:05.721Z",
+    "endTime": "2025-09-07T10:47:05.744Z"
+  },
+  "testResults": [
+    {
+      "testName": "管理员登录测试",
+      "module": "管理员登录测试",
+      "moduleKey": "admin-login",
+      "passed": false,
+      "message": "模块执行异常: TestUtils is not a constructor",
+      "timestamp": "2025-09-07T10:47:05.744Z",
+      "duration": 1,
+      "error": "TypeError: TestUtils is not a constructor\n    at new AdminLoginTest (D:\\50-skillup_platform\\tests\\exam-system\\tests\\admin-login.test.js:19:22)\n    at ExamSystemTestRunner.runTestModule (D:\\50-skillup_platform\\tests\\exam-system\\run-tests.js:168:28)\n    at ExamSystemTestRunner.runTests (D:\\50-skillup_platform\\tests\\exam-system\\run-tests.js:101:20)\n    at main (D:\\50-skillup_platform\\tests\\exam-system\\run-tests.js:349:35)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"
+    }
+  ],
+  "environment": {
+    "os": "win32 x64",
+    "nodeVersion": "v22.16.0",
+    "startTime": "2025-09-07T10:47:05.746Z",
+    "endTime": "2025-09-07T10:47:05.746Z",
+    "browser": "N/A",
+    "timezone": "Asia/Shanghai"
+  },
+  "configuration": {
+    "browser": {
+      "headless": false,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "slowMo": 100
+    },
+    "accounts": [
+      "admin",
+      "student",
+      "teacher"
+    ],
+    "reportFormats": [
+      "html",
+      "json",
+      "csv",
+      "summary"
+    ]
+  }
+}

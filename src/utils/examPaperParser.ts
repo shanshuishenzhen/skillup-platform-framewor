@@ -54,6 +54,8 @@ export interface ExamPaperQuestion {
 export interface ExamPaperParseResult {
   /** 试卷名称 */
   examTitle?: string;
+  /** 试卷ID（来自模板） */
+  paperId?: string;
   /** 题型分布 */
   typeDistribution: QuestionTypeDistribution[];
   /** 试卷题目 */
@@ -95,14 +97,16 @@ const DIFFICULTY_MAPPING: Record<string, QuestionDifficulty> = {
 /**
  * 解析题型分布工作表
  * @param worksheet - Excel工作表对象
- * @returns 题型分布数据数组
+ * @returns 题型分布数据数组和试卷ID
  */
 function parseTypeDistribution(worksheet: XLSX.WorkSheet): {
   data: QuestionTypeDistribution[];
   errors: string[];
+  paperId?: string;
 } {
   const errors: string[] = [];
   const data: QuestionTypeDistribution[] = [];
+  let paperId: string | undefined;
   
   try {
     // 将工作表转换为JSON数组
@@ -110,7 +114,7 @@ function parseTypeDistribution(worksheet: XLSX.WorkSheet): {
     
     if (jsonData.length < 2) {
       errors.push('题型分布工作表数据不足，至少需要标题行和一行数据');
-      return { data, errors };
+      return { data, errors, paperId };
     }
     
     // 查找标题行（通常是第一行或第二行）
@@ -128,13 +132,14 @@ function parseTypeDistribution(worksheet: XLSX.WorkSheet): {
     
     if (headerRowIndex === -1) {
       errors.push('未找到有效的标题行，请确保包含"题型"、"数量"、"分值"等列标题');
-      return { data, errors };
+      return { data, errors, paperId };
     }
     
     const headers = jsonData[headerRowIndex].map((h: any) => String(h || '').trim());
     
     // 根据实际题型分布工作表列标题查找关键列的索引
     // 实际列标题：['试卷ID', '题型代码', '题量', '分值', 'Total']
+    const paperIdIndex = headers.findIndex(h => h.includes('试卷ID') || h.includes('试卷编号'));
     const typeIndex = headers.findIndex(h => h.includes('题型代码') || h.includes('题型'));
     const countIndex = headers.findIndex(h => h.includes('题量') || h.includes('数量'));
     const pointsIndex = headers.findIndex(h => h.includes('分值') || h.includes('分数'));
@@ -142,7 +147,7 @@ function parseTypeDistribution(worksheet: XLSX.WorkSheet): {
     
     if (typeIndex === -1 || countIndex === -1 || pointsIndex === -1) {
       errors.push('缺少必要的列：题型、数量、分值');
-      return { data, errors };
+      return { data, errors, paperId };
     }
     
     // 用于检查重复的题型代码
@@ -152,6 +157,20 @@ function parseTypeDistribution(worksheet: XLSX.WorkSheet): {
     for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
       const row = jsonData[i];
       if (!row || row.length === 0) continue;
+      
+      // 提取试卷ID（只从第一行数据中提取）
+      if (!paperId && paperIdIndex >= 0) {
+        const extractedPaperId = String(row[paperIdIndex] || '').trim();
+        if (extractedPaperId) {
+          // 验证试卷ID格式（可以包含字母、数字、下划线、连字符）
+          const paperIdPattern = /^[A-Za-z0-9_-]+$/;
+          if (paperIdPattern.test(extractedPaperId)) {
+            paperId = extractedPaperId;
+          } else {
+            errors.push(`第${i + 1}行：试卷ID格式不正确，只能包含字母、数字、下划线和连字符，当前值：${extractedPaperId}`);
+          }
+        }
+      }
       
       const questionType = String(row[typeIndex] || '').trim();
       const count = Number(row[countIndex]) || 0;
@@ -193,7 +212,7 @@ function parseTypeDistribution(worksheet: XLSX.WorkSheet): {
     errors.push(`解析题型分布时发生错误: ${error instanceof Error ? error.message : '未知错误'}`);
   }
   
-  return { data, errors };
+  return { data, errors, paperId };
 }
 
 /**
@@ -476,6 +495,13 @@ export async function parseExamPaperFile(file: File): Promise<ExamPaperParseResu
       const typeDistResult = parseTypeDistribution(typeDistSheet);
       result.typeDistribution = typeDistResult.data;
       result.errors.push(...typeDistResult.errors);
+      
+      // 设置试卷ID
+      if (typeDistResult.paperId) {
+        result.paperId = typeDistResult.paperId;
+      } else {
+        result.warnings.push('未找到试卷ID，系统将自动生成');
+      }
     } else {
       result.errors.push('未找到题型分布工作表');
     }
@@ -560,6 +586,7 @@ export function generatePreviewData(parseResult: ExamPaperParseResult) {
   
   return {
     examTitle: parseResult.examTitle,
+    paperId: parseResult.paperId,
     totalQuestions,
     totalPoints,
     typeStats,

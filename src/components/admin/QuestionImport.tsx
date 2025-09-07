@@ -11,7 +11,9 @@ import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Upload, Download, FileText, AlertCircle, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { ExamService, QuestionType, ExamDifficulty } from '@/services/examService';
+import { ExamService } from '@/services/examService';
+import { QuestionType } from '@/types/question';
+import { ExamDifficulty } from '@/types/exam';
 
 interface QuestionImportProps {
   examId: string;

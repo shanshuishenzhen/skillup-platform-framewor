@@ -1,0 +1,473 @@
+# GitHub Actions 自动化测试工作流
+# 在代码推送和Pull Request时自动运行测试套件
+
+name: 自动化测试
+
+on:
+  # 触发条件
+  push:
+    branches: [ main, develop, 'feature/*', 'hotfix/*' ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # 每天凌晨2点运行一次（UTC时间）
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    # 允许手动触发
+    inputs:
+      test_type:
+        description: '测试类型'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - unit
+          - integration
+          - e2e
+          - database
+      coverage:
+        description: '生成覆盖率报告'
+        required: false
+        default: true
+        type: boolean
+
+# 环境变量
+env:
+  NODE_VERSION: '18'
+  CACHE_KEY_PREFIX: 'skillup-platform'
+  
+jobs:
+  # 代码质量检查
+  code-quality:
+    name: 代码质量检查
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: 设置 Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: 安装依赖
+      run: |
+        npm ci
+        npm run check-env
+        
+    - name: 代码格式检查
+      run: npm run lint
+      
+    - name: TypeScript 类型检查
+      run: npx tsc --noEmit
+      
+    - name: 安全漏洞扫描
+      run: npm audit --audit-level=moderate
+      
+    - name: 依赖检查
+      run: |
+        npx depcheck
+        npx npm-check-updates --errorLevel 2
+
+  # 单元测试
+  unit-tests:
+    name: 单元测试
+    runs-on: ubuntu-latest
+    needs: code-quality
+    
+    strategy:
+      matrix:
+        node-version: [16, 18, 20]
+        
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+      
+    - name: 设置 Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        
+    - name: 安装依赖
+      run: npm ci
+      
+    - name: 运行单元测试
+      run: npm run test:unit:coverage
+      
+    - name: 上传覆盖率报告
+      if: matrix.node-version == 18
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/unit/lcov.info
+        flags: unittests
+        name: unit-tests
+        
+    - name: 保存测试结果
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: unit-test-results-node-${{ matrix.node-version }}
+        path: |
+          coverage/unit/
+          test-results/unit/
+
+  # 集成测试
+  integration-tests:
+    name: API集成测试
+    runs-on: ubuntu-latest
+    needs: code-quality
+    
+    services:
+      # PostgreSQL 数据库服务
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: skillup_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+          
+      # Redis 缓存服务
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+      
+    - name: 设置 Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: 安装依赖
+      run: npm ci
+      
+    - name: 设置测试环境变量
+      run: |
+        echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/skillup_test" >> $GITHUB_ENV
+        echo "REDIS_URL=redis://localhost:6379" >> $GITHUB_ENV
+        echo "NODE_ENV=test" >> $GITHUB_ENV
+        
+    - name: 初始化测试数据库
+      run: |
+        npm run db:migrate
+        npm run db:seed:test
+        
+    - name: 运行集成测试
+      run: npm run test:integration:coverage
+      
+    - name: 上传覆盖率报告
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/integration/lcov.info
+        flags: integration
+        name: integration-tests
+        
+    - name: 保存测试结果
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: integration-test-results
+        path: |
+          coverage/integration/
+          test-results/integration/
+
+  # 端到端测试
+  e2e-tests:
+    name: 端到端测试
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests]
+    
+    strategy:
+      matrix:
+        browser: [chromium, firefox, webkit]
+        
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+      
+    - name: 设置 Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: 安装依赖
+      run: npm ci
+      
+    - name: 安装 Playwright 浏览器
+      run: npx playwright install ${{ matrix.browser }} --with-deps
+      
+    - name: 构建应用
+      run: npm run build
+      
+    - name: 启动应用服务器
+      run: |
+        npm start &
+        npx wait-on http://localhost:3000
+        
+    - name: 运行端到端测试
+      run: npm run test:e2e:coverage
+      env:
+        BROWSER: ${{ matrix.browser }}
+        
+    - name: 上传测试截图
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: e2e-screenshots-${{ matrix.browser }}
+        path: test-results/e2e/screenshots/
+        
+    - name: 上传测试视频
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: e2e-videos-${{ matrix.browser }}
+        path: test-results/e2e/videos/
+        
+    - name: 保存测试结果
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: e2e-test-results-${{ matrix.browser }}
+        path: |
+          coverage/e2e/
+          test-results/e2e/
+
+  # 数据库测试
+  database-tests:
+    name: 数据库测试
+    runs-on: ubuntu-latest
+    needs: code-quality
+    
+    strategy:
+      matrix:
+        database: [postgresql, mysql, sqlite]
+        
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: skillup_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+          
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: mysql
+          MYSQL_DATABASE: skillup_test
+        options: >-
+          --health-cmd "mysqladmin ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 3306:3306
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+      
+    - name: 设置 Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: 安装依赖
+      run: npm ci
+      
+    - name: 设置数据库环境
+      run: |
+        if [ "${{ matrix.database }}" = "postgresql" ]; then
+          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/skillup_test" >> $GITHUB_ENV
+        elif [ "${{ matrix.database }}" = "mysql" ]; then
+          echo "DATABASE_URL=mysql://root:mysql@localhost:3306/skillup_test" >> $GITHUB_ENV
+        else
+          echo "DATABASE_URL=sqlite://./test.db" >> $GITHUB_ENV
+        fi
+        
+    - name: 运行数据库测试
+      run: npm run test:database:coverage
+      
+    - name: 保存测试结果
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: database-test-results-${{ matrix.database }}
+        path: |
+          coverage/database/
+          test-results/database/
+
+  # 性能测试
+  performance-tests:
+    name: 性能测试
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+      
+    - name: 设置 Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: 安装依赖
+      run: npm ci
+      
+    - name: 构建应用
+      run: npm run build
+      
+    - name: 运行性能测试
+      run: |
+        npm start &
+        npx wait-on http://localhost:3000
+        npm run test:performance
+        
+    - name: 上传性能报告
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-report
+        path: performance-results/
+
+  # 测试报告汇总
+  test-summary:
+    name: 测试报告汇总
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests, e2e-tests, database-tests]
+    if: always()
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+      
+    - name: 下载所有测试结果
+      uses: actions/download-artifact@v3
+      with:
+        path: test-artifacts/
+        
+    - name: 生成测试报告
+      run: |
+        npm ci
+        node scripts/generate-test-report.js
+        
+    - name: 上传综合测试报告
+      uses: actions/upload-artifact@v3
+      with:
+        name: comprehensive-test-report
+        path: |
+          test-report.html
+          test-summary.json
+          coverage-summary.json
+          
+    - name: 发布测试报告到 GitHub Pages
+      if: github.ref == 'refs/heads/main'
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./test-report
+        destination_dir: test-reports/${{ github.run_number }}
+        
+    - name: 评论 PR 测试结果
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const summary = JSON.parse(fs.readFileSync('test-summary.json', 'utf8'));
+          
+          const comment = `
+          ## 🧪 测试结果摘要
+          
+          | 测试类型 | 状态 | 覆盖率 |
+          |---------|------|--------|
+          | 单元测试 | ${summary.unit.status} | ${summary.unit.coverage}% |
+          | 集成测试 | ${summary.integration.status} | ${summary.integration.coverage}% |
+          | 端到端测试 | ${summary.e2e.status} | ${summary.e2e.coverage}% |
+          | 数据库测试 | ${summary.database.status} | ${summary.database.coverage}% |
+          
+          **总体覆盖率**: ${summary.overall.coverage}%
+          
+          📊 [查看详细报告](https://your-username.github.io/skillup-platform/test-reports/${{ github.run_number }})
+          `;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+
+  # 部署到测试环境
+  deploy-staging:
+    name: 部署到测试环境
+    runs-on: ubuntu-latest
+    needs: test-summary
+    if: github.ref == 'refs/heads/develop' && success()
+    environment: staging
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+      
+    - name: 部署到 Vercel 测试环境
+      uses: amondnet/vercel-action@v25
+      with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+        scope: ${{ secrets.VERCEL_ORG_ID }}
+        alias-domains: |
+          skillup-platform-staging.vercel.app
+
+  # 部署到生产环境
+  deploy-production:
+    name: 部署到生产环境
+    runs-on: ubuntu-latest
+    needs: [test-summary, performance-tests]
+    if: github.ref == 'refs/heads/main' && success()
+    environment: production
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+      
+    - name: 部署到 Vercel 生产环境
+      uses: amondnet/vercel-action@v25
+      with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+        vercel-args: '--prod'
+        scope: ${{ secrets.VERCEL_ORG_ID }}

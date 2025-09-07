@@ -1,0 +1,66 @@
+{
+  "testRun": {
+    "startTime": "2025-09-07T13:30:52.188Z",
+    "endTime": "2025-09-07T13:31:01.258Z",
+    "duration": 9070,
+    "environment": {
+      "baseUrl": "http://localhost:3000",
+      "timeout": 30000,
+      "retryAttempts": 3
+    }
+  },
+  "summary": {
+    "totalTests": 0,
+    "totalPassed": 0,
+    "totalFailed": 0,
+    "totalSuites": 3,
+    "successfulSuites": 0,
+    "successRate": 0,
+    "suiteSuccessRate": 0
+  },
+  "testSuites": [
+    {
+      "name": "管理员登录测试",
+      "key": "adminLogin",
+      "startTime": "2025-09-07T13:30:52.247Z",
+      "endTime": "2025-09-07T13:30:57.681Z",
+      "duration": 5434,
+      "success": false,
+      "error": "testSuite.testUtils.getStats is not a function",
+      "testCount": 0,
+      "passedCount": 0,
+      "failedCount": 0
+    },
+    {
+      "name": "考试管理测试",
+      "key": "examManagement",
+      "startTime": "2025-09-07T13:30:57.682Z",
+      "endTime": "2025-09-07T13:30:58.496Z",
+      "duration": 814,
+      "success": false,
+      "error": "testSuite.testUtils.getStats is not a function",
+      "testCount": 0,
+      "passedCount": 0,
+      "failedCount": 0
+    },
+    {
+      "name": "学生考试测试",
+      "key": "studentExam",
+      "startTime": "2025-09-07T13:30:58.496Z",
+      "endTime": "2025-09-07T13:31:01.257Z",
+      "duration": 2761,
+      "success": false,
+      "error": "testSuite.testUtils.getStats is not a function",
+      "testCount": 0,
+      "passedCount": 0,
+      "failedCount": 0
+    }
+  ],
+  "recommendations": [
+    "部分测试套件执行失败，建议检查系统环境和依赖配置",
+    "没有执行任何测试，建议检查测试配置和网络连接",
+    "测试成功率较低，建议优先修复核心功能问题",
+    "建议定期执行自动化测试，确保系统稳定性",
+    "可以考虑添加性能测试和安全测试用例"
+  ]
+}

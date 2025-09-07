@@ -49,6 +49,7 @@ export default function UsersManagementPage() {
   const [totalPages, setTotalPages] = useState(0);
   const [pageSize] = useState(20);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [unassignDialogOpen, setUnassignDialogOpen] = useState(false);
 
   // 加载用户列表
   const loadUsers = async () => {
@@ -92,16 +93,87 @@ export default function UsersManagementPage() {
     }
 
     try {
+      // 获取选中的试卷名称
+      const selectedExamData = exams.find(exam => exam.id === selectedExam);
+      const examTitle = selectedExamData?.title || '未知试卷';
+      
       await userService.batchAssignExam(selectedUsers, selectedExam);
-      toast.success(`成功为 ${selectedUsers.length} 个用户分配试卷`);
+      
+      // 显示详细的成功信息
+      toast.success(
+        `成功为 ${selectedUsers.length} 个用户分配试卷「${examTitle}」`,
+        {
+          description: `分配时间: ${new Date().toLocaleString()}`,
+          duration: 5000
+        }
+      );
+      
       setSelectedUsers([]);
       setSelectedExam('');
       setAssignDialogOpen(false);
-      loadUsers();
+      
+      // 重新加载用户列表以显示最新状态
+      await loadUsers();
     } catch (error) {
       console.error('批量分配试卷失败:', error);
-      toast.error('批量分配试卷失败');
+      toast.error('批量分配试卷失败，请重试');
     }
+  };
+
+  /**
+   * 处理批量取消分配考试
+   */
+  const handleBatchUnassignExam = async () => {
+    try {
+      setLoading(true);
+      
+      // 筛选出可以取消分配的用户（状态为'assigned'）
+      const unassignableUsers = selectedUsers.filter(userId => {
+        const user = users.find(u => u.id === userId);
+        return user && user.exam_assignment_status === 'assigned';
+      });
+
+      if (unassignableUsers.length === 0) {
+        toast.error('没有可以取消分配的用户（只能取消状态为"已分配"的用户）');
+        return;
+      }
+
+      // 调用API接口
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/admin/users/batch-unassign-exam', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ userIds: unassignableUsers })
+      });
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || '取消分配失败');
+      }
+      
+      toast.success(result.message || `成功为 ${result.data.processedCount} 个用户取消考试分配`);
+      setUnassignDialogOpen(false);
+      setSelectedUsers([]);
+      
+      // 重新加载用户列表
+      loadUsers();
+    } catch (error) {
+      console.error('批量取消分配考试失败:', error);
+      toast.error(error instanceof Error ? error.message : '取消分配失败，请稍后重试');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 获取可以取消分配的用户数量
+  const getUnassignableUsersCount = () => {
+    return users.filter(user => 
+      selectedUsers.includes(user.id) && user.exam_assignment_status === 'assigned'
+    ).length;
   };
 
   // 搜索用户
@@ -140,6 +212,13 @@ export default function UsersManagementPage() {
     if (!status) return null;
     const config = statusMap[status as keyof typeof statusMap];
     return config ? <Badge variant={config.variant}>{config.label}</Badge> : null;
+  };
+
+  // 获取试卷名称
+  const getExamTitle = (examId?: string) => {
+    if (!examId) return null;
+    const exam = exams.find(e => e.id === examId);
+    return exam?.title || `试卷ID: ${examId.slice(0, 8)}...`;
   };
 
   useEffect(() => {
@@ -225,9 +304,113 @@ export default function UsersManagementPage() {
                 </div>
               </DialogContent>
             </Dialog>
+            
+            <Dialog open={unassignDialogOpen} onOpenChange={setUnassignDialogOpen}>
+              <DialogTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  disabled={selectedUsers.length === 0 || getUnassignableUsersCount() === 0}
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  批量取消分配 ({getUnassignableUsersCount()})
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>批量取消分配考试</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <div className="text-yellow-600">
+                        ⚠️
+                      </div>
+                      <div>
+                        <p className="font-medium text-yellow-800 mb-1">注意事项</p>
+                        <ul className="text-sm text-yellow-700 space-y-1">
+                          <li>• 只能取消状态为"已分配"的考试</li>
+                          <li>• 已开始或已完成的考试无法取消分配</li>
+                          <li>• 取消后用户将无法访问该考试</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm text-gray-600">
+                      共选择了 <span className="font-medium">{selectedUsers.length}</span> 个用户，
+                      其中 <span className="font-medium text-red-600">{getUnassignableUsersCount()}</span> 个用户可以取消考试分配
+                    </p>
+                    
+                    {getUnassignableUsersCount() < selectedUsers.length && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        {selectedUsers.length - getUnassignableUsersCount()} 个用户因考试状态不符合条件而无法取消分配
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setUnassignDialogOpen(false)}>
+                      取消
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      onClick={handleBatchUnassignExam}
+                      disabled={getUnassignableUsersCount() === 0}
+                    >
+                      确认取消分配
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </CardContent>
       </Card>
+
+      {/* 分配状态统计 */}
+      {users.length > 0 && (
+        <Card className="mb-4">
+          <CardContent className="p-4">
+            <div className="flex gap-6 text-sm">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">总用户</Badge>
+                <span className="font-medium">{users.length}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary">已分配</Badge>
+                <span className="font-medium">
+                  {users.filter(u => u.exam_assignment_status === 'assigned').length}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="default">已开始</Badge>
+                <span className="font-medium">
+                  {users.filter(u => u.exam_assignment_status === 'started').length}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="default">已完成</Badge>
+                <span className="font-medium">
+                  {users.filter(u => u.exam_assignment_status === 'completed').length}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="destructive">已过期</Badge>
+                <span className="font-medium">
+                  {users.filter(u => u.exam_assignment_status === 'expired').length}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">未分配</Badge>
+                <span className="font-medium">
+                  {users.filter(u => !u.exam_assignment_status).length}
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* 用户列表 */}
       <Card>
@@ -284,6 +467,16 @@ export default function UsersManagementPage() {
                           {user.status === 'active' ? '活跃' : '非活跃'}
                         </Badge>
                         {getAssignmentStatusBadge(user.exam_assignment_status)}
+                        {user.assigned_exam_id && (
+                          <div className="text-xs text-gray-600 max-w-48 truncate" title={getExamTitle(user.assigned_exam_id) || ''}>
+                            试卷: {getExamTitle(user.assigned_exam_id)}
+                          </div>
+                        )}
+                        {user.exam_assignment_date && (
+                          <div className="text-xs text-gray-500">
+                            分配时间: {new Date(user.exam_assignment_date).toLocaleDateString()}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

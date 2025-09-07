@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { CheckCircle, XCircle, AlertTriangle, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
 
 /**
  * 管理员登录调试工具页面
@@ -278,16 +279,16 @@ export default function AdminDebugPage() {
       const data = await response.json();
       
       if (data.success) {
-        alert('权限修复成功！请重新登录。');
+        toast.success('权限修复成功！请重新登录。');
         // 清除本地存储
         localStorage.clear();
         // 重定向到登录页
         window.location.href = '/login';
       } else {
-        alert('权限修复失败: ' + data.error);
+        toast.error('权限修复失败: ' + data.error);
       }
     } catch (error) {
-      alert('权限修复过程中发生错误: ' + (error instanceof Error ? error.message : String(error)));
+      toast.error('权限修复过程中发生错误: ' + (error instanceof Error ? error.message : String(error)));
     } finally {
       setIsLoading(false);
       setCurrentStep('');

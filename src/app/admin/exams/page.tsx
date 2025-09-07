@@ -479,6 +479,15 @@ export default function ExamManagementPage() {
           <Button
             size="sm"
             variant="outline"
+            onClick={() => window.open(`/admin/exams/${exam.id}/candidates`, '_blank')}
+            disabled={loading}
+          >
+            <Users className="h-4 w-4 mr-1" />
+            考生管理
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
             onClick={() => handleViewDetails(exam.id)}
             disabled={loading}
           >
@@ -647,8 +656,8 @@ export default function ExamManagementPage() {
                     const newExam = await examResponse.json();
 
                     // 批量添加题目
-                    const questionsResponse = await fetch(`/api/admin/exams/${newExam.id}/questions/batch`, {
-                      method: 'POST',
+                    const questionsResponse = await fetch(`/api/exams/${newExam.id}/questions`, {
+                      method: 'PUT',
                       headers: {
                         'Content-Type': 'application/json',
                       },

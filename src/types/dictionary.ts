@@ -23,6 +23,38 @@ export const FIELD_DISPLAY_NAMES = {
   learning_hours: '学习时长',
   learning_progress: '学习进度',
   
+  // 学习进度详细字段映射
+  user_id: '用户ID',
+  course_id: '课程ID',
+  lesson_id: '课时ID',
+  current_time_seconds: '当前播放时间',
+  progress_percentage: '完成百分比',
+  is_completed: '是否已完成',
+  last_updated_at: '最后更新时间',
+  
+  // 前端camelCase字段映射
+  userId: '用户ID',
+  courseId: '课程ID',
+  lessonId: '课时ID',
+  currentTime: '当前播放时间',
+  progressPercentage: '完成百分比',
+  isCompleted: '是否已完成',
+  lastUpdatedAt: '最后更新时间',
+  
+  // 课程进度字段
+  totalLessons: '总课时数',
+  completedLessons: '已完成课时数',
+  courseProgressPercentage: '课程完成百分比',
+  totalWatchTime: '总学习时长',
+  lastStudyTime: '最后学习时间',
+  
+  // 学习统计字段
+  totalStudyTime: '总学习时长',
+  completedCourses: '已完成课程数',
+  inProgressCourses: '正在学习课程数',
+  weeklyStudyTime: '本周学习时长',
+  streakDays: '连续学习天数',
+  
   // 考试相关字段
   exam_permissions: '考试权限',
   exam_history: '考试历史',
@@ -109,6 +141,29 @@ export const CHINESE_TO_ENGLISH_FIELDS = {
   '学习等级': 'learning_level',
   '学习时长': 'learning_hours',
   '学习进度': 'learning_progress',
+  
+  // 学习进度详细字段映射
+  '用户ID': 'userId',
+  '课程ID': 'courseId',
+  '课时ID': 'lessonId',
+  '当前播放时间': 'currentTime',
+  '完成百分比': 'progressPercentage',
+  '是否已完成': 'isCompleted',
+  '最后更新时间': 'lastUpdatedAt',
+  
+  // 课程进度字段
+  '总课时数': 'totalLessons',
+  '已完成课时数': 'completedLessons',
+  '课程完成百分比': 'courseProgressPercentage',
+  '总学习时长': 'totalWatchTime',
+  '最后学习时间': 'lastStudyTime',
+  
+  // 学习统计字段
+  '总学习时长': 'totalStudyTime',
+  '已完成课程数': 'completedCourses',
+  '正在学习课程数': 'inProgressCourses',
+  '本周学习时长': 'weeklyStudyTime',
+  '连续学习天数': 'streakDays',
   '考试权限': 'exam_permissions',
   '考试历史': 'exam_history',
   '认证状态': 'certification_status',
@@ -509,4 +564,112 @@ export function getFieldAliases(standardFieldName: string): string[] {
 // 定义行数据类型
 export interface RowData {
   [key: string]: string | number | boolean | undefined;
+}
+
+/**
+ * 数据库字段到前端字段的映射表
+ */
+export const DB_TO_FRONTEND_FIELD_MAP = {
+  // 学习进度相关字段
+  user_id: 'userId',
+  course_id: 'courseId',
+  lesson_id: 'lessonId',
+  current_time_seconds: 'currentTime',
+  progress_percentage: 'progressPercentage',
+  is_completed: 'isCompleted',
+  last_updated_at: 'lastUpdatedAt',
+  created_at: 'createdAt',
+  
+  // 课程进度字段
+  total_lessons: 'totalLessons',
+  completed_lessons: 'completedLessons',
+  course_progress_percentage: 'courseProgressPercentage',
+  total_watch_time: 'totalWatchTime',
+  last_study_time: 'lastStudyTime',
+  
+  // 学习统计字段
+  total_study_time: 'totalStudyTime',
+  completed_courses: 'completedCourses',
+  in_progress_courses: 'inProgressCourses',
+  weekly_study_time: 'weeklyStudyTime',
+  streak_days: 'streakDays'
+} as const;
+
+/**
+ * 前端字段到数据库字段的映射表
+ */
+export const FRONTEND_TO_DB_FIELD_MAP = {
+  // 学习进度相关字段
+  userId: 'user_id',
+  courseId: 'course_id',
+  lessonId: 'lesson_id',
+  currentTime: 'current_time_seconds',
+  progressPercentage: 'progress_percentage',
+  isCompleted: 'is_completed',
+  lastUpdatedAt: 'last_updated_at',
+  createdAt: 'created_at',
+  
+  // 课程进度字段
+  totalLessons: 'total_lessons',
+  completedLessons: 'completed_lessons',
+  courseProgressPercentage: 'course_progress_percentage',
+  totalWatchTime: 'total_watch_time',
+  lastStudyTime: 'last_study_time',
+  
+  // 学习统计字段
+  totalStudyTime: 'total_study_time',
+  completedCourses: 'completed_courses',
+  inProgressCourses: 'in_progress_courses',
+  weeklyStudyTime: 'weekly_study_time',
+  streakDays: 'streak_days'
+} as const;
+
+/**
+ * 将数据库字段对象转换为前端字段对象
+ * @param dbObject 数据库字段对象
+ * @returns 前端字段对象
+ */
+export function convertDbToFrontend<T extends Record<string, any>>(dbObject: T): Record<string, any> {
+  const frontendObject: Record<string, any> = {};
+  
+  for (const [key, value] of Object.entries(dbObject)) {
+    const frontendKey = DB_TO_FRONTEND_FIELD_MAP[key as keyof typeof DB_TO_FRONTEND_FIELD_MAP] || key;
+    frontendObject[frontendKey] = value;
+  }
+  
+  return frontendObject;
+}
+
+/**
+ * 将前端字段对象转换为数据库字段对象
+ * @param frontendObject 前端字段对象
+ * @returns 数据库字段对象
+ */
+export function convertFrontendToDb<T extends Record<string, any>>(frontendObject: T): Record<string, any> {
+  const dbObject: Record<string, any> = {};
+  
+  for (const [key, value] of Object.entries(frontendObject)) {
+    const dbKey = FRONTEND_TO_DB_FIELD_MAP[key as keyof typeof FRONTEND_TO_DB_FIELD_MAP] || key;
+    dbObject[dbKey] = value;
+  }
+  
+  return dbObject;
+}
+
+/**
+ * 批量转换数据库字段数组为前端字段数组
+ * @param dbArray 数据库字段对象数组
+ * @returns 前端字段对象数组
+ */
+export function convertDbArrayToFrontend<T extends Record<string, any>>(dbArray: T[]): Record<string, any>[] {
+  return dbArray.map(item => convertDbToFrontend(item));
+}
+
+/**
+ * 批量转换前端字段数组为数据库字段数组
+ * @param frontendArray 前端字段对象数组
+ * @returns 数据库字段对象数组
+ */
+export function convertFrontendArrayToDb<T extends Record<string, any>>(frontendArray: T[]): Record<string, any>[] {
+  return frontendArray.map(item => convertFrontendToDb(item));
 }

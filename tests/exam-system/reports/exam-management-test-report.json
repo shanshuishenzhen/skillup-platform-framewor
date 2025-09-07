@@ -1,0 +1,41 @@
+{
+  "summary": {
+    "total": 1,
+    "passed": 0,
+    "failed": 1,
+    "passRate": "0.00",
+    "totalDuration": 1551,
+    "timestamp": "2025-09-07T13:31:18.798Z"
+  },
+  "tests": [
+    {
+      "name": "管理员登录",
+      "description": "获取管理员令牌用于后续测试",
+      "startTime": "2025-09-07T13:31:17.246Z",
+      "steps": [
+        {
+          "description": "发送管理员登录请求",
+          "success": true,
+          "timestamp": "2025-09-07T13:31:17.246Z",
+          "data": null
+        },
+        {
+          "description": "断言成功: 管理员登录应该成功",
+          "success": true,
+          "timestamp": "2025-09-07T13:31:18.796Z",
+          "data": null
+        },
+        {
+          "description": "断言失败: 应该返回访问令牌",
+          "success": false,
+          "timestamp": "2025-09-07T13:31:18.797Z",
+          "data": null
+        }
+      ],
+      "status": "failed",
+      "endTime": "2025-09-07T13:31:18.797Z",
+      "duration": 1551,
+      "message": "管理员登录失败: 断言失败: 应该返回访问令牌"
+    }
+  ]
+}

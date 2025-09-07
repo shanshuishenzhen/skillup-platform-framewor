@@ -221,6 +221,15 @@ export async function verifyCode(
       };
     }
 
+    // 测试环境：允许使用固定测试验证码
+    if (process.env.NODE_ENV === 'development' && code === '123456') {
+      return {
+        success: true,
+        message: '验证码验证成功（测试模式）',
+        verified: true
+      };
+    }
+
     // 查找最新的未验证验证码
     const { data: verificationRecord, error } = await supabase
       .from('sms_verification_codes')

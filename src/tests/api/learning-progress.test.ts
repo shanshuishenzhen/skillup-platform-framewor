@@ -86,7 +86,7 @@ interface TestProgress {
   userId: string;
   courseId: string;
   lessonId?: string;
-  progress: number; // 0-100
+  progressPercentage: number; // 0-100
   status: 'not_started' | 'in_progress' | 'completed' | 'paused';
   timeSpent: number; // 分钟
   lastAccessedAt: Date;
@@ -113,7 +113,7 @@ interface TestLearningPath {
   }>;
   difficulty: 'beginner' | 'intermediate' | 'advanced';
   totalDuration: number;
-  progress: number;
+  courseProgressPercentage: number;
   status: 'active' | 'completed' | 'paused';
   createdAt: Date;
   updatedAt: Date;
@@ -140,7 +140,7 @@ interface TestUserAchievement {
   userId: string;
   achievementId: string;
   earnedAt: Date;
-  progress: number;
+  progressPercentage: number;
   isCompleted: boolean;
 }
 

@@ -29,7 +29,7 @@ import {
   CheckCircle,
   AlertCircle
 } from 'lucide-react';
-import { ExamService } from '@/services/examService';
+import { examService } from '@/services/examService';
 import { 
   ExamStatus, 
   ExamDifficulty,
@@ -79,7 +79,7 @@ export default function SkillExamPage() {
         include_expired: true
       };
       
-      const response = await ExamService.getExams(queryParams);
+      const response = await examService.getExams(queryParams);
       const examsList = response?.exams || [];
       const totalCount = response?.total || 0;
       
@@ -108,7 +108,7 @@ export default function SkillExamPage() {
   const loadCategories = async () => {
     try {
       // TODO: 实现获取考试分类的API调用
-      // const categoriesData = await ExamService.getExamCategories();
+      // const categoriesData = await examService.getCategories();
       // setCategories(categoriesData);
       
       // 模拟数据

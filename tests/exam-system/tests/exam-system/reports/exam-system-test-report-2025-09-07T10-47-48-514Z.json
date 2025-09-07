@@ -1,0 +1,155 @@
+{
+  "timestamp": "2025-09-07T10:47:48.514Z",
+  "summary": {
+    "total": 7,
+    "passed": 3,
+    "failed": 4,
+    "passRate": 43,
+    "duration": 4833,
+    "startTime": "2025-09-07T10:47:43.665Z",
+    "endTime": "2025-09-07T10:47:48.498Z"
+  },
+  "testResults": [
+    {
+      "testName": "管理员正常登录",
+      "passed": false,
+      "message": "登录请求失败",
+      "details": {
+        "response": {
+          "success": false,
+          "status": 401,
+          "error": "Request failed with status code 401",
+          "data": {
+            "error": "密码错误"
+          }
+        }
+      },
+      "timestamp": "2025-09-07T10:47:44.631Z",
+      "duration": 4779,
+      "module": "管理员登录测试",
+      "moduleKey": "admin-login"
+    },
+    {
+      "testName": "管理员登录验证令牌",
+      "passed": false,
+      "message": "无法获取管理员令牌",
+      "details": {
+        "loginResult": {
+          "success": false,
+          "status": 401,
+          "error": "Request failed with status code 401",
+          "data": {
+            "error": "密码错误"
+          }
+        }
+      },
+      "timestamp": "2025-09-07T10:47:45.195Z",
+      "duration": 4779,
+      "module": "管理员登录测试",
+      "moduleKey": "admin-login"
+    },
+    {
+      "testName": "管理员权限验证",
+      "passed": false,
+      "message": "权限验证异常: 角色 admin 未登录或令牌已过期",
+      "details": {
+        "error": "Error: 角色 admin 未登录或令牌已过期\n    at TestUtils.getAuthHeaders (D:\\50-skillup_platform\\tests\\exam-system\\utils\\test-utils.js:105:13)\n    at TestUtils.authRequest (D:\\50-skillup_platform\\tests\\exam-system\\utils\\test-utils.js:121:26)\n    at AdminLoginTest.testAdminPermissions (D:\\50-skillup_platform\\tests\\exam-system\\tests\\admin-login.test.js:217:47)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async AdminLoginTest.runAllTests (D:\\50-skillup_platform\\tests\\exam-system\\tests\\admin-login.test.js:45:11)\n    at async ExamSystemTestRunner.runTestModule (D:\\50-skillup_platform\\tests\\exam-system\\run-tests.js:169:22)\n    at async ExamSystemTestRunner.runTests (D:\\50-skillup_platform\\tests\\exam-system\\run-tests.js:101:9)\n    at async main (D:\\50-skillup_platform\\tests\\exam-system\\run-tests.js:349:18)"
+      },
+      "timestamp": "2025-09-07T10:47:45.747Z",
+      "duration": 4779,
+      "module": "管理员登录测试",
+      "moduleKey": "admin-login"
+    },
+    {
+      "testName": "错误密码登录",
+      "passed": true,
+      "message": "正确拒绝了错误密码登录",
+      "details": {
+        "status": 400,
+        "hasToken": false
+      },
+      "timestamp": "2025-09-07T10:47:45.771Z",
+      "duration": 4779,
+      "module": "管理员登录测试",
+      "moduleKey": "admin-login"
+    },
+    {
+      "testName": "不存在用户登录",
+      "passed": true,
+      "message": "正确拒绝了不存在用户登录",
+      "details": {
+        "status": 400
+      },
+      "timestamp": "2025-09-07T10:47:45.794Z",
+      "duration": 4779,
+      "module": "管理员登录测试",
+      "moduleKey": "admin-login"
+    },
+    {
+      "testName": "空参数登录",
+      "passed": true,
+      "message": "正确拒绝了空参数登录",
+      "details": {
+        "testCases": [
+          {
+            "username": "",
+            "password": ""
+          },
+          {
+            "username": "13823738278",
+            "password": ""
+          },
+          {
+            "username": "",
+            "password": "123456"
+          }
+        ]
+      },
+      "timestamp": "2025-09-07T10:47:45.883Z",
+      "duration": 4779,
+      "module": "管理员登录测试",
+      "moduleKey": "admin-login"
+    },
+    {
+      "testName": "登录状态保持",
+      "passed": false,
+      "message": "测试异常: 角色 admin 未登录或令牌已过期",
+      "details": {
+        "error": "Error: 角色 admin 未登录或令牌已过期\n    at TestUtils.getAuthHeaders (D:\\50-skillup_platform\\tests\\exam-system\\utils\\test-utils.js:105:13)\n    at TestUtils.authRequest (D:\\50-skillup_platform\\tests\\exam-system\\utils\\test-utils.js:121:26)\n    at AdminLoginTest.testLoginPersistence (D:\\50-skillup_platform\\tests\\exam-system\\tests\\admin-login.test.js:389:51)\n    at async AdminLoginTest.runAllTests (D:\\50-skillup_platform\\tests\\exam-system\\tests\\admin-login.test.js:45:11)\n    at async ExamSystemTestRunner.runTestModule (D:\\50-skillup_platform\\tests\\exam-system\\run-tests.js:169:22)\n    at async ExamSystemTestRunner.runTests (D:\\50-skillup_platform\\tests\\exam-system\\run-tests.js:101:9)\n    at async main (D:\\50-skillup_platform\\tests\\exam-system\\run-tests.js:349:18)"
+      },
+      "timestamp": "2025-09-07T10:47:48.445Z",
+      "duration": 4779,
+      "module": "管理员登录测试",
+      "moduleKey": "admin-login"
+    }
+  ],
+  "environment": {
+    "os": "win32 x64",
+    "nodeVersion": "v22.16.0",
+    "startTime": "2025-09-07T10:47:48.514Z",
+    "endTime": "2025-09-07T10:47:48.514Z",
+    "browser": "N/A",
+    "timezone": "Asia/Shanghai"
+  },
+  "configuration": {
+    "browser": {
+      "headless": false,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "slowMo": 100
+    },
+    "accounts": [
+      "admin",
+      "student",
+      "teacher"
+    ],
+    "reportFormats": [
+      "html",
+      "json",
+      "csv",
+      "summary"
+    ]
+  }
+}

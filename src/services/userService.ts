@@ -127,7 +127,9 @@ function generateTokenWithPayload(payload: object, secret: string, expiresIn: st
  */
 async function verifyPhoneCode(phone: string, code: string, purpose: 'register' | 'login' | 'reset_password' = 'register'): Promise<boolean> {
   try {
+    console.log('验证码验证开始:', { phone, code, purpose, nodeEnv: process.env.NODE_ENV });
     const result = await verifyCode(phone, code, purpose);
+    console.log('验证码验证结果:', result);
     return result.success;
   } catch (error) {
     console.error('验证码验证失败:', error);
@@ -232,7 +234,7 @@ export async function registerUser(
       message: '注册成功'
     };
   } catch (error) {
-    if (error instanceof AppError && error.context?.additionalData?.code === 'PHONE_ALREADY_EXISTS') {
+    if (error instanceof AppError && error.code === 'PHONE_ALREADY_EXISTS') {
       return {
         success: false,
         message: error.message
@@ -283,8 +285,20 @@ export async function loginUser(
     }, getRetryConfig());
 
     // 验证密码
+    console.log('密码验证调试信息:', {
+      inputPassword: password,
+      inputPasswordLength: password.length,
+      storedHash: user.password_hash,
+      storedHashLength: user.password_hash?.length,
+      userId: user.id,
+      phone: user.phone
+    });
+    
     const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+    console.log('bcrypt.compare结果:', isPasswordValid);
+    
     if (!isPasswordValid) {
+      console.log('密码验证失败，抛出错误');
       throw createError(
         ErrorType.AUTHENTICATION_ERROR,
         '密码错误',
@@ -295,6 +309,8 @@ export async function loginUser(
         }
       );
     }
+    
+    console.log('密码验证成功，继续登录流程');
 
     // 生成JWT token对
     const { token, refreshToken } = generateTokens(user.id, user.user_type, user.role || 'user');
@@ -324,7 +340,7 @@ export async function loginUser(
     };
   } catch (error) {
     if (error instanceof AppError && 
-        (error.context?.additionalData?.code === 'USER_NOT_FOUND' || error.context?.additionalData?.code === 'INVALID_PASSWORD')) {
+        (error.code === 'USER_NOT_FOUND' || error.code === 'INVALID_PASSWORD')) {
       return {
         success: false,
         message: error.message
@@ -1023,3 +1039,78 @@ export async function batchAssignExam(userIds: string[], examId: string) {
     throw error;
   }
 }
+
+/**
+ * 批量取消分配试卷
+ * @param userIds 用户ID数组
+ * @returns 取消分配结果
+ */
+export async function batchUnassignExam(userIds: string[]) {
+  try {
+    // 首先检查用户状态，只能取消状态为'assigned'的用户
+    const { data: users, error: checkError } = await supabase
+      .from('users')
+      .select('id, exam_assignment_status')
+      .in('id', userIds);
+
+    if (checkError) {
+      throw checkError;
+    }
+
+    // 过滤出可以取消分配的用户（状态为'assigned'）
+    const assignedUsers = users?.filter(user => user.exam_assignment_status === 'assigned') || [];
+    const assignedUserIds = assignedUsers.map(user => user.id);
+
+    if (assignedUserIds.length === 0) {
+      return {
+        success: false,
+        message: '没有可以取消分配的用户（只能取消状态为"已分配"的用户）'
+      };
+    }
+
+    // 取消分配
+    const { error } = await supabase
+      .from('users')
+      .update({
+        assigned_exam_id: null,
+        exam_assignment_date: null,
+        exam_assignment_status: null
+      })
+      .in('id', assignedUserIds);
+
+    if (error) {
+      throw error;
+    }
+
+    const skippedCount = userIds.length - assignedUserIds.length;
+    let message = `成功为 ${assignedUserIds.length} 个用户取消试卷分配`;
+    if (skippedCount > 0) {
+      message += `，跳过 ${skippedCount} 个不符合条件的用户`;
+    }
+
+    return {
+      success: true,
+      message,
+      processedCount: assignedUserIds.length,
+      skippedCount
+    };
+  } catch (error) {
+    console.error('批量取消分配试卷失败:', error);
+    throw error;
+  }
+}
+
+// 创建用户服务实例
+export const userService = {
+  registerUser,
+  loginUser,
+  verifyToken,
+  getUserById,
+  enableFaceVerification,
+  verifyFace,
+  getUsers,
+  batchAssignExam,
+  batchUnassignExam
+};
+
+export default userService;

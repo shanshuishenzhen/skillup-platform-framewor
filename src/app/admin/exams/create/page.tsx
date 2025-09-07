@@ -5,13 +5,14 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   ArrowLeft,
   Save,
@@ -23,11 +24,13 @@ import {
   Users,
   Settings,
   Plus,
-  Trash2
+  Trash2,
+  FileText
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AdminPageLayout from '@/components/layout/AdminPageLayout';
 import { PAGE_CONFIGS } from '@/components/ui/page-header';
+import { examPaperService } from '@/services/examPaperService';
 
 interface ExamForm {
   title: string;
@@ -49,14 +52,29 @@ interface ExamForm {
     multipleChoice: number;
     trueFalse: number;
   };
-  questionSource?: 'manual' | 'random';
+  questionSource?: 'manual' | 'random' | 'paper';
+  selectedPaperId?: string;
   questionCategory?: string;
+}
+
+interface ExamPaper {
+  id: string;
+  title: string;
+  description?: string;
+  category?: string;
+  difficulty?: string;
+  total_questions: number;
+  total_score: number;
+  paper_code?: string; // 试卷编码（来自模板的试卷ID）
+  created_at: string;
 }
 
 export default function CreateExamPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  const [availablePapers, setAvailablePapers] = useState<ExamPaper[]>([]);
+  const [loadingPapers, setLoadingPapers] = useState(false);
   const [formData, setFormData] = useState<ExamForm>({
     title: '',
     description: '',
@@ -78,6 +96,7 @@ export default function CreateExamPage() {
       trueFalse: 0
     },
     questionSource: 'manual',
+    selectedPaperId: '',
     questionCategory: ''
   });
 
@@ -98,9 +117,17 @@ export default function CreateExamPage() {
         return;
       }
 
-      if (formData.passingScore > formData.totalScore) {
-        toast.error('及格分不能大于总分');
-        return;
+      // 试卷来源验证
+      if (formData.questionSource === 'paper') {
+        if (!formData.selectedPaperId) {
+          toast.error('请选择试卷');
+          return;
+        }
+      } else {
+        if (formData.passingScore > formData.totalScore) {
+          toast.error('及格分不能大于总分');
+          return;
+        }
       }
 
       // 构建API请求数据
@@ -110,16 +137,20 @@ export default function CreateExamPage() {
         category: formData.category,
         difficulty: formData.difficulty,
         duration: formData.duration,
-        totalQuestions: 0, // 初始为0，后续添加题目时更新
+        totalQuestions: formData.totalQuestions || 0,
         passingScore: formData.passingScore,
         maxAttempts: formData.maxAttempts,
         instructions: formData.instructions,
+        paperId: formData.questionSource === 'paper' ? formData.selectedPaperId : undefined,
         settings: {
           allowReview: formData.allowReview,
           randomOrder: formData.randomOrder,
           startTime: formData.startTime,
           endTime: formData.endTime,
-          totalScore: formData.totalScore
+          totalScore: formData.totalScore,
+          questionSource: formData.questionSource,
+          questionCategory: formData.questionCategory,
+          questionDistribution: formData.questionDistribution
         }
       };
 
@@ -191,6 +222,30 @@ export default function CreateExamPage() {
     { id: 4, name: '高级选项', description: '其他配置选项' }
   ];
 
+  // 加载可用试卷
+  const loadAvailablePapers = async () => {
+    try {
+      setLoadingPapers(true);
+      const response = await examPaperService.getExamPapers({
+        page: 1,
+        limit: 100,
+        sortBy: 'created_at',
+        sortOrder: 'desc'
+      });
+      setAvailablePapers(response.papers);
+    } catch (error) {
+      console.error('加载试卷列表失败:', error);
+      toast.error('加载试卷列表失败');
+    } finally {
+      setLoadingPapers(false);
+    }
+  };
+
+  // 组件挂载时加载试卷
+  useEffect(() => {
+    loadAvailablePapers();
+  }, []);
+
   const renderStep1 = () => (
     <Card>
       <CardHeader>
@@ -252,135 +307,293 @@ export default function CreateExamPage() {
     </Card>
   );
 
-  const renderStep2 = () => (
-    <div className="space-y-6">
-      <div className="bg-white p-6 rounded-lg border">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">试卷配置</h3>
-        
-        <div className="space-y-4">
+  const renderStep2 = () => {
+    const selectedPaper = availablePapers.find(p => p.id === formData.selectedPaperId);
+    
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>试卷配置</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              题目总数
-            </label>
-            <input
-              type="number"
-              min="1"
-              value={formData.totalQuestions || ''}
-              onChange={(e) => handleInputChange('totalQuestions', parseInt(e.target.value) || 0)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="请输入题目总数"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              题目分布
-            </label>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">单选题</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={formData.questionDistribution?.singleChoice || 0}
-                  onChange={(e) => {
-                    const value = parseInt(e.target.value) || 0;
-                    handleInputChange('questionDistribution', {
-                      ...formData.questionDistribution,
-                      singleChoice: value
-                    });
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">多选题</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={formData.questionDistribution?.multipleChoice || 0}
-                  onChange={(e) => {
-                    const value = parseInt(e.target.value) || 0;
-                    handleInputChange('questionDistribution', {
-                      ...formData.questionDistribution,
-                      multipleChoice: value
-                    });
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">判断题</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={formData.questionDistribution?.trueFalse || 0}
-                  onChange={(e) => {
-                    const value = parseInt(e.target.value) || 0;
-                    handleInputChange('questionDistribution', {
-                      ...formData.questionDistribution,
-                      trueFalse: value
-                    });
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              题目来源
-            </label>
-            <div className="space-y-2">
-              <label className="flex items-center">
+            <Label className="text-base font-medium">题目来源</Label>
+            <div className="mt-2 space-y-3">
+              <div className="flex items-center space-x-2">
                 <input
                   type="radio"
+                  id="paper"
+                  name="questionSource"
+                  value="paper"
+                  checked={formData.questionSource === 'paper'}
+                  onChange={(e) => handleInputChange('questionSource', e.target.value)}
+                  className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                />
+                <Label htmlFor="paper" className="text-sm font-medium text-blue-600">
+                  <FileText className="w-4 h-4 inline mr-1" />
+                  使用导入的试卷
+                </Label>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  id="manual"
                   name="questionSource"
                   value="manual"
                   checked={formData.questionSource === 'manual'}
                   onChange={(e) => handleInputChange('questionSource', e.target.value)}
-                  className="mr-2"
+                  className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
                 />
-                手动选择题目
-              </label>
-              <label className="flex items-center">
+                <Label htmlFor="manual" className="text-sm">
+                  手动选择题目
+                </Label>
+              </div>
+              
+              <div className="flex items-center space-x-2">
                 <input
                   type="radio"
+                  id="random"
                   name="questionSource"
                   value="random"
                   checked={formData.questionSource === 'random'}
                   onChange={(e) => handleInputChange('questionSource', e.target.value)}
-                  className="mr-2"
+                  className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
                 />
-                从题库随机抽取
-              </label>
+                <Label htmlFor="random" className="text-sm">
+                  从题库随机抽取
+                </Label>
+              </div>
             </div>
           </div>
 
-          {formData.questionSource === 'random' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                题库类别
-              </label>
-              <select
-                value={formData.questionCategory || ''}
-                onChange={(e) => handleInputChange('questionCategory', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">请选择题库类别</option>
-                <option value="programming">编程基础</option>
-                <option value="database">数据库</option>
-                <option value="network">网络技术</option>
-                <option value="security">信息安全</option>
-                <option value="algorithm">算法与数据结构</option>
-              </select>
+          {/* 试卷选择区域 */}
+          {formData.questionSource === 'paper' && (
+            <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div>
+                <Label htmlFor="selectedPaper" className="text-sm font-medium">选择试卷</Label>
+                <Select
+                  value={formData.selectedPaperId}
+                  onValueChange={(value) => {
+                    handleInputChange('selectedPaperId', value);
+                    const paper = availablePapers.find(p => p.id === value);
+                    if (paper) {
+                      // 自动填充试卷信息
+                      handleInputChange('totalQuestions', paper.total_questions);
+                      handleInputChange('totalScore', paper.total_score);
+                      handleInputChange('passingScore', Math.ceil(paper.total_score * 0.6));
+                    }
+                  }}
+                  disabled={loadingPapers}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder={loadingPapers ? "加载中..." : "请选择试卷"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availablePapers.map((paper) => (
+                      <SelectItem key={paper.id} value={paper.id}>
+                        <div className="flex flex-col">
+                          <div className="flex items-center space-x-2">
+                            <span className="font-medium">{paper.title}</span>
+                            {paper.paper_code && (
+                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+                                ID: {paper.paper_code}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs text-gray-500">
+                            {paper.total_questions}题 · {paper.total_score}分 · {paper.category}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {selectedPaper && (
+                <div className="p-3 bg-white rounded border">
+                  <h4 className="font-medium text-sm mb-2">试卷信息</h4>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                    <div>题目数量: {selectedPaper.total_questions}</div>
+                    <div>总分: {selectedPaper.total_score}</div>
+                    <div>分类: {selectedPaper.category || '未分类'}</div>
+                    <div>难度: {selectedPaper.difficulty || '未设置'}</div>
+                  </div>
+                  {selectedPaper.description && (
+                    <p className="text-xs text-gray-500 mt-2">{selectedPaper.description}</p>
+                  )}
+                </div>
+              )}
+              
+              {availablePapers.length === 0 && !loadingPapers && (
+                <div className="text-center py-4 text-gray-500">
+                  <FileText className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                  <p className="text-sm">暂无可用试卷</p>
+                  <p className="text-xs">请先导入试卷或手动创建题目</p>
+                </div>
+              )}
             </div>
           )}
-        </div>
-      </div>
-    </div>
-  );
+
+          {/* 手动配置区域 */}
+          {formData.questionSource === 'manual' && (
+            <div className="space-y-4 p-4 bg-gray-50 rounded-lg border">
+              <div>
+                <Label className="text-sm font-medium">题目总数</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={formData.totalQuestions || ''}
+                  onChange={(e) => handleInputChange('totalQuestions', parseInt(e.target.value) || 0)}
+                  placeholder="请输入题目总数"
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium">题目分布</Label>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                  <div>
+                    <Label className="text-xs text-gray-500">单选题</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={formData.questionDistribution?.singleChoice || 0}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value) || 0;
+                        handleInputChange('questionDistribution', {
+                          ...formData.questionDistribution,
+                          singleChoice: value
+                        });
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-500">多选题</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={formData.questionDistribution?.multipleChoice || 0}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value) || 0;
+                        handleInputChange('questionDistribution', {
+                          ...formData.questionDistribution,
+                          multipleChoice: value
+                        });
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-500">判断题</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={formData.questionDistribution?.trueFalse || 0}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value) || 0;
+                        handleInputChange('questionDistribution', {
+                          ...formData.questionDistribution,
+                          trueFalse: value
+                        });
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 随机抽取配置区域 */}
+          {formData.questionSource === 'random' && (
+            <div className="space-y-4 p-4 bg-green-50 rounded-lg border border-green-200">
+              <div>
+                <Label className="text-sm font-medium">题目总数</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={formData.totalQuestions || ''}
+                  onChange={(e) => handleInputChange('totalQuestions', parseInt(e.target.value) || 0)}
+                  placeholder="请输入题目总数"
+                  className="mt-1"
+                />
+              </div>
+              
+              <div>
+                <Label className="text-sm font-medium">题库类别</Label>
+                <Select
+                  value={formData.questionCategory || ''}
+                  onValueChange={(value) => handleInputChange('questionCategory', value)}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="请选择题库类别" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="programming">编程基础</SelectItem>
+                    <SelectItem value="database">数据库</SelectItem>
+                    <SelectItem value="network">网络技术</SelectItem>
+                    <SelectItem value="security">信息安全</SelectItem>
+                    <SelectItem value="algorithm">算法与数据结构</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium">题目分布</Label>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                  <div>
+                    <Label className="text-xs text-gray-500">单选题</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={formData.questionDistribution?.singleChoice || 0}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value) || 0;
+                        handleInputChange('questionDistribution', {
+                          ...formData.questionDistribution,
+                          singleChoice: value
+                        });
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-500">多选题</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={formData.questionDistribution?.multipleChoice || 0}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value) || 0;
+                        handleInputChange('questionDistribution', {
+                          ...formData.questionDistribution,
+                          multipleChoice: value
+                        });
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-500">判断题</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={formData.questionDistribution?.trueFalse || 0}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value) || 0;
+                        handleInputChange('questionDistribution', {
+                          ...formData.questionDistribution,
+                          trueFalse: value
+                        });
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
 
   const renderStep3 = () => (
     <Card>

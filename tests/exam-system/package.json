@@ -1,0 +1,33 @@
+{
+  "name": "exam-system-tests",
+  "version": "1.0.0",
+  "description": "在线考试管理系统自动化测试套件",
+  "main": "run-tests.js",
+  "scripts": {
+    "test": "node run-tests.js",
+    "test:admin": "node run-tests.js admin",
+    "test:exam": "node run-tests.js exam",
+    "test:student": "node run-tests.js student",
+    "test:grades": "node run-tests.js grades",
+    "test:permissions": "node run-tests.js permissions",
+    "test:api": "node run-tests.js api",
+    "install-deps": "npm install",
+    "clean": "rimraf reports node_modules"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "fs-extra": "^11.1.1",
+    "path": "^0.12.7"
+  },
+  "devDependencies": {
+    "rimraf": "^5.0.5"
+  },
+  "keywords": [
+    "testing",
+    "automation",
+    "exam-system",
+    "e2e"
+  ],
+  "author": "SOLO Coding",
+  "license": "MIT"
+}

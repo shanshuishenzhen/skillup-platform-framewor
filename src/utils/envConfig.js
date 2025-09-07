@@ -1,8 +1,8 @@
 // /src/utils/envConfig.ts
 
 import { EventEmitter } from 'events';
-import { watch } from 'fs';
-import { join } from 'path';
+// 注意：fs模块只能在服务端使用，客户端代码不能导入
+// fs和path模块将在需要时动态导入
 
 /**
  * 配置验证规则
@@ -373,10 +373,21 @@ class EnvConfigManager extends EventEmitter {
       return;
     }
     
-    const envPath = envFilePath || join(process.cwd(), '.env');
+    // 注意：热重载功能只能在服务端使用，客户端环境不支持fs模块
+    if (typeof window !== 'undefined') {
+      console.warn('[EnvConfig] 热重载功能仅在服务端环境可用');
+      return;
+    }
     
     try {
-      this.envFileWatcher = watch(envPath, (eventType) => {
+      // 动态导入fs和path模块，避免客户端打包时出错
+      // 使用eval来避免打包工具静态分析
+      const fs = eval('require')('fs');
+      const path = eval('require')('path');
+      
+      const envPath = envFilePath || path.join(process.cwd(), '.env');
+      
+      this.envFileWatcher = fs.watch(envPath, (eventType) => {
         if (eventType === 'change') {
           setTimeout(() => {
             this.handleConfigChange();

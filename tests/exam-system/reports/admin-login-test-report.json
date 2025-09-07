@@ -1,0 +1,185 @@
+{
+  "summary": {
+    "total": 6,
+    "passed": 3,
+    "failed": 3,
+    "passRate": "50.00",
+    "totalDuration": 5533,
+    "timestamp": "2025-09-07T13:31:17.245Z"
+  },
+  "tests": [
+    {
+      "name": "有效管理员登录",
+      "description": "使用正确的管理员账号和密码进行登录",
+      "startTime": "2025-09-07T13:31:11.707Z",
+      "steps": [
+        {
+          "description": "发送登录请求: 13823738278",
+          "success": true,
+          "timestamp": "2025-09-07T13:31:11.707Z",
+          "data": null
+        },
+        {
+          "description": "断言成功: 登录请求应该成功",
+          "success": true,
+          "timestamp": "2025-09-07T13:31:13.864Z",
+          "data": null
+        },
+        {
+          "description": "断言成功: 响应状态码应该是200",
+          "success": true,
+          "timestamp": "2025-09-07T13:31:13.864Z",
+          "data": null
+        },
+        {
+          "description": "断言成功: 响应数据应该表示成功",
+          "success": true,
+          "timestamp": "2025-09-07T13:31:13.864Z",
+          "data": null
+        },
+        {
+          "description": "断言失败: 应该返回用户信息",
+          "success": false,
+          "timestamp": "2025-09-07T13:31:13.865Z",
+          "data": null
+        }
+      ],
+      "status": "failed",
+      "endTime": "2025-09-07T13:31:13.865Z",
+      "duration": 2158,
+      "message": "登录测试失败: 断言失败: 应该返回用户信息"
+    },
+    {
+      "name": "错误密码登录",
+      "description": "使用错误密码尝试登录，应该被拒绝",
+      "startTime": "2025-09-07T13:31:13.866Z",
+      "steps": [
+        {
+          "description": "发送错误密码登录请求",
+          "success": true,
+          "timestamp": "2025-09-07T13:31:13.866Z",
+          "data": null
+        },
+        {
+          "description": "断言成功: 错误密码应该登录失败",
+          "success": true,
+          "timestamp": "2025-09-07T13:31:16.238Z",
+          "data": null
+        },
+        {
+          "description": "断言成功: 应该返回401未授权状态码",
+          "success": true,
+          "timestamp": "2025-09-07T13:31:16.239Z",
+          "data": null
+        },
+        {
+          "description": "断言成功: 响应应该表示失败",
+          "success": true,
+          "timestamp": "2025-09-07T13:31:16.239Z",
+          "data": null
+        },
+        {
+          "description": "断言失败: 应该返回错误消息",
+          "success": false,
+          "timestamp": "2025-09-07T13:31:16.239Z",
+          "data": null
+        }
+      ],
+      "status": "failed",
+      "endTime": "2025-09-07T13:31:16.239Z",
+      "duration": 2373,
+      "message": "错误密码测试失败: 断言失败: 应该返回错误消息"
+    },
+    {
+      "name": "错误手机号登录",
+      "description": "使用不存在的手机号尝试登录",
+      "startTime": "2025-09-07T13:31:16.239Z",
+      "steps": [
+        {
+          "description": "发送错误手机号登录请求",
+          "success": true,
+          "timestamp": "2025-09-07T13:31:16.239Z",
+          "data": null
+        },
+        {
+          "description": "断言成功: 错误手机号应该登录失败",
+          "success": true,
+          "timestamp": "2025-09-07T13:31:17.212Z",
+          "data": null
+        },
+        {
+          "description": "断言成功: 应该返回401未授权状态码",
+          "success": true,
+          "timestamp": "2025-09-07T13:31:17.212Z",
+          "data": null
+        }
+      ],
+      "status": "passed",
+      "endTime": "2025-09-07T13:31:17.212Z",
+      "duration": 973,
+      "message": "错误手机号正确被拒绝"
+    },
+    {
+      "name": "空凭据登录",
+      "description": "使用空的用户名或密码尝试登录",
+      "startTime": "2025-09-07T13:31:17.213Z",
+      "steps": [
+        {
+          "description": "测试空手机号",
+          "success": true,
+          "timestamp": "2025-09-07T13:31:17.213Z",
+          "data": null
+        },
+        {
+          "description": "断言成功: 空手机号应该被拒绝",
+          "success": true,
+          "timestamp": "2025-09-07T13:31:17.228Z",
+          "data": null
+        },
+        {
+          "description": "测试空密码",
+          "success": true,
+          "timestamp": "2025-09-07T13:31:17.228Z",
+          "data": null
+        },
+        {
+          "description": "断言成功: 空密码应该被拒绝",
+          "success": true,
+          "timestamp": "2025-09-07T13:31:17.242Z",
+          "data": null
+        }
+      ],
+      "status": "passed",
+      "endTime": "2025-09-07T13:31:17.242Z",
+      "duration": 29,
+      "message": "空凭据正确被拒绝"
+    },
+    {
+      "name": "管理员令牌验证",
+      "description": "验证管理员令牌是否有效且具有管理员权限",
+      "startTime": "2025-09-07T13:31:17.242Z",
+      "steps": [],
+      "status": "failed",
+      "endTime": "2025-09-07T13:31:17.242Z",
+      "duration": 0,
+      "message": "令牌验证测试失败: 没有可用的管理员令牌，请先执行登录测试"
+    },
+    {
+      "name": "管理员登出",
+      "description": "测试管理员登出功能",
+      "startTime": "2025-09-07T13:31:17.243Z",
+      "steps": [
+        {
+          "description": "跳过登出测试，没有有效令牌",
+          "success": true,
+          "timestamp": "2025-09-07T13:31:17.243Z",
+          "data": null
+        }
+      ],
+      "status": "passed",
+      "endTime": "2025-09-07T13:31:17.243Z",
+      "duration": 0,
+      "message": "跳过登出测试"
+    }
+  ]
+}

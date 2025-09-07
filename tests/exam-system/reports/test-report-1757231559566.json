@@ -1,0 +1,142 @@
+{
+  "timestamp": "2025-09-07T07:52:39.565Z",
+  "summary": {
+    "total": 6,
+    "passed": 6,
+    "failed": 0,
+    "passRate": "100.00%"
+  },
+  "tests": [
+    {
+      "name": "管理员登录测试",
+      "status": "PASS",
+      "result": {
+        "success": true,
+        "token": "mock_jwt_token_1757231559561",
+        "user": {
+          "id": 1,
+          "username": "13823738278",
+          "role": "admin"
+        }
+      }
+    },
+    {
+      "name": "学生登录测试",
+      "status": "PASS",
+      "result": {
+        "success": true,
+        "token": "mock_jwt_token_1757231559561",
+        "user": {
+          "id": 1,
+          "username": "13800000002",
+          "role": "student"
+        }
+      }
+    },
+    {
+      "name": "题库管理测试",
+      "status": "PASS",
+      "result": {
+        "list": {
+          "success": true,
+          "questions": [
+            {
+              "id": 1,
+              "title": "测试题目1",
+              "type": "single_choice"
+            },
+            {
+              "id": 2,
+              "title": "测试题目2",
+              "type": "multiple_choice"
+            }
+          ]
+        },
+        "create": {
+          "success": true,
+          "questions": [
+            {
+              "id": 1,
+              "title": "测试题目1",
+              "type": "single_choice"
+            },
+            {
+              "id": 2,
+              "title": "测试题目2",
+              "type": "multiple_choice"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "考试管理测试",
+      "status": "PASS",
+      "result": {
+        "list": {
+          "success": true,
+          "exams": [
+            {
+              "id": 1,
+              "title": "测试考试1",
+              "status": "published"
+            },
+            {
+              "id": 2,
+              "title": "测试考试2",
+              "status": "draft"
+            }
+          ]
+        },
+        "create": {
+          "success": true,
+          "exams": [
+            {
+              "id": 1,
+              "title": "测试考试1",
+              "status": "published"
+            },
+            {
+              "id": 2,
+              "title": "测试考试2",
+              "status": "draft"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "成绩管理测试",
+      "status": "PASS",
+      "result": {
+        "grades": {
+          "success": true,
+          "message": "操作成功"
+        },
+        "stats": {
+          "success": true,
+          "message": "操作成功"
+        }
+      }
+    },
+    {
+      "name": "权限控制测试",
+      "status": "PASS",
+      "result": {
+        "invalidToken": {
+          "success": true,
+          "message": "操作成功"
+        },
+        "studentAccess": {
+          "success": true,
+          "message": "操作成功"
+        }
+      }
+    }
+  ],
+  "environment": {
+    "baseURL": "http://localhost:3000",
+    "nodeVersion": "v22.16.0",
+    "platform": "win32"
+  }
+}

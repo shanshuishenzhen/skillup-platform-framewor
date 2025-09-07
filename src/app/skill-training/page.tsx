@@ -38,20 +38,20 @@ interface TrainingCourse {
 }
 
 /**
- * 学习进度接口定义
+ * 课程学习进度接口定义（页面级别简化版本）
  * @interface LearningProgress
  * @property {string} courseId - 课程ID
- * @property {number} progress - 学习进度百分比
+ * @property {number} courseProgressPercentage - 课程完成百分比
  * @property {number} completedLessons - 已完成课时
  * @property {number} totalLessons - 总课时
- * @property {string} lastStudied - 最后学习时间
+ * @property {string} lastStudyTime - 最后学习时间
  */
 interface LearningProgress {
   courseId: string
-  progress: number
+  courseProgressPercentage: number
   completedLessons: number
   totalLessons: number
-  lastStudied: string
+  lastStudyTime: string
 }
 
 /**
@@ -81,18 +81,33 @@ export default function SkillTrainingPage() {
     return [
       {
         id: '1',
-        title: 'React 前端开发实战',
-        description: '从零开始学习React框架，掌握现代前端开发技能，包括组件开发、状态管理、路由配置等核心知识点。',
-        category: '前端开发',
-        level: '中级',
-        duration: 40,
-        students: 1250,
+        title: 'Python数据分析基础',
+        description: '从零开始学习Python数据分析，掌握pandas、numpy等核心库的使用方法',
+        category: '数据分析',
+        level: '初级',
+        duration: 24,
+        students: 1234,
         rating: 4.8,
         instructor: '张老师',
         price: 299,
-        image: 'https://trae-api-sg.mchost.guru/api/ide/v1/text_to_image?prompt=React%20frontend%20development%20course%20modern%20web%20programming&image_size=landscape_4_3',
-        skills: ['React', 'JavaScript', 'HTML/CSS', '组件开发'],
-        isFree: false
+        image: 'https://trae-api-sg.mchost.guru/api/ide/v1/text_to_image?prompt=Python%20data%20analysis%20course%20cover%20with%20charts%20and%20graphs&image_size=landscape_4_3',
+        skills: ['Python', 'Pandas', 'NumPy', '数据可视化'],
+        isFree: true
+      },
+      {
+        id: '550e8400-e29b-41d4-a716-446655440000', // free-video-course
+        title: 'React开发入门实战',
+        description: '免费学习React前端框架，掌握组件开发、状态管理、路由配置等核心技术',
+        category: '前端开发',
+        level: '初级',
+        duration: 8,
+        students: 2567,
+        rating: 4.9,
+        instructor: '李老师',
+        price: 0,
+        image: 'https://trae-api-sg.mchost.guru/api/ide/v1/text_to_image?prompt=React%20frontend%20development%20course%20cover%20with%20React%20logo&image_size=landscape_4_3',
+        skills: ['React', 'JSX', 'Hooks', '组件开发'],
+        isFree: true
       },
       {
         id: '2',
@@ -168,6 +183,21 @@ export default function SkillTrainingPage() {
         image: 'https://trae-api-sg.mchost.guru/api/ide/v1/text_to_image?prompt=UI%20UX%20design%20user%20interface%20creative%20modern&image_size=landscape_4_3',
         skills: ['UI设计', 'UX设计', '原型设计', '用户研究'],
         isFree: false
+      },
+      {
+        id: '7',
+        title: 'React高级开发技巧',
+        description: '深入学习React高级特性，包括性能优化、自定义Hooks、状态管理等进阶技术',
+        category: '前端开发',
+        level: '中级',
+        duration: 16,
+        students: 1456,
+        rating: 4.7,
+        instructor: '王老师',
+        price: 0,
+        image: 'https://trae-api-sg.mchost.guru/api/ide/v1/text_to_image?prompt=React%20advanced%20development%20programming%20hooks%20optimization&image_size=landscape_4_3',
+        skills: ['React', 'Hooks', '性能优化', '状态管理'],
+        isFree: true
       }
     ]
   }
@@ -180,24 +210,38 @@ export default function SkillTrainingPage() {
     return [
       {
         courseId: '1',
-        progress: 65,
+        courseProgressPercentage: 65,
         completedLessons: 13,
         totalLessons: 20,
-        lastStudied: '2024-01-15'
+        lastStudyTime: '2024-01-15'
+      },
+      {
+        courseId: '550e8400-e29b-41d4-a716-446655440000', // free-video-course
+        courseProgressPercentage: 25,
+        completedLessons: 1,
+        totalLessons: 4,
+        lastStudyTime: '2024-01-16'
       },
       {
         courseId: '2',
-        progress: 100,
+        courseProgressPercentage: 100,
         completedLessons: 15,
         totalLessons: 15,
-        lastStudied: '2024-01-10'
+        lastStudyTime: '2024-01-10'
       },
       {
         courseId: '5',
-        progress: 30,
+        courseProgressPercentage: 30,
         completedLessons: 3,
         totalLessons: 10,
-        lastStudied: '2024-01-12'
+        lastStudyTime: '2024-01-12'
+      },
+      {
+        courseId: '7',
+        courseProgressPercentage: 45,
+        completedLessons: 4,
+        totalLessons: 8,
+        lastStudyTime: '2024-01-17'
       }
     ]
   }
@@ -311,12 +355,12 @@ export default function SkillTrainingPage() {
             <div className="mb-4">
               <div className="flex justify-between text-sm text-gray-600 mb-1">
                 <span>学习进度</span>
-                <span>{courseProgress.progress}%</span>
+                <span>{courseProgress.courseProgressPercentage}%</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div 
                   className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                  style={{ width: `${courseProgress.progress}%` }}
+                  style={{ width: `${courseProgress.courseProgressPercentage}%` }}
                 ></div>
               </div>
               <div className="text-xs text-gray-500 mt-1">
@@ -331,12 +375,18 @@ export default function SkillTrainingPage() {
             </div>
             <div className="flex space-x-2">
               {courseProgress ? (
-                <button className="flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+                <button 
+                  onClick={() => window.location.href = `/courses/${course.id}/learn`}
+                  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                >
                   <Play className="w-4 h-4 mr-1" />
                   继续学习
                 </button>
               ) : (
-                <button className="flex items-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors">
+                <button 
+                  onClick={() => window.location.href = `/courses/${course.id}/learn`}
+                  className="flex items-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                >
                   <BookOpen className="w-4 h-4 mr-1" />
                   开始学习
                 </button>
@@ -428,7 +478,10 @@ export default function SkillTrainingPage() {
                       <div>课时：{p.completedLessons}/{p.totalLessons}</div>
                       <div>最后学习：{p.lastStudied}</div>
                     </div>
-                    <button className="w-full mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+                    <button 
+                      onClick={() => window.location.href = `/courses/${course.id}/learn`}
+                      className="w-full mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                    >
                       {p.progress === 100 ? '复习课程' : '继续学习'}
                     </button>
                   </div>

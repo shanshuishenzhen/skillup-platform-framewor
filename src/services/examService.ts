@@ -187,7 +187,7 @@ export class ExamService {
    * }, 'user123');
    * ```
    */
-  async createExam(examData: CreateExamRequest, userId: string): Promise<Exam> {
+  async createExam(examData: CreateExamRequest & { paperId?: string }, userId: string): Promise<Exam> {
     try {
       const now = new Date().toISOString();
       
@@ -199,11 +199,13 @@ export class ExamService {
         duration: examData.duration,
         total_questions: examData.totalQuestions,
         passing_score: examData.passingScore,
+        total_score: examData.totalScore || 100,
         max_attempts: examData.maxAttempts || 1,
         category: examData.category,
         tags: examData.tags || [],
         instructions: examData.instructions,
         question_ids: examData.questionIds || [],
+        paper_id: examData.paperId || null,
         settings: examData.settings || {},
         created_by: userId,
         created_at: now,
@@ -1500,6 +1502,63 @@ export class ExamService {
       return questions;
     } catch (error) {
       console.error('ExamService.getExamQuestions error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 搜索考试
+   * 
+   * @param searchTerm - 搜索关键词
+   * @param options - 搜索选项
+   * @returns Promise<Exam[]> 搜索结果
+   * 
+   * @example
+   * ```typescript
+   * const results = await examService.searchExams('数学', { limit: 10 });
+   * console.log('搜索结果:', results);
+   * ```
+   */
+  async searchExams(searchTerm: string = '', options: {
+    category?: string;
+    status?: ExamStatus;
+    limit?: number;
+    offset?: number;
+  } = {}): Promise<Exam[]> {
+    try {
+      const {
+        category,
+        status = ExamStatus.PUBLISHED,
+        limit = 20,
+        offset = 0
+      } = options;
+
+      let query = supabase
+        .from('exams')
+        .select('*')
+        .eq('status', status)
+        .range(offset, offset + limit - 1)
+        .order('created_at', { ascending: false });
+
+      // 如果有搜索关键词，添加搜索条件
+      if (searchTerm.trim()) {
+        query = query.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
+      }
+
+      // 如果有分类筛选
+      if (category) {
+        query = query.eq('category', category);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        throw new Error(`搜索考试失败: ${error.message}`);
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('ExamService.searchExams error:', error);
       throw error;
     }
   }

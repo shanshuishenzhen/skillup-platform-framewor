@@ -98,37 +98,15 @@ function LoginForm() {
     setError('');
 
     try {
-      // 检测是否为管理员登录（特定手机号）
-      const isAdminLogin = formData.phone === '13823738278';
-      
       // 根据登录类型构建请求体
       const requestBody = loginType === 'password' 
         ? { phone: formData.phone, password: formData.password }
         : { phone: formData.phone, verificationCode: formData.smsCode };
 
-      // 根据用户类型选择API端点
-      const apiEndpoint = isAdminLogin && loginType === 'password' 
-        ? '/api/admin/auth/login' 
-        : '/api/auth/login';
-      
-      // 管理员只支持密码登录
-      if (isAdminLogin && loginType === 'sms') {
-        setError('管理员账户仅支持密码登录');
-        setLoading(false);
-        return;
-      }
+      // 统一使用普通用户登录API，让后端判断用户类型
+      const apiEndpoint = '/api/auth/login';
 
-      // 添加详细的调试信息
-      console.log('🔐 登录请求开始');
-      console.log('📱 手机号:', formData.phone);
-      console.log('🔑 密码长度:', formData.password?.length || 0);
-      console.log('🎯 登录类型:', loginType);
-      console.log('👑 是否管理员:', isAdminLogin);
-      console.log('🌐 API端点:', apiEndpoint);
-      console.log('📦 请求体:', JSON.stringify(requestBody, null, 2));
-      
-      // 添加alert调试信息
-      alert(`登录调试信息:\n手机号: ${formData.phone}\n密码长度: ${formData.password?.length || 0}\n登录类型: ${loginType}\n是否管理员: ${isAdminLogin}\nAPI端点: ${apiEndpoint}\n即将发送登录请求...`);
+      // 登录请求开始
 
       // 调用API接口进行登录
       const response = await fetch(apiEndpoint, {
@@ -139,40 +117,36 @@ function LoginForm() {
         body: JSON.stringify(requestBody),
       });
 
-      console.log('🌐 API响应状态:', response.status);
-      console.log('🌐 API响应头:', Object.fromEntries(response.headers.entries()));
-
       const result = await response.json();
-      console.log('📦 API响应结果:', JSON.stringify(result, null, 2));
-      
-      // 添加响应调试alert
-      alert(`API响应调试:\n状态码: ${response.status}\n成功: ${result.success}\n消息: ${result.message || result.error || '无消息'}`);
       
       if (result.success && result.user && result.token) {
-        console.debug('✅ 登录成功，用户信息:', result.user);
         toast.success('登录成功！');
         
-        // 登录成功
-        if (isAdminLogin) {
-          // 使用管理员登录函数，传递refresh token
+        // 根据API返回的用户类型进行处理
+        if (result.user.role === 'admin' || result.user.role === 'super_admin') {
+          // 管理员用户 - 等待登录完成后再跳转
           await adminLogin(result.user, result.token, result.refreshToken);
-          router.push('/admin');
+          // 使用setTimeout确保状态更新完成后再跳转
+          setTimeout(() => {
+            router.push('/admin');
+          }, 100);
         } else {
-          // 使用普通用户登录函数，传递refresh token
+          // 普通用户 - 等待登录完成后再跳转
           await login(result.user, result.token, result.refreshToken);
           // 根据用户类型和人脸验证状态跳转
           const returnUrl = searchParams.get('returnUrl');
-          if (result.user.userType === 'premium' && !result.user.faceVerified) {
-            const faceVerifyUrl = returnUrl 
-              ? `/face-verification?returnUrl=${encodeURIComponent(returnUrl)}`
-              : '/face-verification';
-            router.push(faceVerifyUrl);
-          } else {
-            router.push(returnUrl || '/');
-          }
+          setTimeout(() => {
+            if (result.user.userType === 'premium' && !result.user.faceVerified) {
+              const faceVerifyUrl = returnUrl 
+                ? `/face-verification?returnUrl=${encodeURIComponent(returnUrl)}`
+                : '/face-verification';
+              router.push(faceVerifyUrl);
+            } else {
+              router.push(returnUrl || '/');
+            }
+          }, 100);
         }
       } else {
-        console.debug('❌ 登录失败，错误信息:', result.error || result.message);
         setError(result.error || result.message || '登录失败');
         toast.error(result.error || result.message || '登录失败');
       }

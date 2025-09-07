@@ -309,3 +309,10 @@ export function getUpgradeMessage(requiredLevel: number, user?: User | null): st
   
   return '权限不足，无法访问此功能';
 }
+
+/**
+ * 验证管理员认证（verifyAdminAccess的别名）
+ * @param request Next.js请求对象
+ * @returns 用户信息或抛出错误
+ */
+export const verifyAdminAuth = verifyAdminAccess;

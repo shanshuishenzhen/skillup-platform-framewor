@@ -17,6 +17,7 @@ const ExtendedUserSchema = z.object({
   name: z.string().min(1, '姓名不能为空'),
   email: z.string().email('邮箱格式不正确'),
   phone: z.string().optional(),
+  password: z.string().min(6, '密码至少6位').optional(),
   employee_id: z.string().optional(),
   department: z.string().optional(),
   position: z.string().optional(),
@@ -461,8 +462,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 生成随机密码
-    const password = Math.random().toString(36).slice(-8);
+    // 使用传入的密码或生成随机密码
+    const password = userData.password || Math.random().toString(36).slice(-8);
     const hashedPassword = await bcrypt.hash(password, 12);
 
     // 创建用户认证记录
@@ -500,6 +501,7 @@ export async function POST(request: NextRequest) {
         role: userData.role,
         status: 'active',
         is_verified: true,
+        password_hash: hashedPassword,
         import_source: 'manual',
         sync_status: 'synced',
         created_at: new Date().toISOString(),
