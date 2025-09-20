@@ -6,7 +6,7 @@
  * @version 1.0.0
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, jest } from '@jest/globals';
+import { test, expect } from '@playwright/test';
 import request from 'supertest';
 import puppeteer, { Browser, Page, ElementHandle } from 'puppeteer';
 import mysql from 'mysql2/promise';

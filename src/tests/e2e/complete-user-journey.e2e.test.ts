@@ -6,7 +6,7 @@
  * @version 1.0.0
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
+import { test, expect } from '@playwright/test';
 import { chromium, Browser, Page, BrowserContext } from 'playwright';
 import { supabase } from '../../lib/supabase';
 

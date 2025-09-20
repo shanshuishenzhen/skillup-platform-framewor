@@ -13,7 +13,7 @@
  */
 
 import { defineConfig, devices } from '@playwright/test';
-import { globalSetup, globalTeardown } from './src/tests/e2e/setup/test-setup';
+// 使用 require.resolve 直接指定 globalSetup 路径，无需 import
 
 /**
  * 从环境变量读取配置
@@ -25,9 +25,8 @@ export default defineConfig({
   // 测试目录
   testDir: './src/tests/e2e',
   
-  // 全局设置和清理
+  // 全局设置
   globalSetup: require.resolve('./src/tests/e2e/setup/test-setup.ts'),
-  globalTeardown: require.resolve('./src/tests/e2e/setup/test-teardown.ts'),
   
   // 全局超时设置
   timeout: 30 * 1000,

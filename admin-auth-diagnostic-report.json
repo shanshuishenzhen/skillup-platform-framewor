@@ -1,0 +1,25 @@
+{
+  "timestamp": "2025-08-26T11:43:48.881Z",
+  "summary": {
+    "totalIssues": 2,
+    "totalWarnings": 1,
+    "totalFixes": 6
+  },
+  "details": {
+    "issues": [
+      "AdminGuard缺少认证错误处理",
+      "权限检查API缺少GET方法导出"
+    ],
+    "fixes": [
+      "修复AdminGuard组件的权限验证逻辑",
+      "检查权限检查API的实现",
+      "确保token格式正确且包含管理员权限",
+      "检查API响应状态码处理逻辑",
+      "添加更详细的错误日志记录",
+      "实现token自动刷新机制"
+    ],
+    "warnings": [
+      "AdminGuard中可能存在重复的权限检查"
+    ]
+  }
+}

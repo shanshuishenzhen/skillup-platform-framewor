@@ -109,7 +109,7 @@ export async function verifyJWTToken(token: string): Promise<JWTPayload | null> 
     }
 
     const result: JWTPayload = {
-      userId: decoded.userId,
+      userId: decoded.userId || decoded.id, // 兼容两种字段名
       phone: decoded.phone,
       role: userRole,
       iat: decoded.iat,

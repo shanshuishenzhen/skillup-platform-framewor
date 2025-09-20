@@ -3,7 +3,7 @@
  * 配置浏览器环境、测试数据和全局变量
  */
 
-import { beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
+// Playwright 测试环境无需此导入，如有需要请用 test.beforeAll/test.afterAll
 
 // 全局测试配置
 const E2E_CONFIG = {

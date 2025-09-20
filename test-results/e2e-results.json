@@ -1,0 +1,116 @@
+{
+  "config": {
+    "configFile": "D:\\50-skillup_platform\\playwright.config.ts",
+    "rootDir": "D:/50-skillup_platform/src/tests/e2e",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": "D:\\50-skillup_platform\\src\\tests\\e2e\\setup\\test-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {},
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "html",
+        {
+          "outputFolder": "playwright-report"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results/e2e-results.json"
+        }
+      ],
+      [
+        "junit",
+        {
+          "outputFile": "test-results/e2e-results.xml"
+        }
+      ],
+      [
+        "line",
+        null
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "D:/50-skillup_platform/test-results",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {},
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "D:/50-skillup_platform/src/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "D:/50-skillup_platform/test-results",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {},
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "D:/50-skillup_platform/src/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "D:/50-skillup_platform/test-results",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {},
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "D:/50-skillup_platform/src/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "shard": null,
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.55.0",
+    "workers": 2,
+    "webServer": null
+  },
+  "suites": [],
+  "errors": [
+    {
+      "message": "ReferenceError: uniqueEmail is not defined",
+      "stack": "ReferenceError: uniqueEmail is not defined\n    at createTestUser (D:\\50-skillup_platform\\src\\tests\\e2e\\test-data\\seed.ts:243:32)\n    at setupTestData (D:\\50-skillup_platform\\src\\tests\\e2e\\test-data\\seed.ts:336:21)\n    at globalSetup (D:\\50-skillup_platform\\src\\tests\\e2e\\setup\\test-setup.ts:26:22)",
+      "location": {
+        "file": "D:\\50-skillup_platform\\src\\tests\\e2e\\test-data\\seed.ts",
+        "column": 32,
+        "line": 243
+      },
+      "snippet": "\u001b[90m   at \u001b[39mtest-data\\seed.ts:243\n\n\u001b[0m \u001b[90m 241 |\u001b[39m     \u001b[36mreturn\u001b[39m user\u001b[33m.\u001b[39mid\u001b[33m;\u001b[39m\n \u001b[90m 242 |\u001b[39m   } \u001b[36mcatch\u001b[39m (error) {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 243 |\u001b[39m     console\u001b[33m.\u001b[39merror(\u001b[32m`创建测试用户失败 (${uniqueEmail}):`\u001b[39m\u001b[33m,\u001b[39m error)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 244 |\u001b[39m     \u001b[36mthrow\u001b[39m error\u001b[33m;\u001b[39m\n \u001b[90m 245 |\u001b[39m   }\n \u001b[90m 246 |\u001b[39m }\u001b[0m"
+    }
+  ],
+  "stats": {
+    "startTime": "2025-09-11T06:08:18.758Z",
+    "duration": 6935.657,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

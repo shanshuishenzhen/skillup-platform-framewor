@@ -68,4 +68,6 @@ const StatsCard: React.FC<StatsCardProps> = memo(({
 });
 
 // 设置组件显示名称，便于调试
-StatsCard.displayName = 'Stats
+StatsCard.displayName = 'StatsCard';
+
+export default StatsCard;

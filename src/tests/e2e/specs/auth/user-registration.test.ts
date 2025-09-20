@@ -3,7 +3,7 @@
  * 测试完整的用户注册流程，包括短信验证和人脸识别注册
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
+import { test, expect } from '@playwright/test';
 import { setupTestEnvironment, cleanupTestEnvironment, wait, retry } from '../../utils/setup';
 import { testConfig } from '../../config/test-env';
 

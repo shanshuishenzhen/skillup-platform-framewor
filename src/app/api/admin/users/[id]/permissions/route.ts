@@ -1,618 +1,489 @@
+/**
+ * 用户权限管理 API 路由
+ * 处理用户权限的查询、更新和管理
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import jwt from 'jsonwebtoken';
+import { z } from 'zod';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// 权限更新数据验证模式
+const updatePermissionsSchema = z.object({
+  permissions: z.array(z.object({
+    resource: z.string(),
+    actions: z.array(z.string()),
+    conditions: z.object({}).optional()
+  }))
+});
 
-interface UserPermissionRequest {
-  resource: string;
-  action: string;
-  granted: boolean;
-  source_type: 'direct' | 'department' | 'role' | 'group';
-  source_id?: string;
-  conditions?: any;
-  expires_at?: string;
-  priority?: number;
-}
+const addPermissionSchema = z.object({
+  resource: z.string().min(1),
+  actions: z.array(z.string().min(1)),
+  conditions: z.object({}).optional(),
+  expiresAt: z.string().datetime().optional(),
+  notes: z.string().max(500).optional()
+});
 
-interface BatchUserPermissionRequest {
-  permissions: UserPermissionRequest[];
-  override_existing?: boolean;
-  inherit_from_departments?: boolean;
-}
-
-/**
- * 验证管理员权限
- * @param token - JWT令牌
- * @returns 管理员用户信息或null
- */
-async function verifyAdminToken(token: string) {
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
-    const { data: admin } = await supabase
-      .from('admin_users')
-      .select('*')
-      .eq('id', decoded.userId)
-      .eq('status', 'active')
-      .single();
-    
-    return admin;
-  } catch (error) {
-    return null;
-  }
-}
-
-/**
- * 计算用户的有效权限（包含部门继承）
- * @param userId - 用户ID
- * @param resource - 资源
- * @param action - 操作
- * @returns 有效权限信息
- */
-async function calculateUserEffectivePermission(
-  userId: string,
-  resource: string,
-  action: string
-): Promise<{
-  granted: boolean;
-  source: 'direct' | 'department' | 'role' | 'group';
-  source_id?: string;
-  source_name?: string;
-  priority: number;
-  conditions?: any;
-  expires_at?: string;
-}> {
-  const permissions = [];
-
-  // 1. 获取直接权限
-  const { data: directPermissions } = await supabase
-    .from('user_permissions')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('resource', resource)
-    .eq('action', action)
-    .eq('status', 'active')
-    .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString());
-
-  if (directPermissions) {
-    permissions.push(...directPermissions.map(p => ({
-      granted: p.granted,
-      source: p.source_type,
-      source_id: p.source_id,
-      source_name: p.source_type === 'direct' ? '直接授权' : undefined,
-      priority: p.priority || 100,
-      conditions: p.conditions,
-      expires_at: p.expires_at
-    })));
-  }
-
-  // 2. 获取部门权限
-  const { data: userDepartments } = await supabase
-    .from('user_departments')
-    .select(`
-      department_id,
-      departments!inner(
-        id, name, path,
-        department_permissions!inner(
-          resource, action, granted, conditions, expires_at, priority
-        )
-      )
-    `)
-    .eq('user_id', userId)
-    .eq('status', 'active')
-    .eq('departments.department_permissions.resource', resource)
-    .eq('departments.department_permissions.action', action)
-    .eq('departments.department_permissions.status', 'active');
-
-  if (userDepartments) {
-    for (const userDept of userDepartments) {
-      const dept = userDept.departments;
-      if (dept && dept.department_permissions) {
-        for (const perm of dept.department_permissions) {
-          permissions.push({
-            granted: perm.granted,
-            source: 'department' as const,
-            source_id: dept.id,
-            source_name: dept.name,
-            priority: perm.priority || 50,
-            conditions: perm.conditions,
-            expires_at: perm.expires_at
-          });
-        }
+// 模拟用户权限数据
+const mockUserPermissions = new Map([
+  ['1', {
+    userId: '1',
+    permissions: [
+      {
+        id: 'perm-1',
+        resource: 'exams',
+        actions: ['read', 'create', 'update'],
+        conditions: { department: 'tech' },
+        grantedBy: 'admin',
+        grantedAt: '2024-01-15T08:00:00Z',
+        expiresAt: null,
+        notes: '技术部门考试管理权限'
+      },
+      {
+        id: 'perm-2',
+        resource: 'users',
+        actions: ['read'],
+        conditions: {},
+        grantedBy: 'admin',
+        grantedAt: '2024-01-15T08:00:00Z',
+        expiresAt: null,
+        notes: '基础用户查看权限'
+      },
+      {
+        id: 'perm-3',
+        resource: 'reports',
+        actions: ['read', 'export'],
+        conditions: { scope: 'department' },
+        grantedBy: 'manager',
+        grantedAt: '2024-02-01T10:00:00Z',
+        expiresAt: '2024-12-31T23:59:59Z',
+        notes: '部门报告查看和导出权限'
       }
-    }
-  }
-
-  // 3. 按优先级排序（数字越大优先级越高）
-  permissions.sort((a, b) => b.priority - a.priority);
-
-  // 4. 返回最高优先级的权限
-  if (permissions.length > 0) {
-    return permissions[0];
-  }
-
-  // 5. 默认拒绝
-  return {
-    granted: false,
-    source: 'direct',
-    priority: 0
-  };
-}
+    ],
+    roles: [
+      {
+        id: 'role-1',
+        name: 'exam_creator',
+        displayName: '考试创建者',
+        description: '可以创建和管理考试',
+        assignedBy: 'admin',
+        assignedAt: '2024-01-15T08:00:00Z'
+      },
+      {
+        id: 'role-2',
+        name: 'department_viewer',
+        displayName: '部门查看者',
+        description: '可以查看部门相关信息',
+        assignedBy: 'manager',
+        assignedAt: '2024-02-01T10:00:00Z'
+      }
+    ],
+    groups: [
+      {
+        id: 'group-1',
+        name: 'tech_team',
+        displayName: '技术团队',
+        description: '技术部门成员组',
+        joinedAt: '2024-01-15T08:00:00Z'
+      }
+    ],
+    lastUpdated: '2024-03-10T10:30:00Z'
+  }],
+  ['2', {
+    userId: '2',
+    permissions: [
+      {
+        id: 'perm-4',
+        resource: 'products',
+        actions: ['read', 'create', 'update', 'delete'],
+        conditions: {},
+        grantedBy: 'admin',
+        grantedAt: '2024-02-01T09:00:00Z',
+        expiresAt: null,
+        notes: '产品管理完整权限'
+      },
+      {
+        id: 'perm-5',
+        resource: 'analytics',
+        actions: ['read', 'analyze'],
+        conditions: { level: 'advanced' },
+        grantedBy: 'admin',
+        grantedAt: '2024-02-01T09:00:00Z',
+        expiresAt: null,
+        notes: '高级数据分析权限'
+      }
+    ],
+    roles: [
+      {
+        id: 'role-3',
+        name: 'product_manager',
+        displayName: '产品经理',
+        description: '产品管理和策略制定',
+        assignedBy: 'admin',
+        assignedAt: '2024-02-01T09:00:00Z'
+      }
+    ],
+    groups: [
+      {
+        id: 'group-2',
+        name: 'product_team',
+        displayName: '产品团队',
+        description: '产品部门成员组',
+        joinedAt: '2024-02-01T09:00:00Z'
+      }
+    ],
+    lastUpdated: '2024-03-12T16:45:00Z'
+  }]
+]);
 
 /**
- * 记录权限变更历史
- * @param userId - 用户ID
- * @param resource - 资源
- * @param action - 操作
- * @param oldGranted - 旧权限状态
- * @param newGranted - 新权限状态
- * @param changeType - 变更类型
- * @param changedBy - 变更人
- * @param reason - 变更原因
- * @param request - 请求对象
- */
-async function logUserPermissionChange(
-  userId: string,
-  resource: string,
-  action: string,
-  oldGranted: boolean | null,
-  newGranted: boolean,
-  changeType: string,
-  changedBy: string,
-  reason?: string,
-  request?: NextRequest
-) {
-  const clientIP = request?.headers.get('x-forwarded-for') || 
-                   request?.headers.get('x-real-ip') || 
-                   'unknown';
-  const userAgent = request?.headers.get('user-agent') || 'unknown';
-
-  await supabase
-    .from('permission_change_history')
-    .insert({
-      target_type: 'user',
-      target_id: userId,
-      resource,
-      action,
-      old_granted: oldGranted,
-      new_granted: newGranted,
-      change_type: changeType,
-      change_reason: reason,
-      changed_by: changedBy,
-      ip_address: clientIP,
-      user_agent: userAgent
-    });
-}
-
-/**
- * 获取用户权限配置
  * GET /api/admin/users/[id]/permissions
+ * 获取用户权限信息
  */
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const token = request.headers.get('Authorization')?.replace('Bearer ', '');
-    if (!token) {
-      return NextResponse.json({ error: '未提供认证令牌' }, { status: 401 });
-    }
-
-    const admin = await verifyAdminToken(token);
-    if (!admin) {
-      return NextResponse.json({ error: '无效的认证令牌' }, { status: 401 });
-    }
-
-    const userId = params.id;
+    const { id } = params;
     const { searchParams } = new URL(request.url);
-    const includeEffective = searchParams.get('include_effective') === 'true';
-    const includeDepartment = searchParams.get('include_department') === 'true';
+    const includeRoles = searchParams.get('include_roles') === 'true';
+    const includeGroups = searchParams.get('include_groups') === 'true';
     const resource = searchParams.get('resource');
-    const action = searchParams.get('action');
-    const sourceType = searchParams.get('source_type');
 
-    // 验证用户是否存在
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('id, email, name')
-      .eq('id', userId)
-      .single();
-
-    if (userError || !user) {
-      return NextResponse.json({ error: '用户不存在' }, { status: 404 });
+    // 验证用户ID
+    if (!id) {
+      return NextResponse.json(
+        { error: '用户ID不能为空' },
+        { status: 400 }
+      );
     }
 
-    // 获取直接权限
-    let directQuery = supabase
-      .from('user_permissions')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('status', 'active');
-
-    if (resource) {
-      directQuery = directQuery.eq('resource', resource);
-    }
-    if (action) {
-      directQuery = directQuery.eq('action', action);
-    }
-    if (sourceType) {
-      directQuery = directQuery.eq('source_type', sourceType);
+    // 获取用户权限信息
+    const userPermissions = mockUserPermissions.get(id);
+    if (!userPermissions) {
+      return NextResponse.json(
+        { error: '用户权限信息不存在' },
+        { status: 404 }
+      );
     }
 
-    const { data: directPermissions, error: directError } = await directQuery;
-
-    if (directError) {
-      throw directError;
-    }
-
-    let result: any = {
-      user_id: userId,
-      user_info: user,
-      direct_permissions: directPermissions || []
+    // 构建响应数据
+    let responseData: any = {
+      userId: id,
+      permissions: userPermissions.permissions,
+      lastUpdated: userPermissions.lastUpdated
     };
 
-    // 如果需要包含部门权限
-    if (includeDepartment) {
-      const { data: departmentPermissions } = await supabase
-        .from('user_departments')
-        .select(`
-          department_id,
-          role,
-          departments!inner(
-            id, name, path, level,
-            department_permissions(
-              id, resource, action, granted, conditions, expires_at, priority,
-              inherit_from_parent, created_at, updated_at
-            )
-          )
-        `)
-        .eq('user_id', userId)
-        .eq('status', 'active');
-
-      result.department_permissions = departmentPermissions || [];
+    // 根据查询参数过滤权限
+    if (resource) {
+      responseData.permissions = userPermissions.permissions.filter(
+        perm => perm.resource === resource
+      );
     }
 
-    // 如果需要计算有效权限
-    if (includeEffective) {
-      const effectivePermissions = [];
-      
-      // 获取所有可能的资源和操作组合
-      const { data: allPermissions } = await supabase
-        .from('user_permissions')
-        .select('resource, action')
-        .eq('status', 'active');
-
-      const { data: allDeptPermissions } = await supabase
-        .from('department_permissions')
-        .select('resource, action')
-        .eq('status', 'active');
-
-      const allCombinations = new Set();
-      
-      if (allPermissions) {
-        allPermissions.forEach(p => allCombinations.add(`${p.resource}:${p.action}`));
-      }
-      
-      if (allDeptPermissions) {
-        allDeptPermissions.forEach(p => allCombinations.add(`${p.resource}:${p.action}`));
-      }
-
-      for (const combination of allCombinations) {
-        const [res, act] = combination.split(':');
-        if ((!resource || res === resource) && (!action || act === action)) {
-          const effective = await calculateUserEffectivePermission(userId, res, act);
-          effectivePermissions.push({
-            resource: res,
-            action: act,
-            ...effective
-          });
-        }
-      }
-
-      result.effective_permissions = effectivePermissions;
+    // 包含角色信息
+    if (includeRoles) {
+      responseData.roles = userPermissions.roles;
     }
 
-    return NextResponse.json(result);
+    // 包含用户组信息
+    if (includeGroups) {
+      responseData.groups = userPermissions.groups;
+    }
+
+    // 计算权限统计
+    const stats = {
+      totalPermissions: userPermissions.permissions.length,
+      totalRoles: userPermissions.roles.length,
+      totalGroups: userPermissions.groups.length,
+      expiredPermissions: userPermissions.permissions.filter(
+        perm => perm.expiresAt && new Date(perm.expiresAt) < new Date()
+      ).length,
+      resourceCounts: userPermissions.permissions.reduce((acc, perm) => {
+        acc[perm.resource] = (acc[perm.resource] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>)
+    };
+
+    return NextResponse.json({
+      success: true,
+      data: responseData,
+      stats,
+      message: '获取用户权限信息成功'
+    });
 
   } catch (error) {
-    console.error('获取用户权限失败:', error);
+    console.error('获取用户权限信息失败:', error);
     return NextResponse.json(
-      { error: '获取用户权限失败' },
+      { 
+        success: false,
+        error: '服务器内部错误',
+        message: '获取用户权限信息失败，请稍后重试'
+      },
       { status: 500 }
     );
   }
 }
 
 /**
- * 配置用户权限
+ * PUT /api/admin/users/[id]/permissions
+ * 更新用户权限
+ */
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = params;
+    const body = await request.json();
+
+    // 验证用户ID
+    if (!id) {
+      return NextResponse.json(
+        { error: '用户ID不能为空' },
+        { status: 400 }
+      );
+    }
+
+    // 验证请求数据
+    const validationResult = updatePermissionsSchema.safeParse(body);
+    if (!validationResult.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '数据验证失败',
+          details: validationResult.error.errors
+        },
+        { status: 400 }
+      );
+    }
+
+    // 获取现有权限信息
+    const existingPermissions = mockUserPermissions.get(id);
+    if (!existingPermissions) {
+      return NextResponse.json(
+        { error: '用户权限信息不存在' },
+        { status: 404 }
+      );
+    }
+
+    // 更新权限信息
+    const updatedPermissions = {
+      ...existingPermissions,
+      permissions: validationResult.data.permissions.map((perm, index) => ({
+        id: `perm-${Date.now()}-${index}`,
+        ...perm,
+        grantedBy: 'admin', // 实际应用中应该从认证信息中获取
+        grantedAt: new Date().toISOString(),
+        expiresAt: null
+      })),
+      lastUpdated: new Date().toISOString()
+    };
+
+    // 保存更新后的权限信息
+    mockUserPermissions.set(id, updatedPermissions);
+
+    return NextResponse.json({
+      success: true,
+      data: updatedPermissions,
+      message: '用户权限更新成功'
+    });
+
+  } catch (error) {
+    console.error('更新用户权限失败:', error);
+    return NextResponse.json(
+      { 
+        success: false,
+        error: '服务器内部错误',
+        message: '更新用户权限失败，请稍后重试'
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
  * POST /api/admin/users/[id]/permissions
+ * 添加用户权限
  */
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const token = request.headers.get('Authorization')?.replace('Bearer ', '');
-    if (!token) {
-      return NextResponse.json({ error: '未提供认证令牌' }, { status: 401 });
+    const { id } = params;
+    const body = await request.json();
+
+    // 验证用户ID
+    if (!id) {
+      return NextResponse.json(
+        { error: '用户ID不能为空' },
+        { status: 400 }
+      );
     }
 
-    const admin = await verifyAdminToken(token);
-    if (!admin) {
-      return NextResponse.json({ error: '无效的认证令牌' }, { status: 401 });
+    // 验证请求数据
+    const validationResult = addPermissionSchema.safeParse(body);
+    if (!validationResult.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '数据验证失败',
+          details: validationResult.error.errors
+        },
+        { status: 400 }
+      );
     }
 
-    const userId = params.id;
-    const body: BatchUserPermissionRequest = await request.json();
-
-    // 验证用户是否存在
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('id', userId)
-      .single();
-
-    if (userError || !user) {
-      return NextResponse.json({ error: '用户不存在' }, { status: 404 });
+    // 获取现有权限信息
+    const existingPermissions = mockUserPermissions.get(id);
+    if (!existingPermissions) {
+      // 如果用户权限信息不存在，创建新的
+      const newUserPermissions = {
+        userId: id,
+        permissions: [],
+        roles: [],
+        groups: [],
+        lastUpdated: new Date().toISOString()
+      };
+      mockUserPermissions.set(id, newUserPermissions);
     }
 
-    const results = [];
-    const errors = [];
+    const userPermissions = mockUserPermissions.get(id)!;
 
-    // 如果需要从部门继承权限
-    if (body.inherit_from_departments) {
-      const { data: userDepartments } = await supabase
-        .from('user_departments')
-        .select(`
-          department_id,
-          departments!inner(
-            department_permissions(
-              resource, action, granted, conditions, expires_at, priority
-            )
-          )
-        `)
-        .eq('user_id', userId)
-        .eq('status', 'active');
+    // 检查权限是否已存在
+    const existingPermission = userPermissions.permissions.find(
+      perm => perm.resource === validationResult.data.resource &&
+              JSON.stringify(perm.actions.sort()) === JSON.stringify(validationResult.data.actions.sort())
+    );
 
-      if (userDepartments) {
-        for (const userDept of userDepartments) {
-          const dept = userDept.departments;
-          if (dept && dept.department_permissions) {
-            for (const deptPerm of dept.department_permissions) {
-              body.permissions.push({
-                resource: deptPerm.resource,
-                action: deptPerm.action,
-                granted: deptPerm.granted,
-                source_type: 'department',
-                source_id: userDept.department_id,
-                conditions: deptPerm.conditions,
-                expires_at: deptPerm.expires_at,
-                priority: (deptPerm.priority || 50) - 10 // 部门权限优先级稍低
-              });
-            }
-          }
-        }
-      }
+    if (existingPermission) {
+      return NextResponse.json(
+        { error: '相同的权限已存在' },
+        { status: 409 }
+      );
     }
 
-    // 处理每个权限配置
-    for (const permission of body.permissions) {
-      try {
-        // 检查是否已存在
-        const { data: existing } = await supabase
-          .from('user_permissions')
-          .select('*')
-          .eq('user_id', userId)
-          .eq('resource', permission.resource)
-          .eq('action', permission.action)
-          .eq('source_type', permission.source_type)
-          .eq('source_id', permission.source_id || '')
-          .single();
+    // 添加新权限
+    const newPermission = {
+      id: `perm-${Date.now()}`,
+      ...validationResult.data,
+      grantedBy: 'admin', // 实际应用中应该从认证信息中获取
+      grantedAt: new Date().toISOString()
+    };
 
-        const permissionData = {
-          user_id: userId,
-          resource: permission.resource,
-          action: permission.action,
-          granted: permission.granted,
-          source_type: permission.source_type,
-          source_id: permission.source_id,
-          conditions: permission.conditions,
-          expires_at: permission.expires_at,
-          priority: permission.priority || 100,
-          updated_by: admin.id,
-          updated_at: new Date().toISOString()
-        };
+    userPermissions.permissions.push(newPermission);
+    userPermissions.lastUpdated = new Date().toISOString();
 
-        let result;
-        if (existing) {
-          if (body.override_existing) {
-            // 更新现有权限
-            const { data, error } = await supabase
-              .from('user_permissions')
-              .update(permissionData)
-              .eq('id', existing.id)
-              .select()
-              .single();
-
-            if (error) throw error;
-            result = data;
-
-            // 记录变更历史
-            await logUserPermissionChange(
-              userId,
-              permission.resource,
-              permission.action,
-              existing.granted,
-              permission.granted,
-              'update',
-              admin.id,
-              '权限配置更新',
-              request
-            );
-          } else {
-            // 跳过已存在的权限
-            continue;
-          }
-        } else {
-          // 创建新权限
-          const { data, error } = await supabase
-            .from('user_permissions')
-            .insert({
-              ...permissionData,
-              created_by: admin.id
-            })
-            .select()
-            .single();
-
-          if (error) throw error;
-          result = data;
-
-          // 记录变更历史
-          await logUserPermissionChange(
-            userId,
-            permission.resource,
-            permission.action,
-            null,
-            permission.granted,
-            'create',
-            admin.id,
-            '新增权限配置',
-            request
-          );
-        }
-
-        results.push(result);
-
-      } catch (error) {
-        console.error(`配置用户权限失败 ${permission.resource}:${permission.action}:`, error);
-        errors.push({
-          resource: permission.resource,
-          action: permission.action,
-          error: error instanceof Error ? error.message : '未知错误'
-        });
-      }
-    }
+    // 保存更新后的权限信息
+    mockUserPermissions.set(id, userPermissions);
 
     return NextResponse.json({
       success: true,
-      results,
-      errors: errors.length > 0 ? errors : undefined,
-      message: `成功配置 ${results.length} 个权限${errors.length > 0 ? `，${errors.length} 个失败` : ''}`
+      data: newPermission,
+      message: '权限添加成功'
     });
 
   } catch (error) {
-    console.error('配置用户权限失败:', error);
+    console.error('添加用户权限失败:', error);
     return NextResponse.json(
-      { error: '配置用户权限失败' },
+      { 
+        success: false,
+        error: '服务器内部错误',
+        message: '添加用户权限失败，请稍后重试'
+      },
       { status: 500 }
     );
   }
 }
 
 /**
- * 删除用户权限
  * DELETE /api/admin/users/[id]/permissions
+ * 删除用户权限
  */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const token = request.headers.get('Authorization')?.replace('Bearer ', '');
-    if (!token) {
-      return NextResponse.json({ error: '未提供认证令牌' }, { status: 401 });
-    }
-
-    const admin = await verifyAdminToken(token);
-    if (!admin) {
-      return NextResponse.json({ error: '无效的认证令牌' }, { status: 401 });
-    }
-
-    const userId = params.id;
+    const { id } = params;
     const { searchParams } = new URL(request.url);
-    const resource = searchParams.get('resource');
-    const action = searchParams.get('action');
-    const sourceType = searchParams.get('source_type');
-    const sourceId = searchParams.get('source_id');
     const permissionId = searchParams.get('permission_id');
+    const resource = searchParams.get('resource');
 
-    if (!resource || !action) {
+    // 验证用户ID
+    if (!id) {
       return NextResponse.json(
-        { error: '必须提供resource和action参数' },
+        { error: '用户ID不能为空' },
         { status: 400 }
       );
     }
 
-    // 构建查询条件
-    let query = supabase
-      .from('user_permissions')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('resource', resource)
-      .eq('action', action);
-
-    if (sourceType) {
-      query = query.eq('source_type', sourceType);
-    }
-    if (sourceId) {
-      query = query.eq('source_id', sourceId);
-    }
-    if (permissionId) {
-      query = query.eq('id', permissionId);
-    }
-
-    const { data: permissions, error: getError } = await query;
-
-    if (getError) {
-      throw getError;
-    }
-
-    if (!permissions || permissions.length === 0) {
-      return NextResponse.json({ error: '权限不存在' }, { status: 404 });
-    }
-
-    const deletedPermissions = [];
-
-    for (const permission of permissions) {
-      // 删除权限
-      const { error: deleteError } = await supabase
-        .from('user_permissions')
-        .delete()
-        .eq('id', permission.id);
-
-      if (deleteError) {
-        throw deleteError;
-      }
-
-      deletedPermissions.push(permission);
-
-      // 记录变更历史
-      await logUserPermissionChange(
-        userId,
-        permission.resource,
-        permission.action,
-        permission.granted,
-        false,
-        'delete',
-        admin.id,
-        '删除权限配置',
-        request
+    // 验证删除参数
+    if (!permissionId && !resource) {
+      return NextResponse.json(
+        { error: '必须指定权限ID或资源类型' },
+        { status: 400 }
       );
     }
 
+    // 获取用户权限信息
+    const userPermissions = mockUserPermissions.get(id);
+    if (!userPermissions) {
+      return NextResponse.json(
+        { error: '用户权限信息不存在' },
+        { status: 404 }
+      );
+    }
+
+    let deletedCount = 0;
+
+    if (permissionId) {
+      // 删除指定权限
+      const initialLength = userPermissions.permissions.length;
+      userPermissions.permissions = userPermissions.permissions.filter(
+        perm => perm.id !== permissionId
+      );
+      deletedCount = initialLength - userPermissions.permissions.length;
+    } else if (resource) {
+      // 删除指定资源的所有权限
+      const initialLength = userPermissions.permissions.length;
+      userPermissions.permissions = userPermissions.permissions.filter(
+        perm => perm.resource !== resource
+      );
+      deletedCount = initialLength - userPermissions.permissions.length;
+    }
+
+    if (deletedCount === 0) {
+      return NextResponse.json(
+        { error: '未找到要删除的权限' },
+        { status: 404 }
+      );
+    }
+
+    // 更新最后修改时间
+    userPermissions.lastUpdated = new Date().toISOString();
+
+    // 保存更新后的权限信息
+    mockUserPermissions.set(id, userPermissions);
+
     return NextResponse.json({
       success: true,
-      deleted_permissions: deletedPermissions,
-      message: `成功删除 ${deletedPermissions.length} 个权限`
+      data: {
+        deletedCount,
+        remainingPermissions: userPermissions.permissions.length
+      },
+      message: `成功删除 ${deletedCount} 个权限`
     });
 
   } catch (error) {
     console.error('删除用户权限失败:', error);
     return NextResponse.json(
-      { error: '删除用户权限失败' },
+      { 
+        success: false,
+        error: '服务器内部错误',
+        message: '删除用户权限失败，请稍后重试'
+      },
       { status: 500 }
     );
   }

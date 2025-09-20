@@ -6,7 +6,7 @@
  * @date 2024
  */
 
-import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import { test, expect } from '@playwright/test';
 
 // 模拟浏览器环境
 Object.defineProperty(window, 'location', {

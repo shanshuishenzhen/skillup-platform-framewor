@@ -581,7 +581,7 @@ class EnvConfigManager extends EventEmitter {
           encryptionKey: this.getEnvVar('ENCRYPTION_KEY'),
           apiSecretKey: this.getEnvVar('API_SECRET_KEY'),
           sessionSecret: this.getEnvVar('SESSION_SECRET'),
-          jwtSecret: this.getEnvVar('JWT_SECRET', 'your-secret-key'),
+          jwtSecret: this.getEnvVar('JWT_SECRET_KEY') || this.getEnvVar('JWT_SECRET', 'your-secret-key'),
           jwtExpiresIn: this.getEnvVar('JWT_EXPIRES_IN', '24h'),
           jwtRefreshExpiresIn: this.getEnvVar('JWT_REFRESH_EXPIRES_IN', '7d')
         },
