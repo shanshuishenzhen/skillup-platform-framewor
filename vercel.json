@@ -1,11 +1,4 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/next"
-    }
-  ],
   "rewrites": [
     {
       "source": "/api/(.*)",
@@ -14,10 +7,5 @@
   ],
   "env": {
     "NODE_ENV": "production"
-  },
-  "functions": {
-    "app/api/**/*.js": {
-      "maxDuration": 30
-    }
   }
 }
