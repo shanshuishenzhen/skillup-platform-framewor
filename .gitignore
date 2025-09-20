@@ -60,3 +60,23 @@ logs/
 # temporary files
 /tmp/
 /temp/
+
+# test results and cache
+/test-results/
+/playwright-report/
+/coverage/
+*.db
+*.db-shm
+*.db-wal
+
+# cache directories
+.cache/
+/node_modules/.cache/
+
+# large files
+*.zip
+*.tar.gz
+*.webm
+*.png
+*.jpg
+*.jpeg
