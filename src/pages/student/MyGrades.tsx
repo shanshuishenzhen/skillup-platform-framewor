@@ -14,7 +14,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import {
   TrendingUp,
   TrendingDown,
@@ -119,18 +119,18 @@ const PIE_COLORS = ['#10B981', '#3B82F6', '#F59E0B', '#F97316', '#EF4444'];
  * 学员个人成绩页面
  */
 export default function MyGrades() {
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const router = useRouter();
+  const { query } = router;
   
   // 状态管理
   const [grades, setGrades] = useState<Grade[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
+  const [searchTerm, setSearchTerm] = useState((query.search as string) || '');
   const [statusFilter, setStatusFilter] = useState<GradeStatus | 'all'>(
-    (searchParams.get('status') as GradeStatus) || 'all'
+    (query.status as GradeStatus) || 'all'
   );
   const [levelFilter, setLevelFilter] = useState<GradeLevel | 'all'>(
-    (searchParams.get('level') as GradeLevel) || 'all'
+    (query.level as GradeLevel) || 'all'
   );
   const [sortBy, setSortBy] = useState<'submitted_at' | 'score' | 'exam_title'>('submitted_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -195,17 +195,18 @@ export default function MyGrades() {
    * 更新URL参数
    */
   const updateSearchParams = (params: Record<string, string>) => {
-    setSearchParams(prev => {
-      const newParams = new URLSearchParams(prev);
-      Object.entries(params).forEach(([key, value]) => {
-        if (value) {
-          newParams.set(key, value);
-        } else {
-          newParams.delete(key);
-        }
-      });
-      return newParams;
+    const newQuery = { ...query };
+    Object.entries(params).forEach(([key, value]) => {
+      if (value) {
+        newQuery[key] = value;
+      } else {
+        delete newQuery[key];
+      }
     });
+    router.push({
+      pathname: router.pathname,
+      query: newQuery
+    }, undefined, { shallow: true });
   };
 
   /**

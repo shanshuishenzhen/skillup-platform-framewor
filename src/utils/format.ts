@@ -289,3 +289,56 @@ export function formatNumber(num: number | null | undefined): string {
   
   return num.toLocaleString('zh-CN');
 }
+
+/**
+ * 格式化时间为HH:MM:SS格式
+ * @param date - 要格式化的日期
+ * @returns 格式化后的时间字符串
+ * 
+ * @example
+ * formatTime(new Date()) // "16:30:45"
+ */
+export function formatTime(date: Date | string | null | undefined): string {
+  if (!date) return '-';
+  
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  
+  if (isNaN(dateObj.getTime())) {
+    return '-';
+  }
+  
+  return dateObj.toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+}
+
+/**
+ * 格式化日期时间为完整格式
+ * @param date - 要格式化的日期
+ * @returns 格式化后的日期时间字符串
+ * 
+ * @example
+ * formatDateTime(new Date()) // "2025年9月2日 16:30:45"
+ */
+export function formatDateTime(date: Date | string | null | undefined): string {
+  if (!date) return '-';
+  
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  
+  if (isNaN(dateObj.getTime())) {
+    return '-';
+  }
+  
+  return dateObj.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZone: 'Asia/Shanghai'
+  });
+}
