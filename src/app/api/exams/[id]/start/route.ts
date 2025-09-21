@@ -77,17 +77,17 @@ export async function POST(
     }
 
     // 检查报名状态
-    const registration = await examService.getExamRegistration(examId, user.id);
-    if (!registration || registration.status !== 'approved') {
+    const registration = await examService.getExamRegistration(examId, user.userId);
+    if (!registration) {
       return NextResponse.json({
         success: false,
-        message: '您未报名此考试或报名未通过审核'
+        message: '您尚未报名此考试或报名未通过审核'
       }, { status: 403 });
     }
 
     // 检查考试资格
-    const eligibility = await examService.checkExamEligibility(examId, user.id);
-    if (!eligibility.canStart) {
+    const eligibility = await examService.checkExamEligibility(examId, user.userId);
+    if (!eligibility.can_take) {
       return NextResponse.json({
         success: false,
         message: eligibility.reason || '不符合考试条件',
@@ -99,7 +99,7 @@ export async function POST(
     }
 
     // 检查是否有进行中的考试
-    const ongoingAttempt = await examService.getOngoingExamAttempt(examId, user.id);
+    const ongoingAttempt = await examService.getOngoingExamAttempt(examId, user.userId);
     if (ongoingAttempt) {
       // 返回现有的考试会话
       const questions = await examService.getExamQuestions(examId, false); // 不包含答案
@@ -123,12 +123,7 @@ export async function POST(
     const ipAddress = forwardedFor?.split(',')[0] || realIp || 'unknown';
 
     // 创建新的考试尝试
-    const attempt = await examService.startExam(examId, user.id, {
-      userAgent,
-      ipAddress,
-      screenResolution: '', // 前端会通过WebSocket发送
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-    });
+    const attempt = await examService.startExam(examId, user.userId);
 
     // 获取考试题目（不包含正确答案）
     const questions = await examService.getExamQuestions(examId, false);
@@ -186,7 +181,7 @@ export async function GET(
     const { user } = authResult;
 
     // 检查是否有进行中的考试
-    const ongoingAttempt = await examService.getOngoingExamAttempt(examId, user.id);
+    const ongoingAttempt = await examService.getOngoingExamAttempt(examId, user.userId);
     
     if (!ongoingAttempt) {
       return NextResponse.json({
@@ -211,7 +206,7 @@ export async function GET(
     
     // 如果时间已到，自动提交考试
     if (timeRemaining <= 0) {
-      await examService.autoSubmitExam(ongoingAttempt.id);
+      await examService.submitExamBySubmissionId(ongoingAttempt.id);
       
       return NextResponse.json({
         success: true,

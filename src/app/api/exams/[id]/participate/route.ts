@@ -41,10 +41,10 @@ function getUserIdFromRequest(request: NextRequest): string | null {
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: examId } = params;
+    const { id: examId } = await params;
     const userId = getUserIdFromRequest(request);
     
     if (!examId) {
@@ -137,10 +137,10 @@ export async function POST(
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: examId } = params;
+    const { id: examId } = await params;
     const userId = getUserIdFromRequest(request);
     
     if (!examId) {
@@ -215,10 +215,10 @@ export async function GET(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: examId } = params;
+    const { id: examId } = await params;
     const userId = getUserIdFromRequest(request);
     const body = await request.json();
     const { action } = body;

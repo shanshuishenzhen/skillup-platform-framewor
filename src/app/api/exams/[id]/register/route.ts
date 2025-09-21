@@ -57,18 +57,20 @@ export async function POST(
       }, { status: 400 });
     }
 
-    // 检查报名截止时间
+    // 检查考试时间（使用start_time作为报名截止时间）
     const now = new Date();
-    const deadline = new Date(exam.registrationDeadline);
-    if (now > deadline) {
-      return NextResponse.json({
-        success: false,
-        message: '报名时间已截止'
-      }, { status: 400 });
+    if (exam.start_time) {
+      const startTime = new Date(exam.start_time);
+      if (now > startTime) {
+        return NextResponse.json({
+          success: false,
+          message: '考试已开始，无法报名'
+        }, { status: 400 });
+      }
     }
 
     // 检查是否已经报名
-    const existingRegistration = await examService.getExamRegistration(examId, user.id);
+    const existingRegistration = await examService.getExamRegistration(examId, user.userId);
     if (existingRegistration) {
       if (existingRegistration.status === 'approved') {
         return NextResponse.json({
@@ -84,21 +86,20 @@ export async function POST(
     }
 
     // 检查用户资格
-    const eligibility = await examService.checkExamEligibility(examId, user.id);
-    if (!eligibility.eligible) {
+    const eligibility = await examService.checkExamEligibility(examId, user.userId);
+    if (!eligibility.can_take) {
       return NextResponse.json({
         success: false,
-        message: eligibility.reason || '不符合报名条件',
-        details: eligibility.requirements
+        message: eligibility.reason || '不符合报名条件'
       }, { status: 400 });
     }
 
     // 创建报名记录
-    const registration = await examService.registerForExam(examId, user.id);
+    const registration = await examService.registerForExam(examId, user.userId);
 
     return NextResponse.json({
       success: true,
-      message: exam.requiresApproval ? '报名申请已提交，等待审核' : '报名成功',
+      message: exam.require_approval ? '报名申请已提交，等待审核' : '报名成功',
       data: registration
     }, { status: 201 });
 
@@ -142,7 +143,7 @@ export async function DELETE(
     const { user } = authResult;
 
     // 检查报名记录是否存在
-    const registration = await examService.getExamRegistration(examId, user.id);
+    const registration = await examService.getExamRegistration(examId, user.userId);
     if (!registration) {
       return NextResponse.json({
         success: false,
@@ -160,9 +161,9 @@ export async function DELETE(
 
     // 检查考试是否已经开始
     const exam = await examService.getExamById(examId);
-    if (exam) {
+    if (exam && exam.start_time) {
       const now = new Date();
-      const startTime = new Date(exam.startTime);
+      const startTime = new Date(exam.start_time);
       if (now >= startTime) {
         return NextResponse.json({
           success: false,
@@ -172,7 +173,7 @@ export async function DELETE(
     }
 
     // 检查是否已经参加考试
-    const attempts = await examService.getUserExamAttempts(examId, user.id);
+    const attempts = await examService.getUserExamAttempts(examId, user.userId);
     if (attempts.length > 0) {
       return NextResponse.json({
         success: false,
@@ -181,7 +182,7 @@ export async function DELETE(
     }
 
     // 取消报名
-    await examService.cancelExamRegistration(examId, user.id);
+    await examService.cancelExamRegistration(examId, user.userId);
 
     return NextResponse.json({
       success: true,
@@ -228,10 +229,10 @@ export async function GET(
     const { user } = authResult;
 
     // 获取报名记录
-    const registration = await examService.getExamRegistration(examId, user.id);
+    const registration = await examService.getExamRegistration(examId, user.userId);
     
     // 检查考试资格
-    const eligibility = await examService.checkExamEligibility(examId, user.id);
+    const eligibility = await examService.checkExamEligibility(examId, user.userId);
 
     return NextResponse.json({
       success: true,

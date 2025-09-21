@@ -9,22 +9,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ExamService } from '@/services/examService';
 import { supabaseAdmin } from '@/lib/supabase';
+import { verifyAdminAccess } from '@/middleware/rbac';
 
 // 初始化考试服务
 const examService = new ExamService(supabaseAdmin);
-
-/**
- * 从请求头中获取用户ID
- * 在实际应用中，这应该从JWT token或session中获取
- * 
- * @param request - Next.js请求对象
- * @returns 用户ID或null
- */
-function getUserIdFromRequest(request: NextRequest): string | null {
-  // 这里应该实现真实的用户认证逻辑
-  // 暂时从请求头中获取用户ID用于测试
-  return request.headers.get('x-user-id') || null;
-}
 
 /**
  * POST /api/exams/[id]/submit
@@ -47,11 +35,10 @@ function getUserIdFromRequest(request: NextRequest): string | null {
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: examId } = params;
-    const userId = getUserIdFromRequest(request);
+    const { id: examId } = await params;
     const body = await request.json();
     const { answers, submissionType = 'final' } = body;
     
@@ -65,15 +52,17 @@ export async function POST(
       );
     }
 
-    if (!userId) {
+    // 验证用户身份
+    const authResult = await verifyAdminAccess(request, ['student', 'teacher', 'admin']);
+    if (!authResult.success) {
       return NextResponse.json(
-        {
-          success: false,
-          error: '用户未登录'
-        },
+        { success: false, error: authResult.message },
         { status: 401 }
       );
     }
+
+    const { user } = authResult;
+    const userId = user.userId;
 
     if (!answers || typeof answers !== 'object') {
       return NextResponse.json(
@@ -175,11 +164,10 @@ export async function POST(
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: examId } = params;
-    const userId = getUserIdFromRequest(request);
+    const { id: examId } = await params;
     const { searchParams } = new URL(request.url);
     const attemptNumber = searchParams.get('attempt');
     
@@ -193,15 +181,17 @@ export async function GET(
       );
     }
 
-    if (!userId) {
+    // 验证用户身份
+    const authResult = await verifyAdminAccess(request, ['student', 'teacher', 'admin']);
+    if (!authResult.success) {
       return NextResponse.json(
-        {
-          success: false,
-          error: '用户未登录'
-        },
+        { success: false, error: authResult.message },
         { status: 401 }
       );
     }
+
+    const { user } = authResult;
+    const userId = user.userId;
 
     // 获取用户的提交记录
     const submissions = await examService.getUserSubmissions(examId, userId, attemptNumber ? parseInt(attemptNumber) : undefined);
@@ -256,7 +246,21 @@ export async function PUT(
 ) {
   try {
     const { id: examId } = params;
-    const userId = getUserIdFromRequest(request);
+    
+    // 验证用户身份
+    const authResult = await verifyAdminAccess(request);
+    if (!authResult.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: authResult.message || '用户未登录'
+        },
+        { status: 401 }
+      );
+    }
+
+    const { user } = authResult;
+    const userId = user.userId;
     const body = await request.json();
     const { action, submissionId } = body;
     
@@ -358,7 +362,21 @@ export async function DELETE(
 ) {
   try {
     const { id: examId } = params;
-    const userId = getUserIdFromRequest(request);
+    
+    // 验证用户身份
+    const authResult = await verifyAdminAccess(request);
+    if (!authResult.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: authResult.message || '用户未登录'
+        },
+        { status: 401 }
+      );
+    }
+
+    const { user } = authResult;
+    const userId = user.userId;
     const { searchParams } = new URL(request.url);
     const submissionId = searchParams.get('submissionId');
     

@@ -77,6 +77,9 @@ export function extractTokenFromRequest(req: NextRequest): string | null {
 export async function verifyJWTToken(token: string): Promise<JWTPayload | null> {
   try {
     const config = getEnvConfig();
+    console.log('🔍 JWT调试信息:');
+    console.log('- 服务器JWT密钥:', config.security.jwtSecret);
+    console.log('- 接收到的令牌:', token.substring(0, 50) + '...');
     const decoded = jwt.verify(token, config.security.jwtSecret) as any;
     
     // 验证令牌是否过期
@@ -95,6 +98,9 @@ export async function verifyJWTToken(token: string): Promise<JWTPayload | null> 
           break;
         case 'ADMIN':
           userRole = UserRole.ADMIN;
+          break;
+        case 'TEACHER':
+          userRole = UserRole.TEACHER;
           break;
         case 'USER':
           userRole = UserRole.USER;
@@ -227,14 +233,16 @@ export async function verifyRBAC(
     checkDBRole?: boolean; // 是否从数据库检查最新角色
     allowExpiredToken?: boolean; // 是否允许过期令牌
   } = {}
-): Promise<RBACResult> {
+): Promise<RBACResult & { error?: string; status?: number }> {
   try {
     // 提取JWT令牌
     const token = extractTokenFromRequest(req);
     if (!token) {
       return {
         success: false,
-        message: '未提供认证令牌'
+        message: '未提供认证令牌',
+        error: '未提供认证令牌',
+        status: 401
       };
     }
 
@@ -245,7 +253,9 @@ export async function verifyRBAC(
       if (!decoded) {
         return {
           success: false,
-          message: '无效的令牌'
+          message: '无效的令牌',
+          error: '无效的令牌',
+          status: 401
         };
       }
       user = decoded;
@@ -253,12 +263,16 @@ export async function verifyRBAC(
       if (error instanceof RBACError) {
         return {
           success: false,
-          message: error.message
+          message: error.message,
+          error: error.message,
+          status: error.statusCode
         };
       }
       return {
         success: false,
-        message: '令牌验证失败'
+        message: '令牌验证失败',
+        error: '令牌验证失败',
+        status: 401
       };
     }
 
@@ -277,7 +291,9 @@ export async function verifyRBAC(
     if (!hasRequiredRole(currentRole, requiredRoles)) {
       return {
         success: false,
-        message: '权限不足，需要以下角色之一: ' + requiredRoles.join(', ')
+        message: '权限不足，需要以下角色之一: ' + requiredRoles.join(', '),
+        error: '权限不足，需要以下角色之一: ' + requiredRoles.join(', '),
+        status: 403
       };
     }
 
@@ -292,7 +308,9 @@ export async function verifyRBAC(
     console.error('RBAC验证过程中发生错误:', error);
     return {
       success: false,
-      message: '权限验证失败'
+      message: '权限验证失败',
+      error: '权限验证失败',
+      status: 500
     };
   }
 }
